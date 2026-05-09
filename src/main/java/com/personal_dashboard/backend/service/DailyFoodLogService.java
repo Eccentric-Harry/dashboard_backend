@@ -178,7 +178,9 @@ public class DailyFoodLogService {
      * Get daily food logs for a date range (inclusive).
      */
     public List<DailyFoodLog> getDailyLogsForRange(LocalDate startDate, LocalDate endDate) {
-        return dailyFoodLogRepository.findByDateGreaterThanEqualAndDateLessThanEqualOrderByDateDesc(startDate, endDate);
+        String startMealId = startDate.format(DATE_FORMATTER);
+        String endMealId = endDate.format(DATE_FORMATTER);
+        return dailyFoodLogRepository.findByMealIdRange(startMealId, endMealId);
     }
 
     /**
