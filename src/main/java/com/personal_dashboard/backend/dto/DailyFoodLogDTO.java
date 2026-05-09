@@ -22,6 +22,9 @@ public class DailyFoodLogDTO {
 
     private Map<String, List<MealEntryDTO>> meals;
 
+    private HydrationRecordDTO hydration;
+
+
     @Data
     @Builder
     @NoArgsConstructor

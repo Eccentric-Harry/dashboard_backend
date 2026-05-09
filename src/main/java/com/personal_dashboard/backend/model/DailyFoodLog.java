@@ -39,4 +39,7 @@ public class DailyFoodLog {
     /** Meals grouped by mealType. Keys: "Breakfast", "Lunch", "Dinner", "Snack", etc. */
     @Builder.Default
     private Map<String, List<MealEntry>> meals = new LinkedHashMap<>();
+
+    @Builder.Default
+    private HydrationData hydration = new HydrationData();
 }

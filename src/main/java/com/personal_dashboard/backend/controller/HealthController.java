@@ -3,10 +3,7 @@ package com.personal_dashboard.backend.controller;
 import com.personal_dashboard.backend.dto.*;
 import com.personal_dashboard.backend.dto.request.FoodEntryRequest;
 import com.personal_dashboard.backend.dto.request.HydrationRequest;
-import com.personal_dashboard.backend.model.DailyFoodLog;
-import com.personal_dashboard.backend.model.HydrationRecord;
-import com.personal_dashboard.backend.model.MealEntry;
-import com.personal_dashboard.backend.repository.HydrationRecordRepository;
+import com.personal_dashboard.backend.model.*;
 import com.personal_dashboard.backend.service.DailyFoodLogService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +23,6 @@ import java.util.stream.Collectors;
 public class HealthController {
 
     private final DailyFoodLogService dailyFoodLogService;
-    private final HydrationRecordRepository hydrationRecordRepository;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final double DEFAULT_TARGET_ML = 4000.0;
@@ -182,29 +178,16 @@ public class HealthController {
     public ResponseEntity<ApiResponse<HydrationRecordDTO>> createOrUpdateHydration(
             @Valid @RequestBody HydrationRequest request) {
 
-        LocalDate localDate = LocalDate.parse(request.getDate(), DATE_FORMATTER);
         double target = request.getTargetMl() != null ? request.getTargetMl() : DEFAULT_TARGET_ML;
 
-        HydrationRecord existingRecord = hydrationRecordRepository.findFirstByDate(localDate)
-                .orElse(null);
+        DailyFoodLog log = dailyFoodLogService.updateHydration(
+                request.getDate(),
+                request.getWaterIntakeMl(),
+                target,
+                request.getNotes()
+        );
 
-        HydrationRecord record;
-        if (existingRecord != null) {
-            existingRecord.setWaterIntakeMl(request.getWaterIntakeMl());
-            existingRecord.setTargetMl(target);
-            existingRecord.setNotes(request.getNotes());
-            record = hydrationRecordRepository.save(existingRecord);
-        } else {
-            record = HydrationRecord.builder()
-                    .date(localDate)
-                    .waterIntakeMl(request.getWaterIntakeMl())
-                    .targetMl(target)
-                    .notes(request.getNotes())
-                    .build();
-            record = hydrationRecordRepository.save(record);
-        }
-
-        HydrationRecordDTO responseDto = toHydrationDto(record);
+        HydrationRecordDTO responseDto = dailyFoodLogService.toHydrationDto(request.getDate(), log.getHydration());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(buildResponse(responseDto));
     }
@@ -214,36 +197,12 @@ public class HealthController {
             @RequestParam(value = "days", required = false) Integer days,
             @RequestParam(value = "date", required = false) String dateStr) {
 
-        HydrationRecordDTO responseDto;
-        LocalDate targetDate;
+        String targetDate = dateStr != null && !dateStr.isEmpty()
+                ? dateStr
+                : LocalDate.now().format(DATE_FORMATTER);
 
-        if (dateStr != null && !dateStr.isEmpty()) {
-            targetDate = LocalDate.parse(dateStr, DATE_FORMATTER);
-            HydrationRecord record = hydrationRecordRepository.findFirstByDate(targetDate).orElse(null);
-            if (record == null) {
-                responseDto = HydrationRecordDTO.builder()
-                        .date(dateStr)
-                        .waterIntakeMl(0.0)
-                        .targetMl(DEFAULT_TARGET_ML)
-                        .progress(0.0)
-                        .build();
-            } else {
-                responseDto = toHydrationDto(record);
-            }
-        } else {
-            targetDate = LocalDate.now();
-            HydrationRecord record = hydrationRecordRepository.findFirstByDate(targetDate).orElse(null);
-            if (record == null) {
-                responseDto = HydrationRecordDTO.builder()
-                        .date(targetDate.format(DATE_FORMATTER))
-                        .waterIntakeMl(0.0)
-                        .targetMl(DEFAULT_TARGET_ML)
-                        .progress(0.0)
-                        .build();
-            } else {
-                responseDto = toHydrationDto(record);
-            }
-        }
+        DailyFoodLog log = dailyFoodLogService.getDailyLog(targetDate);
+        HydrationRecordDTO responseDto = dailyFoodLogService.toHydrationDto(targetDate, log.getHydration());
 
         return ResponseEntity.ok(buildResponse(responseDto));
     }
@@ -252,30 +211,18 @@ public class HealthController {
     public ResponseEntity<ApiResponse<HydrationRecordDTO>> updateHydration(
             @PathVariable String id,
             @Valid @RequestBody HydrationRequest request) {
-
-        HydrationRecord existingRecord = hydrationRecordRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Hydration record not found with id: " + id));
-
-        double target = request.getTargetMl() != null ? request.getTargetMl() : DEFAULT_TARGET_ML;
-
-        existingRecord.setWaterIntakeMl(request.getWaterIntakeMl());
-        existingRecord.setTargetMl(target);
-        existingRecord.setNotes(request.getNotes());
-
-        HydrationRecord updatedRecord = hydrationRecordRepository.save(existingRecord);
-        HydrationRecordDTO responseDto = toHydrationDto(updatedRecord);
-
-        return ResponseEntity.ok(buildResponse(responseDto));
+        
+        // Note: id (date string) is used as id in the new schema
+        return createOrUpdateHydration(request);
     }
 
     @DeleteMapping("/hydration/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteHydration(@PathVariable String id) {
-
-        if (!hydrationRecordRepository.existsById(id)) {
-            throw new RuntimeException("Hydration record not found with id: " + id);
-        }
-
-        hydrationRecordRepository.deleteById(id);
+        // Hydration is now part of the daily log, we don't 'delete' it usually, 
+        // but we can reset it if needed. For now, let's just return success 
+        // since the user wants to rely on daily_food_logs and hydration is embedded.
+        
+        dailyFoodLogService.updateHydration(id, 0.0, DEFAULT_TARGET_ML, null);
 
         return ResponseEntity.ok(buildResponse(null));
     }
@@ -285,41 +232,18 @@ public class HealthController {
             @RequestParam(value = "date", required = false) String dateStr,
             @RequestParam(value = "amount", required = true) Double amount) {
 
-        LocalDate targetDate = dateStr != null && !dateStr.isEmpty()
-                ? LocalDate.parse(dateStr, DATE_FORMATTER)
-                : LocalDate.now();
+        String targetDate = dateStr != null && !dateStr.isEmpty()
+                ? dateStr
+                : LocalDate.now().format(DATE_FORMATTER);
 
-        HydrationRecord existingRecord = hydrationRecordRepository.findFirstByDate(targetDate)
-                .orElse(HydrationRecord.builder()
-                        .date(targetDate)
-                        .waterIntakeMl(0.0)
-                        .targetMl(DEFAULT_TARGET_ML)
-                        .build());
-
-        existingRecord.setWaterIntakeMl(Math.max(0, existingRecord.getWaterIntakeMl() + amount));
-        HydrationRecord savedRecord = hydrationRecordRepository.save(existingRecord);
-        HydrationRecordDTO responseDto = toHydrationDto(savedRecord);
+        DailyFoodLog log = dailyFoodLogService.addWaterIntake(targetDate, amount);
+        HydrationRecordDTO responseDto = dailyFoodLogService.toHydrationDto(targetDate, log.getHydration());
 
         return ResponseEntity.ok(buildResponse(responseDto));
     }
 
     // ─── Private Helpers ───────────────────────────────────────────────
 
-    private HydrationRecordDTO toHydrationDto(HydrationRecord record) {
-        double progress = record.getTargetMl() > 0
-                ? (record.getWaterIntakeMl() / record.getTargetMl()) * 100.0
-                : 0.0;
-        progress = Math.min(progress, 100.0);
-
-        return HydrationRecordDTO.builder()
-                .id(record.getId())
-                .date(record.getDate().format(DATE_FORMATTER))
-                .waterIntakeMl(record.getWaterIntakeMl())
-                .targetMl(record.getTargetMl())
-                .progress(progress)
-                .notes(record.getNotes())
-                .build();
-    }
 
     private <T> ApiResponse<T> buildResponse(T data) {
         ApiMeta meta = ApiMeta.builder()

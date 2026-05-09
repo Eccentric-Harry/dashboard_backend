@@ -2,10 +2,9 @@ package com.personal_dashboard.backend.service;
 
 import com.personal_dashboard.backend.dto.DailyFoodLogDTO;
 import com.personal_dashboard.backend.dto.FoodEntryDTO;
+import com.personal_dashboard.backend.dto.HydrationRecordDTO;
 import com.personal_dashboard.backend.dto.MealEntryDTO;
-import com.personal_dashboard.backend.model.DailyFoodLog;
-import com.personal_dashboard.backend.model.DailyTotals;
-import com.personal_dashboard.backend.model.MealEntry;
+import com.personal_dashboard.backend.model.*;
 import com.personal_dashboard.backend.repository.DailyFoodLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -157,6 +156,55 @@ public class DailyFoodLogService {
         return dailyFoodLogRepository.save(dailyLog);
     }
 
+    /**
+     * Update hydration data for the given date.
+     */
+    public DailyFoodLog updateHydration(String dateStr, Double waterIntakeMl, Double targetMl, String notes) {
+        DailyFoodLog dailyLog = getDailyLogInternal(dateStr);
+
+        if (dailyLog.getHydration() == null) {
+            dailyLog.setHydration(new HydrationData());
+        }
+
+        if (waterIntakeMl != null) dailyLog.getHydration().setWaterIntakeMl(waterIntakeMl);
+        if (targetMl != null) dailyLog.getHydration().setTargetMl(targetMl);
+        if (notes != null) dailyLog.getHydration().setNotes(notes);
+
+        return dailyFoodLogRepository.save(dailyLog);
+    }
+
+    /**
+     * Increment water intake for the given date.
+     */
+    public DailyFoodLog addWaterIntake(String dateStr, Double amount) {
+        DailyFoodLog dailyLog = getDailyLogInternal(dateStr);
+
+        if (dailyLog.getHydration() == null) {
+            dailyLog.setHydration(new HydrationData());
+        }
+
+        Double current = dailyLog.getHydration().getWaterIntakeMl();
+        dailyLog.getHydration().setWaterIntakeMl(Math.max(0, current + amount));
+
+        return dailyFoodLogRepository.save(dailyLog);
+    }
+
+    /**
+     * Helper to get or create a daily log.
+     */
+    private DailyFoodLog getDailyLogInternal(String dateStr) {
+        return dailyFoodLogRepository.findById(dateStr)
+                .orElseGet(() -> DailyFoodLog.builder()
+                        .id(dateStr)
+                        .mealId(dateStr)
+                        .date(LocalDate.parse(dateStr, DATE_FORMATTER))
+                        .dailyTotals(new DailyTotals())
+                        .meals(new LinkedHashMap<>())
+                        .hydration(new HydrationData())
+                        .build());
+    }
+
+
     // ─── Query Operations ──────────────────────────────────────────────
 
     /**
@@ -249,6 +297,34 @@ public class DailyFoodLogService {
                 .date(log.getDate() != null ? log.getDate().format(DATE_FORMATTER) : log.getId())
                 .dailyTotals(totalsDto)
                 .meals(mealsDto)
+                .hydration(toHydrationDto(log.getDate() != null ? log.getDate().format(DATE_FORMATTER) : log.getId(), log.getHydration()))
+                .build();
+    }
+
+    /**
+     * Convert HydrationData to HydrationRecordDTO.
+     */
+    public HydrationRecordDTO toHydrationDto(String dateStr, HydrationData data) {
+        if (data == null) {
+            return HydrationRecordDTO.builder()
+                    .date(dateStr)
+                    .waterIntakeMl(0.0)
+                    .targetMl(4000.0)
+                    .progress(0.0)
+                    .build();
+        }
+
+        double progress = data.getTargetMl() > 0
+                ? (data.getWaterIntakeMl() / data.getTargetMl()) * 100.0
+                : 0.0;
+        progress = Math.min(progress, 100.0);
+
+        return HydrationRecordDTO.builder()
+                .date(dateStr)
+                .waterIntakeMl(data.getWaterIntakeMl())
+                .targetMl(data.getTargetMl())
+                .progress(progress)
+                .notes(data.getNotes())
                 .build();
     }
 
