@@ -82,6 +82,7 @@ public class DashboardService {
                 .sleepHours(sleepHours)
                 .weightTrend(weightTrend)
                 .foodEntries(foodEntryDTOs)
+                .hydration(dailyFoodLogService.toHydrationDto(dateStr, dailyLog.getHydration()))
                 .build();
     }
 

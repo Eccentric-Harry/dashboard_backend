@@ -22,4 +22,6 @@ public class HealthMetrics {
     private List<WeightEntry> weightTrend;
 
     private List<FoodEntryDTO> foodEntries;
+
+    private HydrationRecordDTO hydration;
 }
