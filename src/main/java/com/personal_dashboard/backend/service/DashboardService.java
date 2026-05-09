@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DashboardService {
 
-    private final FoodEntryRepository foodEntryRepository;
+    private final DailyFoodLogService dailyFoodLogService;
     private final DailyHealthRecordRepository dailyHealthRecordRepository;
     private final TransactionRepository transactionRepository;
     private final DailyLogRepository dailyLogRepository;
@@ -32,16 +32,13 @@ public class DashboardService {
      * Aggregates data for the dashboard for a given target date.
      */
     public HealthMetrics aggregateHealthData(LocalDate targetDate) {
-        // Fetch today's food entries
-        List<FoodEntry> foodEntries = foodEntryRepository.findByDate(targetDate);
+        // Fetch today's daily food log
+        String dateStr = targetDate.format(DATE_FORMATTER);
+        DailyFoodLog dailyLog = dailyFoodLogService.getDailyLog(dateStr);
 
-        // Calculate daily totals
-        int totalCalories = foodEntries.stream()
-                .mapToInt(entry -> entry.getCalories() != null ? entry.getCalories() : 0)
-                .sum();
-        int totalProtein = foodEntries.stream()
-                .mapToInt(entry -> entry.getProteinGrams() != null ? entry.getProteinGrams() : 0)
-                .sum();
+        // Get daily totals directly from the daily log
+        int totalCalories = dailyLog.getDailyTotals() != null ? dailyLog.getDailyTotals().getTotalCalories() : 0;
+        int totalProtein = dailyLog.getDailyTotals() != null ? dailyLog.getDailyTotals().getTotalProteinGrams() : 0;
 
         // Fetch health record for the day
         Optional<DailyHealthRecord> healthRecord = dailyHealthRecordRepository.findByDate(targetDate);
@@ -76,10 +73,8 @@ public class DashboardService {
                 .map(Collections::singletonList)
                 .orElse(Collections.emptyList());
 
-        // Map food entries to DTOs
-        List<FoodEntryDTO> foodEntryDTOs = foodEntries.stream()
-                .map(this::toFoodEntryDto)
-                .collect(Collectors.toList());
+        // Flatten daily log meals into FoodEntryDTOs for backward compatibility
+        List<FoodEntryDTO> foodEntryDTOs = dailyFoodLogService.flattenToFoodEntryDTOs(dailyLog);
 
         return HealthMetrics.builder()
                 .dailyFood(dailyFood)
@@ -366,46 +361,52 @@ public class DashboardService {
     public Map<String, Object> getNutritionSummary(LocalDate targetDate) {
         LocalDate sevenDaysAgo = targetDate.minusDays(6);
 
-        List<FoodEntry> entries = getFoodEntriesForDateRange(sevenDaysAgo, targetDate);
+        List<DailyFoodLog> dailyLogs = dailyFoodLogService.getDailyLogsForRange(sevenDaysAgo, targetDate);
 
-        // Group by date and calculate daily totals
-        Map<LocalDate, Integer> dailyCalories = new LinkedHashMap<>();
-        Map<LocalDate, Integer> dailyProtein = new LinkedHashMap<>();
+        // Build daily totals maps
+        Map<String, Integer> dailyCalories = new LinkedHashMap<>();
+        Map<String, Integer> dailyProtein = new LinkedHashMap<>();
 
+        // Initialize all days with 0
         for (LocalDate date = sevenDaysAgo; !date.isAfter(targetDate); date = date.plusDays(1)) {
-            dailyCalories.put(date, 0);
-            dailyProtein.put(date, 0);
+            dailyCalories.put(date.format(DATE_FORMATTER), 0);
+            dailyProtein.put(date.format(DATE_FORMATTER), 0);
         }
 
-        entries.forEach(entry -> {
-            dailyCalories.merge(entry.getDate(), entry.getCalories() != null ? entry.getCalories() : 0, Integer::sum);
-            dailyProtein.merge(entry.getDate(), entry.getProteinGrams() != null ? entry.getProteinGrams() : 0, Integer::sum);
-        });
+        // Fill in actual data from daily logs
+        for (DailyFoodLog log : dailyLogs) {
+            String dateKey = log.getDate().format(DATE_FORMATTER);
+            if (log.getDailyTotals() != null) {
+                dailyCalories.put(dateKey, log.getDailyTotals().getTotalCalories());
+                dailyProtein.put(dateKey, log.getDailyTotals().getTotalProteinGrams());
+            }
+        }
 
         // Group by meal type for today
-        Map<String, Integer> mealTypeBreakdown = entries.stream()
-                .filter(e -> e.getDate().equals(targetDate))
-                .collect(Collectors.groupingBy(
-                        FoodEntry::getMealType,
-                        Collectors.summingInt(e -> e.getCalories() != null ? e.getCalories() : 0)
-                ));
+        String todayKey = targetDate.format(DATE_FORMATTER);
+        Map<String, Integer> mealTypeBreakdown = new LinkedHashMap<>();
+        DailyFoodLog todayLog = dailyLogs.stream()
+                .filter(log -> todayKey.equals(log.getId()))
+                .findFirst()
+                .orElse(null);
+
+        if (todayLog != null && todayLog.getMeals() != null) {
+            for (Map.Entry<String, java.util.List<MealEntry>> mealGroup : todayLog.getMeals().entrySet()) {
+                int mealCalories = mealGroup.getValue().stream()
+                        .mapToInt(e -> e.getCalories() != null ? e.getCalories() : 0)
+                        .sum();
+                mealTypeBreakdown.put(mealGroup.getKey(), mealCalories);
+            }
+        }
 
         // Build response
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("date", targetDate.format(DATE_FORMATTER));
-        response.put("dailyCalories", dailyCalories.entrySet().stream()
-                .collect(Collectors.toMap(
-                        e -> e.getKey().format(DATE_FORMATTER),
-                        Map.Entry::getValue
-                )));
-        response.put("dailyProtein", dailyProtein.entrySet().stream()
-                .collect(Collectors.toMap(
-                        e -> e.getKey().format(DATE_FORMATTER),
-                        Map.Entry::getValue
-                )));
+        response.put("dailyCalories", dailyCalories);
+        response.put("dailyProtein", dailyProtein);
         response.put("mealTypeBreakdown", mealTypeBreakdown);
-        response.put("todayTotalCalories", dailyCalories.getOrDefault(targetDate, 0));
-        response.put("todayTotalProtein", dailyProtein.getOrDefault(targetDate, 0));
+        response.put("todayTotalCalories", dailyCalories.getOrDefault(todayKey, 0));
+        response.put("todayTotalProtein", dailyProtein.getOrDefault(todayKey, 0));
         response.put("calorieGoal", CALORIE_GOAL);
         response.put("proteinGoal", PROTEIN_GOAL);
 
@@ -453,32 +454,5 @@ public class DashboardService {
         response.put("transactionCount", transactions.size());
 
         return response;
-    }
-
-    private FoodEntryDTO toFoodEntryDto(FoodEntry entry) {
-        return FoodEntryDTO.builder()
-                .id(entry.getId())
-                .description(entry.getDescription())
-                .calories(entry.getCalories())
-                .proteinGrams(entry.getProteinGrams())
-                .mealType(entry.getMealType())
-                .date(entry.getDate().format(DATE_FORMATTER))
-                .mealQuality(entry.getMealQuality())
-                .notes(entry.getNotes())
-                .recipeCategory(entry.getRecipeCategory())
-                .serving(entry.getServing())
-                .servingNotes(entry.getServingNotes())
-                .sourceNotes(entry.getSourceNotes())
-                .build();
-    }
-
-    private List<FoodEntry> getFoodEntriesForDateRange(LocalDate startDate, LocalDate endDate) {
-        List<FoodEntry> entries = new ArrayList<>();
-
-        for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
-            entries.addAll(foodEntryRepository.findByDate(date));
-        }
-
-        return entries;
     }
 }

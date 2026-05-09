@@ -1,15 +1,13 @@
 package com.personal_dashboard.backend.controller;
 
-import com.personal_dashboard.backend.dto.ApiMeta;
-import com.personal_dashboard.backend.dto.ApiResponse;
-import com.personal_dashboard.backend.dto.FoodEntryDTO;
-import com.personal_dashboard.backend.dto.HydrationRecordDTO;
+import com.personal_dashboard.backend.dto.*;
 import com.personal_dashboard.backend.dto.request.FoodEntryRequest;
 import com.personal_dashboard.backend.dto.request.HydrationRequest;
-import com.personal_dashboard.backend.model.FoodEntry;
+import com.personal_dashboard.backend.model.DailyFoodLog;
 import com.personal_dashboard.backend.model.HydrationRecord;
-import com.personal_dashboard.backend.repository.FoodEntryRepository;
+import com.personal_dashboard.backend.model.MealEntry;
 import com.personal_dashboard.backend.repository.HydrationRecordRepository;
+import com.personal_dashboard.backend.service.DailyFoodLogService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,110 +17,109 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/health")
 @RequiredArgsConstructor
 public class HealthController {
 
-    private final FoodEntryRepository foodEntryRepository;
+    private final DailyFoodLogService dailyFoodLogService;
     private final HydrationRecordRepository hydrationRecordRepository;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final double DEFAULT_TARGET_ML = 4000.0;
 
+    // ─── Food Endpoints ────────────────────────────────────────────────
+
+    /**
+     * Add a meal entry to the daily food log.
+     * If a daily document for the date already exists, the meal is appended.
+     * If not, a new daily document is created.
+     */
     @PostMapping("/food")
     public ResponseEntity<ApiResponse<FoodEntryDTO>> createFoodEntry(
             @Valid @RequestBody FoodEntryRequest request) {
 
-        LocalDate localDate = LocalDate.parse(request.getDate(), DATE_FORMATTER);
+        MealEntry entry = MealEntry.builder()
+                .description(request.getDescription())
+                .calories(request.getCalories())
+                .proteinGrams(request.getProteinGrams())
+                .timestamp(Instant.now())
+                .build();
 
-        // Create and save the food entry
-        FoodEntry foodEntry = FoodEntry.builder()
+        DailyFoodLog savedLog = dailyFoodLogService.addMeal(
+                request.getDate(), request.getMealType(), entry);
+
+        // Return the newly added entry as a FoodEntryDTO (backward compat)
+        FoodEntryDTO responseDto = FoodEntryDTO.builder()
+                .id(entry.getId())
+                .description(entry.getDescription())
+                .calories(entry.getCalories())
+                .proteinGrams(entry.getProteinGrams())
+                .mealType(request.getMealType())
+                .date(request.getDate())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(buildResponse(responseDto));
+    }
+
+    /**
+     * Update a meal entry within a daily log.
+     * The {mealId} is the date string, {entryId} is the UUID of the meal entry.
+     */
+    @PutMapping("/food/{mealId}/meal/{entryId}")
+    public ResponseEntity<ApiResponse<FoodEntryDTO>> updateFoodEntry(
+            @PathVariable String mealId,
+            @PathVariable String entryId,
+            @Valid @RequestBody FoodEntryRequest request) {
+
+        MealEntry updatedEntry = MealEntry.builder()
+                .description(request.getDescription())
+                .calories(request.getCalories())
+                .proteinGrams(request.getProteinGrams())
+                .build();
+
+        DailyFoodLog result = dailyFoodLogService.updateMeal(
+                mealId, entryId, request.getMealType(), updatedEntry);
+
+        if (result == null) {
+            throw new RuntimeException("Meal entry not found: mealId=" + mealId + ", entryId=" + entryId);
+        }
+
+        FoodEntryDTO responseDto = FoodEntryDTO.builder()
+                .id(entryId)
                 .description(request.getDescription())
                 .calories(request.getCalories())
                 .proteinGrams(request.getProteinGrams())
                 .mealType(request.getMealType())
-                .date(localDate)
+                .date(mealId)
                 .build();
 
-        FoodEntry savedEntry = foodEntryRepository.save(foodEntry);
-
-        FoodEntryDTO responseDto = toDto(savedEntry);
-
-        ApiMeta meta = ApiMeta.builder()
-                .requestId(UUID.randomUUID().toString())
-                .timestamp(Instant.now().toString())
-                .source("api")
-                .build();
-
-        ApiResponse<FoodEntryDTO> response = ApiResponse.<FoodEntryDTO>builder()
-                .data(responseDto)
-                .meta(meta)
-                .build();
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.ok(buildResponse(responseDto));
     }
 
-    @PutMapping("/food/{id}")
-    public ResponseEntity<ApiResponse<FoodEntryDTO>> updateFoodEntry(
-            @PathVariable String id,
-            @Valid @RequestBody FoodEntryRequest request) {
+    /**
+     * Delete a specific meal entry from a daily log.
+     */
+    @DeleteMapping("/food/{mealId}/meal/{entryId}")
+    public ResponseEntity<ApiResponse<Void>> deleteFoodEntry(
+            @PathVariable String mealId,
+            @PathVariable String entryId) {
 
-        FoodEntry existingEntry = foodEntryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Food entry not found with id: " + id));
-
-        LocalDate localDate = LocalDate.parse(request.getDate(), DATE_FORMATTER);
-
-        existingEntry.setDescription(request.getDescription());
-        existingEntry.setCalories(request.getCalories());
-        existingEntry.setProteinGrams(request.getProteinGrams());
-        existingEntry.setMealType(request.getMealType());
-        existingEntry.setDate(localDate);
-
-        FoodEntry updatedEntry = foodEntryRepository.save(existingEntry);
-
-        FoodEntryDTO responseDto = toDto(updatedEntry);
-
-        ApiMeta meta = ApiMeta.builder()
-                .requestId(UUID.randomUUID().toString())
-                .timestamp(Instant.now().toString())
-                .source("api")
-                .build();
-
-        ApiResponse<FoodEntryDTO> response = ApiResponse.<FoodEntryDTO>builder()
-                .data(responseDto)
-                .meta(meta)
-                .build();
-
-        return ResponseEntity.ok(response);
-    }
-
-    @DeleteMapping("/food/{id}")
-    public ResponseEntity<ApiResponse<Void>> deleteFoodEntry(@PathVariable String id) {
-        
-        if (!foodEntryRepository.existsById(id)) {
-            throw new RuntimeException("Food entry not found with id: " + id);
+        DailyFoodLog result = dailyFoodLogService.removeMeal(mealId, entryId);
+        if (result == null) {
+            throw new RuntimeException("Meal entry not found: mealId=" + mealId + ", entryId=" + entryId);
         }
 
-        foodEntryRepository.deleteById(id);
-
-        ApiMeta meta = ApiMeta.builder()
-                .requestId(UUID.randomUUID().toString())
-                .timestamp(Instant.now().toString())
-                .source("api")
-                .build();
-
-        ApiResponse<Void> response = ApiResponse.<Void>builder()
-                .data(null)
-                .meta(meta)
-                .build();
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(buildResponse(null));
     }
 
+    /**
+     * Get food entries as a flat list (backward compatibility).
+     * Supports filtering by date range, days, and meal type.
+     */
     @GetMapping("/food")
     public ResponseEntity<ApiResponse<List<FoodEntryDTO>>> getFoodEntries(
             @RequestParam(value = "days", required = false) Integer days,
@@ -143,60 +140,43 @@ public class HealthController {
             startDate = endDate.minusDays(daysToSubtract);
         }
 
-        List<FoodEntry> entries = getFoodEntriesForDateRange(startDate, endDate);
+        List<DailyFoodLog> dailyLogs = dailyFoodLogService.getDailyLogsForRange(startDate, endDate);
 
+        // Flatten daily logs into individual FoodEntryDTOs
+        List<FoodEntryDTO> dtos = dailyLogs.stream()
+                .flatMap(log -> dailyFoodLogService.flattenToFoodEntryDTOs(log).stream())
+                .sorted((a, b) -> b.getDate().compareTo(a.getDate()))
+                .collect(Collectors.toList());
+
+        // Filter by meal type if specified
         if (mealType != null && !mealType.isEmpty()) {
             String normalizedMealType = mealType.substring(0, 1).toUpperCase() + mealType.substring(1).toLowerCase();
-            entries = entries.stream()
+            dtos = dtos.stream()
                     .filter(e -> e.getMealType().equalsIgnoreCase(normalizedMealType))
                     .toList();
         }
 
-        List<FoodEntryDTO> dtos = entries.stream()
-                .map(this::toDto)
-                .sorted((a, b) -> b.getDate().compareTo(a.getDate())) // Sort by date descending
-                .toList();
-
-        ApiMeta meta = ApiMeta.builder()
-                .requestId(UUID.randomUUID().toString())
-                .timestamp(Instant.now().toString())
-                .source("api")
-                .build();
-
-        ApiResponse<List<FoodEntryDTO>> response = ApiResponse.<List<FoodEntryDTO>>builder()
-                .data(dtos)
-                .meta(meta)
-                .build();
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(buildResponse(dtos));
     }
 
-    private FoodEntryDTO toDto(FoodEntry entry) {
-        return FoodEntryDTO.builder()
-                .id(entry.getId())
-                .description(entry.getDescription())
-                .calories(entry.getCalories())
-                .proteinGrams(entry.getProteinGrams())
-                .mealType(entry.getMealType())
-                .date(entry.getDate().format(DATE_FORMATTER))
-                .mealQuality(entry.getMealQuality())
-                .notes(entry.getNotes())
-                .recipeCategory(entry.getRecipeCategory())
-                .serving(entry.getServing())
-                .servingNotes(entry.getServingNotes())
-                .sourceNotes(entry.getSourceNotes())
-                .build();
+    /**
+     * Get a single daily food log with nested meals (new endpoint).
+     */
+    @GetMapping("/food/daily")
+    public ResponseEntity<ApiResponse<DailyFoodLogDTO>> getDailyFoodLog(
+            @RequestParam(value = "date", required = false) String dateStr) {
+
+        String targetDate = dateStr != null && !dateStr.isEmpty()
+                ? dateStr
+                : LocalDate.now().format(DATE_FORMATTER);
+
+        DailyFoodLog log = dailyFoodLogService.getDailyLog(targetDate);
+        DailyFoodLogDTO dto = dailyFoodLogService.toDto(log);
+
+        return ResponseEntity.ok(buildResponse(dto));
     }
 
-    private List<FoodEntry> getFoodEntriesForDateRange(LocalDate startDate, LocalDate endDate) {
-        List<FoodEntry> entries = new java.util.ArrayList<>();
-
-        for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
-            entries.addAll(foodEntryRepository.findByDate(date));
-        }
-
-        return entries;
-    }
+    // ─── Hydration Endpoints (unchanged) ───────────────────────────────
 
     @PostMapping("/hydration")
     public ResponseEntity<ApiResponse<HydrationRecordDTO>> createOrUpdateHydration(
@@ -226,18 +206,7 @@ public class HealthController {
 
         HydrationRecordDTO responseDto = toHydrationDto(record);
 
-        ApiMeta meta = ApiMeta.builder()
-                .requestId(UUID.randomUUID().toString())
-                .timestamp(Instant.now().toString())
-                .source("api")
-                .build();
-
-        ApiResponse<HydrationRecordDTO> response = ApiResponse.<HydrationRecordDTO>builder()
-                .data(responseDto)
-                .meta(meta)
-                .build();
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.status(HttpStatus.CREATED).body(buildResponse(responseDto));
     }
 
     @GetMapping("/hydration")
@@ -276,18 +245,7 @@ public class HealthController {
             }
         }
 
-        ApiMeta meta = ApiMeta.builder()
-                .requestId(UUID.randomUUID().toString())
-                .timestamp(Instant.now().toString())
-                .source("api")
-                .build();
-
-        ApiResponse<HydrationRecordDTO> response = ApiResponse.<HydrationRecordDTO>builder()
-                .data(responseDto)
-                .meta(meta)
-                .build();
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(buildResponse(responseDto));
     }
 
     @PutMapping("/hydration/{id}")
@@ -307,41 +265,19 @@ public class HealthController {
         HydrationRecord updatedRecord = hydrationRecordRepository.save(existingRecord);
         HydrationRecordDTO responseDto = toHydrationDto(updatedRecord);
 
-        ApiMeta meta = ApiMeta.builder()
-                .requestId(UUID.randomUUID().toString())
-                .timestamp(Instant.now().toString())
-                .source("api")
-                .build();
-
-        ApiResponse<HydrationRecordDTO> response = ApiResponse.<HydrationRecordDTO>builder()
-                .data(responseDto)
-                .meta(meta)
-                .build();
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(buildResponse(responseDto));
     }
 
     @DeleteMapping("/hydration/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteHydration(@PathVariable String id) {
-        
+
         if (!hydrationRecordRepository.existsById(id)) {
             throw new RuntimeException("Hydration record not found with id: " + id);
         }
 
         hydrationRecordRepository.deleteById(id);
 
-        ApiMeta meta = ApiMeta.builder()
-                .requestId(UUID.randomUUID().toString())
-                .timestamp(Instant.now().toString())
-                .source("api")
-                .build();
-
-        ApiResponse<Void> response = ApiResponse.<Void>builder()
-                .data(null)
-                .meta(meta)
-                .build();
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(buildResponse(null));
     }
 
     @PostMapping("/hydration/add")
@@ -364,23 +300,14 @@ public class HealthController {
         HydrationRecord savedRecord = hydrationRecordRepository.save(existingRecord);
         HydrationRecordDTO responseDto = toHydrationDto(savedRecord);
 
-        ApiMeta meta = ApiMeta.builder()
-                .requestId(UUID.randomUUID().toString())
-                .timestamp(Instant.now().toString())
-                .source("api")
-                .build();
-
-        ApiResponse<HydrationRecordDTO> response = ApiResponse.<HydrationRecordDTO>builder()
-                .data(responseDto)
-                .meta(meta)
-                .build();
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(buildResponse(responseDto));
     }
 
+    // ─── Private Helpers ───────────────────────────────────────────────
+
     private HydrationRecordDTO toHydrationDto(HydrationRecord record) {
-        double progress = record.getTargetMl() > 0 
-                ? (record.getWaterIntakeMl() / record.getTargetMl()) * 100.0 
+        double progress = record.getTargetMl() > 0
+                ? (record.getWaterIntakeMl() / record.getTargetMl()) * 100.0
                 : 0.0;
         progress = Math.min(progress, 100.0);
 
@@ -391,6 +318,19 @@ public class HealthController {
                 .targetMl(record.getTargetMl())
                 .progress(progress)
                 .notes(record.getNotes())
+                .build();
+    }
+
+    private <T> ApiResponse<T> buildResponse(T data) {
+        ApiMeta meta = ApiMeta.builder()
+                .requestId(UUID.randomUUID().toString())
+                .timestamp(Instant.now().toString())
+                .source("api")
+                .build();
+
+        return ApiResponse.<T>builder()
+                .data(data)
+                .meta(meta)
                 .build();
     }
 }

@@ -4,9 +4,8 @@ import com.opencsv.CSVParser;
 import com.opencsv.CSVParserBuilder;
 import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;
-import com.personal_dashboard.backend.model.FoodEntry;
+import com.personal_dashboard.backend.model.MealEntry;
 import com.personal_dashboard.backend.model.Transaction;
-import com.personal_dashboard.backend.repository.FoodEntryRepository;
 import com.personal_dashboard.backend.repository.TransactionRepository;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,7 +25,7 @@ import java.util.*;
 @AllArgsConstructor
 public class CsvImportService {
 
-    private final FoodEntryRepository foodEntryRepository;
+    private final DailyFoodLogService dailyFoodLogService;
     private final TransactionRepository transactionRepository;
 
     private static final String IST_TIMEZONE = "Asia/Kolkata";
@@ -38,11 +37,10 @@ public class CsvImportService {
 
         if (foodCsv != null && !foodCsv.isEmpty()) {
             FoodImportResult foodImport = parseFoodCsv(foodCsv);
-            foodEntryRepository.saveAll(foodImport.entries());
-            result.put("foodEntriesImported", foodImport.entries().size());
+            result.put("foodEntriesImported", foodImport.importedCount());
             result.put("foodEntriesSkippedWithoutDate", foodImport.skippedWithoutDate());
             result.put("foodEntriesSkippedDuplicates", foodImport.skippedDuplicates());
-            log.info("Imported {} food entries", foodImport.entries().size());
+            log.info("Imported {} food entries", foodImport.importedCount());
         }
 
         if (spendingCsv != null && !spendingCsv.isEmpty()) {
@@ -56,7 +54,7 @@ public class CsvImportService {
     }
 
     private FoodImportResult parseFoodCsv(MultipartFile file) throws Exception {
-        List<FoodEntry> entries = new ArrayList<>();
+        int importedCount = 0;
         int skippedWithoutDate = 0;
         int skippedDuplicates = 0;
 
@@ -76,14 +74,21 @@ public class CsvImportService {
                         continue;
                     }
 
-                    FoodEntry entry = parseFoodLine(line, headerIndex);
-                    if (entry != null) {
-                        if (entry.getImportKey() != null && foodEntryRepository.existsByImportKey(entry.getImportKey())) {
-                            skippedDuplicates++;
-                            continue;
-                        }
-                        entries.add(entry);
+                    ParsedFoodLine parsed = parseFoodLine(line, headerIndex);
+                    if (parsed == null) {
+                        continue;
                     }
+
+                    // Check for duplicate by importKey
+                    if (parsed.entry().getImportKey() != null &&
+                            dailyFoodLogService.existsByImportKey(parsed.dateStr(), parsed.entry().getImportKey())) {
+                        skippedDuplicates++;
+                        continue;
+                    }
+
+                    // Add meal via service (creates or appends to daily document)
+                    dailyFoodLogService.addMeal(parsed.dateStr(), parsed.mealType(), parsed.entry());
+                    importedCount++;
                 } catch (Exception e) {
                     log.warn("Skipping invalid food entry: {}", Arrays.toString(line), e);
                     continue;
@@ -91,10 +96,10 @@ public class CsvImportService {
             }
         }
 
-        return new FoodImportResult(entries, skippedWithoutDate, skippedDuplicates);
+        return new FoodImportResult(importedCount, skippedWithoutDate, skippedDuplicates);
     }
 
-    private FoodEntry parseFoodLine(String[] line, Map<String, Integer> headerIndex) {
+    private ParsedFoodLine parseFoodLine(String[] line, Map<String, Integer> headerIndex) {
         if (line.length == 0 || headerIndex.isEmpty()) {
             return null;
         }
@@ -128,12 +133,12 @@ public class CsvImportService {
             // Normalize meal type
             mealType = normalizeMealType(mealType);
 
-            return FoodEntry.builder()
+            String isoDateStr = date.format(DateTimeFormatter.ISO_LOCAL_DATE);
+
+            MealEntry entry = MealEntry.builder()
                     .description(description)
                     .calories(calories)
                     .proteinGrams(protein)
-                    .mealType(mealType)
-                    .date(date)
                     .mealQuality(emptyToNull(mealQuality))
                     .notes(emptyToNull(notes))
                     .recipeCategory(emptyToNull(recipeCategory))
@@ -141,7 +146,10 @@ public class CsvImportService {
                     .servingNotes(emptyToNull(servingNotes))
                     .sourceNotes(emptyToNull(sourceNotes))
                     .importKey(buildImportKey(description, date, mealType, calories, protein, serving, notes, sourceNotes))
+                    .timestamp(Instant.now())
                     .build();
+
+            return new ParsedFoodLine(isoDateStr, mealType, entry);
         } catch (Exception e) {
             log.debug("Failed to parse food line: {}", Arrays.toString(line), e);
             return null;
@@ -317,6 +325,9 @@ public class CsvImportService {
         return "Snack"; // Default fallback
     }
 
-    private record FoodImportResult(List<FoodEntry> entries, int skippedWithoutDate, int skippedDuplicates) {
+    private record FoodImportResult(int importedCount, int skippedWithoutDate, int skippedDuplicates) {
+    }
+
+    private record ParsedFoodLine(String dateStr, String mealType, MealEntry entry) {
     }
 }
