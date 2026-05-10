@@ -9,7 +9,7 @@
 
 const { MongoClient } = require('mongodb');
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://harinathrao13_db_user:oQcgOC69QRDWIVsf@cluster0.5imoofj.mongodb.net/personal_dashboard?retryWrites=true&w=majority&authSource=admin';
 const DB_NAME = process.env.DB_NAME || 'personal_dashboard';
 const COLLECTION = 'strava_activities';
 
