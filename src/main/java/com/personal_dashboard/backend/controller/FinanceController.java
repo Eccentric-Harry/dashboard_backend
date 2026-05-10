@@ -4,6 +4,8 @@ import com.personal_dashboard.backend.dto.ApiMeta;
 import com.personal_dashboard.backend.dto.ApiResponse;
 import com.personal_dashboard.backend.dto.TransactionDTO;
 import com.personal_dashboard.backend.dto.request.TransactionRequest;
+import com.personal_dashboard.backend.model.DailyFinancialLog;
+import com.personal_dashboard.backend.repository.DailyFinancialLogRepository;
 import com.personal_dashboard.backend.model.Transaction;
 import com.personal_dashboard.backend.repository.TransactionRepository;
 import jakarta.validation.Valid;
@@ -26,6 +28,7 @@ import java.util.UUID;
 public class FinanceController {
 
     private final TransactionRepository transactionRepository;
+    private final DailyFinancialLogRepository dailyFinancialLogRepository;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
@@ -118,6 +121,29 @@ public class FinanceController {
 
         ApiResponse<List<TransactionDTO>> response = ApiResponse.<List<TransactionDTO>>builder()
                 .data(dtos)
+                .meta(meta)
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/daily-logs")
+    public ResponseEntity<ApiResponse<List<DailyFinancialLog>>> getDailyLogs(
+            @RequestParam(value = "days", defaultValue = "30") int days) {
+
+        Instant endDate = Instant.now();
+        Instant startDate = endDate.minus(Duration.ofDays(days));
+
+        List<DailyFinancialLog> logs = dailyFinancialLogRepository.findByDateBetween(startDate, endDate);
+
+        ApiMeta meta = ApiMeta.builder()
+                .requestId(UUID.randomUUID().toString())
+                .timestamp(Instant.now().toString())
+                .source("api")
+                .build();
+
+        ApiResponse<List<DailyFinancialLog>> response = ApiResponse.<List<DailyFinancialLog>>builder()
+                .data(logs)
                 .meta(meta)
                 .build();
 
