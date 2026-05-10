@@ -184,4 +184,108 @@ public class FinanceController {
 
         return ResponseEntity.ok(response);
     }
+
+    @PutMapping("/transactions/{id}")
+    public ResponseEntity<ApiResponse<TransactionDTO>> updateTransaction(
+            @PathVariable String id,
+            @Valid @RequestBody TransactionRequest request) {
+
+        Transaction existingTransaction = transactionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Transaction not found"));
+
+        // 1. Remove from old log (using current state)
+        removeTransactionFromLog(existingTransaction);
+
+        // 2. Parse new date
+        LocalDate newLocalDate = LocalDate.parse(request.getDate(), DATE_FORMATTER);
+        Instant newDateInstant = newLocalDate.atStartOfDay()
+                .atZone(ZoneId.systemDefault())
+                .toInstant();
+
+        // 3. Update the transaction object
+        existingTransaction.setDescription(request.getDescription());
+        existingTransaction.setAmount(request.getAmount());
+        existingTransaction.setCategory(request.getCategory());
+        existingTransaction.setType(request.getType());
+        existingTransaction.setDate(newDateInstant);
+
+        Transaction savedTransaction = transactionRepository.save(existingTransaction);
+
+        // 4. Add to new log
+        addTransactionToLog(savedTransaction);
+
+        // 5. Map to DTO
+        TransactionDTO responseDto = TransactionDTO.builder()
+                .id(savedTransaction.getId())
+                .description(savedTransaction.getDescription())
+                .amount(savedTransaction.getAmount().doubleValue())
+                .category(savedTransaction.getCategory())
+                .type(savedTransaction.getType())
+                .date(savedTransaction.getDate().toString())
+                .build();
+
+        ApiMeta meta = ApiMeta.builder()
+                .requestId(UUID.randomUUID().toString())
+                .timestamp(Instant.now().toString())
+                .source("api")
+                .build();
+
+        ApiResponse<TransactionDTO> response = ApiResponse.<TransactionDTO>builder()
+                .data(responseDto)
+                .meta(meta)
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
+
+    private void removeTransactionFromLog(Transaction transaction) {
+        String dateStr = transaction.getDate().atZone(ZoneId.systemDefault()).toLocalDate().toString();
+        dailyFinancialLogRepository.findById(dateStr).ifPresent(log -> {
+            boolean removed = false;
+            for (List<FinancialTransaction> list : log.getTransactions().values()) {
+                if (list.removeIf(t -> t.getId().equals(transaction.getId()))) {
+                    removed = true;
+                    break;
+                }
+            }
+            if (removed) {
+                if ("Income".equalsIgnoreCase(transaction.getType())) {
+                    log.getDailyTotals().setTotalIncome(log.getDailyTotals().getTotalIncome().subtract(transaction.getAmount()));
+                } else {
+                    log.getDailyTotals().setTotalExpense(log.getDailyTotals().getTotalExpense().subtract(transaction.getAmount()));
+                }
+                dailyFinancialLogRepository.save(log);
+            }
+        });
+    }
+
+    private void addTransactionToLog(Transaction transaction) {
+        String dateStr = transaction.getDate().atZone(ZoneId.systemDefault()).toLocalDate().toString();
+        DailyFinancialLog dailyLog = dailyFinancialLogRepository.findById(dateStr)
+                .orElse(DailyFinancialLog.builder()
+                        .id(dateStr)
+                        .date(transaction.getDate())
+                        .dailyTotals(new FinancialTotals())
+                        .transactions(new LinkedHashMap<>())
+                        .build());
+
+        dailyLog.getTransactions()
+                .computeIfAbsent(transaction.getCategory(), k -> new ArrayList<>())
+                .add(FinancialTransaction.builder()
+                        .id(transaction.getId())
+                        .description(transaction.getDescription())
+                        .amount(transaction.getAmount())
+                        .timestamp(transaction.getDate())
+                        .build());
+
+        if ("Income".equalsIgnoreCase(transaction.getType())) {
+            dailyLog.getDailyTotals().setTotalIncome(
+                    dailyLog.getDailyTotals().getTotalIncome().add(transaction.getAmount()));
+        } else {
+            dailyLog.getDailyTotals().setTotalExpense(
+                    dailyLog.getDailyTotals().getTotalExpense().add(transaction.getAmount()));
+        }
+
+        dailyFinancialLogRepository.save(dailyLog);
+    }
 }
