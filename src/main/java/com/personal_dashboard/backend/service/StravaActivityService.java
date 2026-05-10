@@ -103,12 +103,17 @@ public class StravaActivityService {
         stats.put("currentStreakWeeks", computeWeeklyStreak(activities));
 
         // Recent activities with embed IDs (for the embed card)
-        List<String> recentEmbedIds = activities.stream()
+        List<Map<String, String>> recentEmbeds = activities.stream()
                 .filter(a -> a.getStravaEmbedId() != null && !a.getStravaEmbedId().isBlank())
-                .map(StravaActivity::getStravaEmbedId)
                 .limit(5)
+                .map(a -> {
+                    Map<String, String> embed = new HashMap<>();
+                    embed.put("id", a.getStravaEmbedId());
+                    embed.put("token", a.getStravaToken());
+                    return embed;
+                })
                 .collect(Collectors.toList());
-        stats.put("recentEmbedIds", recentEmbedIds);
+        stats.put("recentEmbeds", recentEmbeds);
 
         return stats;
     }
@@ -138,6 +143,7 @@ public class StravaActivityService {
                 .elevationGainMeters(request.getElevationGainMeters())
                 .paceMinPerKm(pace)
                 .stravaEmbedId(request.getStravaEmbedId())
+                .stravaToken(request.getStravaToken())
                 .source(request.getStravaEmbedId() != null && !request.getStravaEmbedId().isBlank()
                         ? "strava-embed" : "manual")
                 .build();
@@ -173,6 +179,7 @@ public class StravaActivityService {
                     .elevationGainMeters(request.getElevationGainMeters())
                     .paceMinPerKm(pace)
                     .stravaEmbedId(request.getStravaEmbedId())
+                    .stravaToken(request.getStravaToken())
                     .source("strava-csv")
                     .build();
         }).collect(Collectors.toList());

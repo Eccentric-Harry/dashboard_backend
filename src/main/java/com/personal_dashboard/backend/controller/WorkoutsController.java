@@ -272,6 +272,38 @@ public class WorkoutsController {
         }
     }
 
+    /**
+     * Get the featured Strava embed from RDH cache
+     */
+    @GetMapping("/featured-embed")
+    @Operation(summary = "Get featured embed", description = "Fetch the pinned Strava embed from RDH Cache")
+    public ResponseEntity<?> getFeaturedEmbed() {
+        try {
+            log.info("Fetching featured Strava embed");
+            Object featured = workoutsService.getFeaturedEmbed();
+            return ResponseEntity.ok(ApiResponse.builder().data(featured).meta(buildMeta("rdh-cache")).build());
+        } catch (Exception e) {
+            log.error("Error fetching featured embed", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(buildErrorResponse(e.getMessage()));
+        }
+    }
+
+    /**
+     * Update the featured Strava embed in RDH cache
+     */
+    @PostMapping("/featured-embed")
+    @Operation(summary = "Update featured embed", description = "Pin a Strava embed to the RDH Cache")
+    public ResponseEntity<?> updateFeaturedEmbed(@RequestBody Map<String, String> data) {
+        try {
+            log.info("Updating featured Strava embed");
+            Object updated = workoutsService.updateFeaturedEmbed(data);
+            return ResponseEntity.ok(ApiResponse.builder().data(updated).meta(buildMeta("rdh-update")).build());
+        } catch (Exception e) {
+            log.error("Error updating featured embed", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(buildErrorResponse(e.getMessage()));
+        }
+    }
+
     // ─── Helpers ─────────────────────────────────────────────────────────
 
     private ApiMeta buildMeta(String source) {

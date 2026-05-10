@@ -21,6 +21,8 @@ public class StravaActivity {
 
     private String stravaEmbedId;
 
+    private String stravaToken;
+
     private LocalDate date;
 
     private String activityName;

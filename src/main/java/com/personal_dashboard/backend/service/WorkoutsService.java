@@ -76,6 +76,21 @@ public class WorkoutsService {
     }
 
     /**
+     * Get the pinned featured Strava embed from RDH cache
+     */
+    public Object getFeaturedEmbed() {
+        return cacheService.getCacheData("workouts_featured_embed", Object.class).orElse(null);
+    }
+
+    /**
+     * Update the pinned featured Strava embed in RDH cache
+     */
+    public Object updateFeaturedEmbed(Object data) {
+        cacheService.saveCacheData("workouts_featured_embed", data, "manual_featured_update");
+        return data;
+    }
+
+    /**
      * Builds a safe fallback object to avoid UI crashes when the cache is empty
      */
     private WorkoutsMetrics buildEmptyWorkoutsMetrics() {

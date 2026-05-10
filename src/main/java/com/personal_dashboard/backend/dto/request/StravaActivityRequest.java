@@ -36,4 +36,6 @@ public class StravaActivityRequest {
     private String date;
 
     private String stravaEmbedId;
+
+    private String stravaToken;
 }
