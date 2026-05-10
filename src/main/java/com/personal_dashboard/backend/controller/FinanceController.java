@@ -8,6 +8,8 @@ import com.personal_dashboard.backend.model.DailyFinancialLog;
 import com.personal_dashboard.backend.repository.DailyFinancialLogRepository;
 import com.personal_dashboard.backend.model.Transaction;
 import com.personal_dashboard.backend.repository.TransactionRepository;
+import com.personal_dashboard.backend.model.FinancialTransaction;
+import com.personal_dashboard.backend.model.FinancialTotals;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,6 +23,8 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 
 @RestController
 @RequestMapping("/api/v1/finance")
@@ -53,6 +57,37 @@ public class FinanceController {
                 .build();
 
         Transaction savedTransaction = transactionRepository.save(transaction);
+
+        // Update DailyFinancialLog
+        String logId = request.getDate();
+        DailyFinancialLog dailyLog = dailyFinancialLogRepository.findById(logId)
+                .orElse(DailyFinancialLog.builder()
+                        .id(logId)
+                        .date(dateInstant)
+                        .dailyTotals(new FinancialTotals())
+                        .transactions(new LinkedHashMap<>())
+                        .build());
+
+        // Add transaction to the appropriate category list
+        dailyLog.getTransactions()
+                .computeIfAbsent(request.getCategory(), k -> new ArrayList<>())
+                .add(FinancialTransaction.builder()
+                        .id(savedTransaction.getId())
+                        .description(savedTransaction.getDescription())
+                        .amount(savedTransaction.getAmount())
+                        .timestamp(savedTransaction.getDate())
+                        .build());
+
+        // Update totals
+        if ("Income".equalsIgnoreCase(request.getType())) {
+            dailyLog.getDailyTotals().setTotalIncome(
+                    dailyLog.getDailyTotals().getTotalIncome().add(request.getAmount()));
+        } else {
+            dailyLog.getDailyTotals().setTotalExpense(
+                    dailyLog.getDailyTotals().getTotalExpense().add(request.getAmount()));
+        }
+
+        dailyFinancialLogRepository.save(dailyLog);
 
         // Map to DTO
         TransactionDTO responseDto = TransactionDTO.builder()
