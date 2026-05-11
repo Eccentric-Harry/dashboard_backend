@@ -26,18 +26,13 @@ public class StravaActivity {
     private LocalDate date;
 
     private String activityName;
-
     private String sportType;
-
     private Double distanceKm;
-
     private String movingTime;
-
     private Double movingTimeMinutes;
-
     private Integer elevationGainMeters;
-
     private Double paceMinPerKm;
-
     private String source;
+    private java.time.Instant startTime;
+    private String activityUrl;
 }

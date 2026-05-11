@@ -2,6 +2,7 @@ package com.personal_dashboard.backend.controller;
 
 import com.personal_dashboard.backend.dto.ApiMeta;
 import com.personal_dashboard.backend.dto.ApiResponse;
+import com.personal_dashboard.backend.dto.StravaImportDto;
 import com.personal_dashboard.backend.dto.WorkoutsMetrics;
 import com.personal_dashboard.backend.dto.request.StravaActivityRequest;
 import com.personal_dashboard.backend.model.StravaActivity;
@@ -267,6 +268,30 @@ public class WorkoutsController {
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (Exception e) {
             log.error("Error bulk creating Strava activities", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(buildErrorResponse(e.getMessage()));
+        }
+    }
+
+    /**
+     * Import a raw Strava JSON payload
+     */
+    @PostMapping("/import/strava")
+    @Operation(summary = "Import Strava JSON", description = "Parse raw JSON from Strava API and map it to the dashboard model")
+    public ResponseEntity<?> importStravaActivity(@RequestBody StravaImportDto dto) {
+        try {
+            log.info("Importing Strava activity JSON for: {}", dto.getName());
+
+            StravaActivity imported = stravaActivityService.importStravaActivity(dto);
+
+            ApiResponse<StravaActivity> response = ApiResponse.<StravaActivity>builder()
+                    .data(imported)
+                    .meta(buildMeta("strava-import"))
+                    .build();
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (Exception e) {
+            log.error("Error importing Strava activity JSON", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(buildErrorResponse(e.getMessage()));
         }

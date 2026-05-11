@@ -1,5 +1,6 @@
 package com.personal_dashboard.backend.service;
 
+import com.personal_dashboard.backend.dto.StravaImportDto;
 import com.personal_dashboard.backend.dto.request.StravaActivityRequest;
 import com.personal_dashboard.backend.model.StravaActivity;
 import com.personal_dashboard.backend.repository.StravaActivityRepository;
@@ -7,7 +8,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -21,6 +25,7 @@ public class StravaActivityService {
     private final StravaActivityRepository stravaActivityRepository;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
+    private static final DateTimeFormatter STRAVA_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssZ");
 
     /**
      * Get all activities sorted by date descending
@@ -151,6 +156,63 @@ public class StravaActivityService {
         StravaActivity saved = stravaActivityRepository.save(activity);
         log.info("Created Strava activity: {} on {}", saved.getActivityName(), saved.getDate());
         return saved;
+    }
+
+    /**
+     * Import a Strava activity from raw JSON DTO
+     */
+    public StravaActivity importStravaActivity(StravaImportDto dto) {
+        log.info("Importing Strava activity: {}", dto.getName());
+
+        // Parse time
+        OffsetDateTime odt = OffsetDateTime.parse(dto.getStartTime(), STRAVA_TIME_FORMATTER);
+        Instant startTime = odt.toInstant();
+        LocalDate date = odt.toLocalDate();
+
+        // Convert units
+        double distanceKm = dto.getDistanceRaw() / 1000.0;
+        distanceKm = Math.round(distanceKm * 100.0) / 100.0;
+
+        double movingTimeMinutes = dto.getMovingTimeRaw() / 60.0;
+        movingTimeMinutes = Math.round(movingTimeMinutes * 100.0) / 100.0;
+
+        String movingTime = formatSecondsToTime(dto.getMovingTimeRaw());
+
+        Double pace = null;
+        if (("Run".equalsIgnoreCase(dto.getSportType()) || "Walk".equalsIgnoreCase(dto.getSportType())) && distanceKm > 0) {
+            pace = movingTimeMinutes / distanceKm;
+            pace = Math.round(pace * 100.0) / 100.0;
+        }
+
+        StravaActivity activity = StravaActivity.builder()
+                .activityName(dto.getName())
+                .sportType(dto.getSportType())
+                .date(date)
+                .startTime(startTime)
+                .distanceKm(distanceKm)
+                .movingTime(movingTime)
+                .movingTimeMinutes(movingTimeMinutes)
+                .elevationGainMeters(dto.getElevationGainRaw() != null ? dto.getElevationGainRaw().intValue() : 0)
+                .paceMinPerKm(pace)
+                .activityUrl(dto.getActivityUrl())
+                .source("strava-import")
+                .build();
+
+        StravaActivity saved = stravaActivityRepository.save(activity);
+        log.info("Successfully imported Strava activity: {} with ID: {}", saved.getActivityName(), saved.getId());
+        return saved;
+    }
+
+    private String formatSecondsToTime(int totalSeconds) {
+        int hours = totalSeconds / 3600;
+        int minutes = (totalSeconds % 3600) / 60;
+        int seconds = totalSeconds % 60;
+
+        if (hours > 0) {
+            return String.format("%d:%02d:%02d", hours, minutes, seconds);
+        } else {
+            return String.format("%02d:%02d", minutes, seconds);
+        }
     }
 
     /**
