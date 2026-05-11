@@ -185,6 +185,28 @@ public class FinanceController {
         return ResponseEntity.ok(response);
     }
 
+    @DeleteMapping("/transactions/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteTransaction(@PathVariable String id) {
+        Transaction transaction = transactionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Transaction not found: " + id));
+
+        removeTransactionFromLog(transaction);
+        transactionRepository.delete(transaction);
+
+        ApiMeta meta = ApiMeta.builder()
+                .requestId(UUID.randomUUID().toString())
+                .timestamp(Instant.now().toString())
+                .source("api")
+                .build();
+
+        ApiResponse<Void> response = ApiResponse.<Void>builder()
+                .data(null)
+                .meta(meta)
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
+
     @PutMapping("/transactions/{id}")
     public ResponseEntity<ApiResponse<TransactionDTO>> updateTransaction(
             @PathVariable String id,
