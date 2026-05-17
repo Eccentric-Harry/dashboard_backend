@@ -1,0 +1,8 @@
+target/
+.git/
+.idea/
+*.md
+.env
+.env.*
+scripts/
+
