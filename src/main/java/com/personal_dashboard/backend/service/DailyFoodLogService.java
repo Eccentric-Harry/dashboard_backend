@@ -294,10 +294,10 @@ public class DailyFoodLogService {
 
         return DailyFoodLogDTO.builder()
                 .mealId(log.getMealId())
-                .date(log.getDate() != null ? log.getDate().format(DATE_FORMATTER) : log.getId())
+                .date(log.getMealId() != null ? log.getMealId() : log.getId())
                 .dailyTotals(totalsDto)
                 .meals(mealsDto)
-                .hydration(toHydrationDto(log.getDate() != null ? log.getDate().format(DATE_FORMATTER) : log.getId(), log.getHydration()))
+                .hydration(toHydrationDto(log.getMealId() != null ? log.getMealId() : log.getId(), log.getHydration()))
                 .build();
     }
 
@@ -355,7 +355,7 @@ public class DailyFoodLogService {
         List<FoodEntryDTO> result = new ArrayList<>();
         if (log.getMeals() == null) return result;
 
-        String dateStr = log.getDate() != null ? log.getDate().format(DATE_FORMATTER) : log.getId();
+        String dateStr = log.getMealId() != null ? log.getMealId() : log.getId();
 
         for (Map.Entry<String, List<MealEntry>> mealGroup : log.getMeals().entrySet()) {
             String mealType = mealGroup.getKey();

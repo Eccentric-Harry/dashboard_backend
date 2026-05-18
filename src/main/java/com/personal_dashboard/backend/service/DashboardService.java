@@ -376,7 +376,7 @@ public class DashboardService {
 
         // Fill in actual data from daily logs
         for (DailyFoodLog log : dailyLogs) {
-            String dateKey = log.getDate().format(DATE_FORMATTER);
+            String dateKey = log.getMealId() != null ? log.getMealId() : log.getId();
             if (log.getDailyTotals() != null) {
                 dailyCalories.put(dateKey, log.getDailyTotals().getTotalCalories());
                 dailyProtein.put(dateKey, log.getDailyTotals().getTotalProteinGrams());
