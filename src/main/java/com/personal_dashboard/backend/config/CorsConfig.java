@@ -15,7 +15,8 @@ public class CorsConfig implements WebMvcConfigurer {
                         "http://localhost:5173",
                         "http://127.0.0.1:3000",
                         "http://127.0.0.1:5173",
-                        "https://dashboard-ui-flame-psi.vercel.app"
+                        "https://dashboard-ui-flame-psi.vercel.app",
+                        "https://dashboard-6ni3iac5z-eccentric-harry-prod.vercel.app"
                 )
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
                 .allowedHeaders("*")
