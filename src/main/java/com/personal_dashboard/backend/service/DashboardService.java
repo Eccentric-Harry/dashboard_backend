@@ -23,6 +23,8 @@ public class DashboardService {
     private final DailyHealthRecordRepository dailyHealthRecordRepository;
     private final TransactionRepository transactionRepository;
     private final DailyLogRepository dailyLogRepository;
+    private final LearningRepository learningRepository;
+    private final DailyTaskRepository dailyTaskRepository;
 
     private static final int CALORIE_GOAL = 2000;
     private static final int PROTEIN_GOAL = 100;
@@ -455,5 +457,114 @@ public class DashboardService {
         response.put("transactionCount", transactions.size());
 
         return response;
+    }
+
+    /**
+     * Learnings hub summary: today stats, 7-day timeline, coding counters.
+     */
+    public LearningsSummaryResponse getLearningsSummary(LocalDate targetDate) {
+        LocalDate sevenDaysAgo = targetDate.minusDays(6);
+
+        List<Learning> rangeLearnings = learningRepository.findByDateBetween(sevenDaysAgo, targetDate);
+        List<DailyTask> rangeTasks = new ArrayList<>();
+        for (LocalDate date = sevenDaysAgo; !date.isAfter(targetDate); date = date.plusDays(1)) {
+            rangeTasks.addAll(dailyTaskRepository.findByDate(date));
+        }
+        List<DailyLog> rangeLogs = dailyLogRepository.findByDateBetween(sevenDaysAgo, targetDate);
+
+        Map<LocalDate, List<Learning>> learningsByDate = rangeLearnings.stream()
+                .collect(Collectors.groupingBy(Learning::getDate));
+        Map<LocalDate, List<DailyTask>> tasksByDate = rangeTasks.stream()
+                .collect(Collectors.groupingBy(DailyTask::getDate));
+        Map<LocalDate, DailyLog> logsByDate = rangeLogs.stream()
+                .collect(Collectors.toMap(DailyLog::getDate, log -> log, (a, b) -> a));
+
+        List<LearningsTimelineDay> timeline = new ArrayList<>();
+        for (LocalDate date = sevenDaysAgo; !date.isAfter(targetDate); date = date.plusDays(1)) {
+            List<Learning> dayLearnings = learningsByDate.getOrDefault(date, List.of());
+            List<DailyTask> dayTasks = tasksByDate.getOrDefault(date, List.of());
+            int tasksCompleted = (int) dayTasks.stream()
+                    .filter(t -> Boolean.TRUE.equals(t.getCompleted()))
+                    .count();
+            DailyLog dayLog = logsByDate.get(date);
+            int commits = dayLog != null && dayLog.getGithubCommits() != null ? dayLog.getGithubCommits() : 0;
+            int intensity = calculateIntensity(dayLearnings.size() + tasksCompleted, commits);
+
+            timeline.add(LearningsTimelineDay.builder()
+                    .date(date.format(DATE_FORMATTER))
+                    .learningsCount(dayLearnings.size())
+                    .tasksCompleted(tasksCompleted)
+                    .intensity(intensity)
+                    .build());
+        }
+
+        List<Learning> todayLearnings = learningsByDate.getOrDefault(targetDate, List.of());
+        List<DailyTask> todayTasks = tasksByDate.getOrDefault(targetDate, List.of());
+        int todayTasksCompleted = (int) todayTasks.stream()
+                .filter(t -> Boolean.TRUE.equals(t.getCompleted()))
+                .count();
+
+        Map<String, Long> categoryCounts = todayLearnings.stream()
+                .collect(Collectors.groupingBy(Learning::getCategory, Collectors.counting()));
+        List<LearningsCategoryCount> categories = categoryCounts.entrySet().stream()
+                .map(e -> LearningsCategoryCount.builder()
+                        .name(e.getKey())
+                        .count(e.getValue().intValue())
+                        .build())
+                .sorted(Comparator.comparing(LearningsCategoryCount::getCount).reversed())
+                .collect(Collectors.toList());
+
+        DailyLog todayLog = logsByDate.get(targetDate);
+        String dailyOneThing = todayLog != null ? todayLog.getDailyOneThing() : null;
+        Boolean dailyOneThingCompleted = todayLog != null ? todayLog.getDailyOneThingCompleted() : false;
+
+        int weeklyLearningCount = rangeLearnings.size();
+        int githubCommits = rangeLogs.stream()
+                .mapToInt(log -> log.getGithubCommits() != null ? log.getGithubCommits() : 0)
+                .sum();
+        int leetCodeSolved = rangeLogs.stream()
+                .mapToInt(log -> log.getLeetCodeSolved() != null ? log.getLeetCodeSolved() : 0)
+                .sum();
+        int streakDays = calculateActivityStreak(timeline);
+
+        LearningsTodaySummary today = LearningsTodaySummary.builder()
+                .learningsCount(todayLearnings.size())
+                .tasksTotal(todayTasks.size())
+                .tasksCompleted(todayTasksCompleted)
+                .categories(categories)
+                .dailyOneThing(dailyOneThing)
+                .dailyOneThingCompleted(dailyOneThingCompleted != null && dailyOneThingCompleted)
+                .build();
+
+        LearningsStatsSummary stats = LearningsStatsSummary.builder()
+                .weeklyLearningCount(weeklyLearningCount)
+                .streakDays(streakDays)
+                .githubCommits(githubCommits)
+                .leetCodeSolved(leetCodeSolved)
+                .build();
+
+        return LearningsSummaryResponse.builder()
+                .date(targetDate.format(DATE_FORMATTER))
+                .today(today)
+                .sevenDayTimeline(timeline)
+                .stats(stats)
+                .build();
+    }
+
+    private int calculateActivityStreak(List<LearningsTimelineDay> timeline) {
+        if (timeline.isEmpty()) return 0;
+        int streak = 0;
+        for (int i = timeline.size() - 1; i >= 0; i--) {
+            LearningsTimelineDay day = timeline.get(i);
+            boolean active = (day.getLearningsCount() != null && day.getLearningsCount() > 0)
+                    || (day.getTasksCompleted() != null && day.getTasksCompleted() > 0)
+                    || (day.getIntensity() != null && day.getIntensity() > 0);
+            if (active) {
+                streak++;
+            } else {
+                break;
+            }
+        }
+        return streak;
     }
 }

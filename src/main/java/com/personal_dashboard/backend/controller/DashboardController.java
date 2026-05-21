@@ -1,6 +1,7 @@
 package com.personal_dashboard.backend.controller;
 
 import com.personal_dashboard.backend.dto.ApiResponse;
+import com.personal_dashboard.backend.dto.LearningsSummaryResponse;
 import com.personal_dashboard.backend.service.DashboardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -69,6 +70,28 @@ public class DashboardController {
 
         ApiResponse<Map<String, Object>> response = ApiResponse.<Map<String, Object>>builder()
                 .data(spendingData)
+                .meta(com.personal_dashboard.backend.dto.ApiMeta.builder()
+                        .requestId(UUID.randomUUID().toString())
+                        .timestamp(Instant.now().toString())
+                        .source("api")
+                        .build())
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/learnings-summary")
+    public ResponseEntity<ApiResponse<LearningsSummaryResponse>> getLearningsSummary(
+            @RequestParam(name = "date", required = false) String date) {
+
+        LocalDate targetDate = date != null && !date.isBlank()
+                ? LocalDate.parse(date, DATE_FORMATTER)
+                : LocalDate.now();
+
+        LearningsSummaryResponse summary = dashboardService.getLearningsSummary(targetDate);
+
+        ApiResponse<LearningsSummaryResponse> response = ApiResponse.<LearningsSummaryResponse>builder()
+                .data(summary)
                 .meta(com.personal_dashboard.backend.dto.ApiMeta.builder()
                         .requestId(UUID.randomUUID().toString())
                         .timestamp(Instant.now().toString())
