@@ -301,7 +301,8 @@ public class DashboardService {
      */
     private int calculateDeepWorkSessions(List<DailyLog> logs) {
         return (int) logs.stream()
-                .filter(log -> log.getDailyOneThingCompleted() != null && log.getDailyOneThingCompleted())
+                .filter(log -> (log.getGithubCommits() != null && log.getGithubCommits() > 0) || 
+                               (log.getLeetCodeSolved() != null && log.getLeetCodeSolved() > 0))
                 .count();
     }
 
@@ -514,9 +515,7 @@ public class DashboardService {
                 .sorted(Comparator.comparing(LearningsCategoryCount::getCount).reversed())
                 .collect(Collectors.toList());
 
-        DailyLog todayLog = logsByDate.get(targetDate);
-        String dailyOneThing = todayLog != null ? todayLog.getDailyOneThing() : null;
-        Boolean dailyOneThingCompleted = todayLog != null ? todayLog.getDailyOneThingCompleted() : false;
+
 
         int weeklyLearningCount = rangeLearnings.size();
         int githubCommits = rangeLogs.stream()
@@ -532,8 +531,6 @@ public class DashboardService {
                 .tasksTotal(todayTasks.size())
                 .tasksCompleted(todayTasksCompleted)
                 .categories(categories)
-                .dailyOneThing(dailyOneThing)
-                .dailyOneThingCompleted(dailyOneThingCompleted != null && dailyOneThingCompleted)
                 .build();
 
         LearningsStatsSummary stats = LearningsStatsSummary.builder()

@@ -15,5 +15,6 @@ public interface DailyLogRepository extends MongoRepository<DailyLog, String> {
 
     List<DailyLog> findByDateBetween(LocalDate startDate, LocalDate endDate);
 
-    List<DailyLog> findByDailyOneThingCompleted(Boolean completed);
+    List<DailyLog> findByDateIn(java.util.Collection<LocalDate> dates);
+
 }

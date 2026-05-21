@@ -28,9 +28,5 @@ public class DailyLog {
 
     private List<String> newLearnings;
 
-    private String dailyOneThing;
-
-    private Boolean dailyOneThingCompleted;
-
     private String moodRating;
 }

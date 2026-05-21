@@ -11,8 +11,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class DailyLogRequest {
 
-    private String dailyOneThing;
-    private Boolean dailyOneThingCompleted;
     private String moodRating;
     private Integer githubCommits;
     private Integer leetCodeSolved;

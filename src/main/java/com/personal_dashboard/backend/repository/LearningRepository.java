@@ -13,4 +13,6 @@ public interface LearningRepository extends MongoRepository<Learning, String> {
     List<Learning> findByDate(LocalDate date);
 
     List<Learning> findByDateBetween(LocalDate startDate, LocalDate endDate);
+
+    List<Learning> findByDateIn(java.util.Collection<LocalDate> dates);
 }

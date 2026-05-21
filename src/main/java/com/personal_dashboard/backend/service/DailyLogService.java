@@ -23,7 +23,6 @@ public class DailyLogService {
                         .date(date)
                         .githubCommits(0)
                         .leetCodeSolved(0)
-                        .dailyOneThingCompleted(false)
                         .build());
     }
 
@@ -31,12 +30,6 @@ public class DailyLogService {
         DailyLog log = dailyLogRepository.findByDate(date)
                 .orElse(DailyLog.builder().date(date).build());
 
-        if (request.getDailyOneThing() != null) {
-            log.setDailyOneThing(request.getDailyOneThing());
-        }
-        if (request.getDailyOneThingCompleted() != null) {
-            log.setDailyOneThingCompleted(request.getDailyOneThingCompleted());
-        }
         if (request.getMoodRating() != null) {
             log.setMoodRating(request.getMoodRating());
         }

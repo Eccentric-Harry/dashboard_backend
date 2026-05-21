@@ -17,6 +17,4 @@ public class LearningsTodaySummary {
     private Integer tasksTotal;
     private Integer tasksCompleted;
     private List<LearningsCategoryCount> categories;
-    private String dailyOneThing;
-    private Boolean dailyOneThingCompleted;
 }
