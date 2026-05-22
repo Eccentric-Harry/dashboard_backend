@@ -18,7 +18,7 @@ public class DailyLogService {
     private final DailyLogRepository dailyLogRepository;
 
     public DailyLog getOrEmptyForDate(LocalDate date) {
-        return dailyLogRepository.findByDate(date)
+        return firstLogForDate(date)
                 .orElse(DailyLog.builder()
                         .date(date)
                         .githubCommits(0)
@@ -27,7 +27,7 @@ public class DailyLogService {
     }
 
     public DailyLog upsertForDate(LocalDate date, DailyLogRequest request) {
-        DailyLog log = dailyLogRepository.findByDate(date)
+        DailyLog log = firstLogForDate(date)
                 .orElse(DailyLog.builder().date(date).build());
 
         if (request.getMoodRating() != null) {
@@ -44,6 +44,10 @@ public class DailyLogService {
     }
 
     public Optional<DailyLog> findByDate(LocalDate date) {
-        return dailyLogRepository.findByDate(date);
+        return firstLogForDate(date);
+    }
+
+    private Optional<DailyLog> firstLogForDate(LocalDate date) {
+        return dailyLogRepository.findByDateRange(date, date).stream().findFirst();
     }
 }

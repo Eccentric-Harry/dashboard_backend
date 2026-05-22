@@ -19,12 +19,12 @@ public class LearningService {
 
     public List<Learning> getLearningsForDate(LocalDate date) {
         log.info("Fetching learnings for date: {}", date);
-        return learningRepository.findByDate(date);
+        return learningRepository.findByDateRange(date, date);
     }
 
     public List<Learning> getLearningsForRange(LocalDate startDate, LocalDate endDate) {
         log.info("Fetching learnings between {} and {}", startDate, endDate);
-        return learningRepository.findByDateBetween(startDate, endDate);
+        return learningRepository.findByDateRange(startDate, endDate);
     }
 
     public List<Learning> getAllLearnings() {

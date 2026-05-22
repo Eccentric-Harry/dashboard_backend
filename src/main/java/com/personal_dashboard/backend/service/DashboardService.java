@@ -152,7 +152,7 @@ public class DashboardService {
     public CodingMetrics aggregateCodingData(LocalDate targetDate) {
         LocalDate sevenDaysAgo = targetDate.minusDays(6); // Include target date = 7 days total
 
-        List<DailyLog> dailyLogs = dailyLogRepository.findByDateBetween(sevenDaysAgo, targetDate);
+        List<DailyLog> dailyLogs = dailyLogRepository.findByDateRange(sevenDaysAgo, targetDate);
 
         // Build learning heatmap
         List<LearningHeatmapEntry> heatmapEntries = dailyLogs.stream()
@@ -464,14 +464,11 @@ public class DashboardService {
      * Learnings hub summary: today stats, 7-day timeline, coding counters.
      */
     public LearningsSummaryResponse getLearningsSummary(LocalDate targetDate) {
-        LocalDate sevenDaysAgo = targetDate.minusDays(6);
+        LocalDate startDate = targetDate.minusDays(13); // 14 days total
 
-        List<Learning> rangeLearnings = learningRepository.findByDateBetween(sevenDaysAgo, targetDate);
-        List<DailyTask> rangeTasks = new ArrayList<>();
-        for (LocalDate date = sevenDaysAgo; !date.isAfter(targetDate); date = date.plusDays(1)) {
-            rangeTasks.addAll(dailyTaskRepository.findByDate(date));
-        }
-        List<DailyLog> rangeLogs = dailyLogRepository.findByDateBetween(sevenDaysAgo, targetDate);
+        List<Learning> rangeLearnings = learningRepository.findByDateRange(startDate, targetDate);
+        List<DailyTask> rangeTasks = dailyTaskRepository.findByDateRange(startDate, targetDate.plusDays(1));
+        List<DailyLog> rangeLogs = dailyLogRepository.findByDateRange(startDate, targetDate);
 
         Map<LocalDate, List<Learning>> learningsByDate = rangeLearnings.stream()
                 .collect(Collectors.groupingBy(Learning::getDate));
@@ -481,7 +478,7 @@ public class DashboardService {
                 .collect(Collectors.toMap(DailyLog::getDate, log -> log, (a, b) -> a));
 
         List<LearningsTimelineDay> timeline = new ArrayList<>();
-        for (LocalDate date = sevenDaysAgo; !date.isAfter(targetDate); date = date.plusDays(1)) {
+        for (LocalDate date = startDate; !date.isAfter(targetDate); date = date.plusDays(1)) {
             List<Learning> dayLearnings = learningsByDate.getOrDefault(date, List.of());
             List<DailyTask> dayTasks = tasksByDate.getOrDefault(date, List.of());
             int tasksCompleted = (int) dayTasks.stream()
@@ -543,7 +540,7 @@ public class DashboardService {
         return LearningsSummaryResponse.builder()
                 .date(targetDate.format(DATE_FORMATTER))
                 .today(today)
-                .sevenDayTimeline(timeline)
+                .timeline(timeline)
                 .stats(stats)
                 .build();
     }

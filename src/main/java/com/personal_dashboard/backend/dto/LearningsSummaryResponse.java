@@ -15,6 +15,6 @@ public class LearningsSummaryResponse {
 
     private String date;
     private LearningsTodaySummary today;
-    private List<LearningsTimelineDay> sevenDayTimeline;
+    private List<LearningsTimelineDay> timeline;
     private LearningsStatsSummary stats;
 }

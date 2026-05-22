@@ -19,15 +19,16 @@ public class DailyTaskService {
     private final DailyTaskRepository dailyTaskRepository;
 
     public List<DailyTask> getTasksForDate(LocalDate date) {
-        return sortTasks(dailyTaskRepository.findByDate(date));
+        return sortTasks(dailyTaskRepository.findByDateRange(date, date.plusDays(1)));
     }
 
     public List<DailyTask> getTasksForRange(LocalDate startDate, LocalDate endDate) {
-        return sortTasks(dailyTaskRepository.findByDateBetween(startDate, endDate));
+        return sortTasks(dailyTaskRepository.findByDateRange(startDate, endDate.plusDays(1)));
     }
 
     public DailyTask createTask(DailyTaskRequest request) {
-        int nextOrder = dailyTaskRepository.findByDate(LocalDate.parse(request.getDate())).size();
+        LocalDate taskDate = LocalDate.parse(request.getDate());
+        int nextOrder = dailyTaskRepository.findByDateRange(taskDate, taskDate.plusDays(1)).size();
         DailyTask task = DailyTask.builder()
                 .title(request.getTitle())
                 .date(LocalDate.parse(request.getDate()))
