@@ -17,4 +17,11 @@ public interface DailyTaskRepository extends MongoRepository<DailyTask, String> 
      */
     @Query("{ 'date': { $gte: ?0, $lt: ?1 } }")
     List<DailyTask> findByDateRange(LocalDate startInclusive, LocalDate endExclusive);
+
+    /**
+     * Fetches tasks scheduled on the target date (inclusive/exclusive range) OR scheduled before the target date
+     * that are not yet marked as completed.
+     */
+    @Query("{ $or: [ { 'date': { $gte: ?0, $lt: ?1 } }, { 'date': { $lt: ?0 }, 'completed': { $ne: true } } ] }")
+    List<DailyTask> findTasksForDateWithIncompletePrevious(LocalDate dateInclusive, LocalDate nextDayExclusive);
 }

@@ -35,7 +35,7 @@ public class DailyTaskController {
     public ResponseEntity<ApiResponse<List<DailyTask>>> getTasks(
             @RequestParam(name = "date") String dateStr) {
         LocalDate date = LocalDate.parse(dateStr, DATE_FORMATTER);
-        List<DailyTask> tasks = dailyTaskService.getTasksForDate(date);
+        List<DailyTask> tasks = dailyTaskService.getTasksForDateWithIncompletePrevious(date);
         return ResponseEntity.ok(ApiResponse.<List<DailyTask>>builder()
                 .data(tasks)
                 .meta(buildMeta("fetch"))
