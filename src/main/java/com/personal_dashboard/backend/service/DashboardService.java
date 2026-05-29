@@ -497,7 +497,7 @@ public class DashboardService {
         }
 
         List<Learning> todayLearnings = learningsByDate.getOrDefault(targetDate, List.of());
-        List<DailyTask> todayTasks = tasksByDate.getOrDefault(targetDate, List.of());
+        List<DailyTask> todayTasks = dailyTaskRepository.findTasksForDateWithIncompletePrevious(targetDate, targetDate.plusDays(1));
         int todayTasksCompleted = (int) todayTasks.stream()
                 .filter(t -> Boolean.TRUE.equals(t.getCompleted()))
                 .count();

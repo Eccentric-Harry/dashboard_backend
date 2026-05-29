@@ -22,6 +22,10 @@ public class DailyTaskService {
         return sortTasks(dailyTaskRepository.findByDateRange(date, date.plusDays(1)));
     }
 
+    public List<DailyTask> getTasksForDateWithIncompletePrevious(LocalDate date) {
+        return sortTasks(dailyTaskRepository.findTasksForDateWithIncompletePrevious(date, date.plusDays(1)));
+    }
+
     public List<DailyTask> getTasksForRange(LocalDate startDate, LocalDate endDate) {
         return sortTasks(dailyTaskRepository.findByDateRange(startDate, endDate.plusDays(1)));
     }
