@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 
@@ -26,6 +27,11 @@ public class DailyTaskService {
         return sortTasks(dailyTaskRepository.findTasksForDateWithIncompletePrevious(date, date.plusDays(1)));
     }
 
+    public List<DailyTask> getActiveTasks() {
+        LocalDateTime cutoff = LocalDateTime.now().minusHours(48);
+        return sortTasks(dailyTaskRepository.findActiveTasks(cutoff));
+    }
+
     public List<DailyTask> getTasksForRange(LocalDate startDate, LocalDate endDate) {
         return sortTasks(dailyTaskRepository.findByDateRange(startDate, endDate.plusDays(1)));
     }
@@ -33,12 +39,14 @@ public class DailyTaskService {
     public DailyTask createTask(DailyTaskRequest request) {
         LocalDate taskDate = LocalDate.parse(request.getDate());
         int nextOrder = dailyTaskRepository.findByDateRange(taskDate, taskDate.plusDays(1)).size();
+        boolean isCompleted = Boolean.TRUE.equals(request.getCompleted());
         DailyTask task = DailyTask.builder()
                 .title(request.getTitle())
                 .date(LocalDate.parse(request.getDate()))
                 .scheduledTime(request.getScheduledTime())
                 .notes(request.getNotes())
                 .completed(request.getCompleted() != null ? request.getCompleted() : false)
+                .completedAt(isCompleted ? LocalDateTime.now() : null)
                 .sortOrder(request.getSortOrder() != null ? request.getSortOrder() : nextOrder)
                 .build();
         return dailyTaskRepository.save(task);
@@ -53,6 +61,13 @@ public class DailyTaskService {
         existing.setScheduledTime(request.getScheduledTime());
         existing.setNotes(request.getNotes());
         if (request.getCompleted() != null) {
+            boolean wasCompleted = Boolean.TRUE.equals(existing.getCompleted());
+            boolean isCompleted = Boolean.TRUE.equals(request.getCompleted());
+            if (isCompleted && !wasCompleted) {
+                existing.setCompletedAt(LocalDateTime.now());
+            } else if (!isCompleted && wasCompleted) {
+                existing.setCompletedAt(null);
+            }
             existing.setCompleted(request.getCompleted());
         }
         if (request.getSortOrder() != null) {
@@ -65,7 +80,9 @@ public class DailyTaskService {
     public DailyTask toggleTask(String id) {
         DailyTask existing = dailyTaskRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Task not found with id: " + id));
-        existing.setCompleted(existing.getCompleted() == null || !existing.getCompleted());
+        boolean newCompleted = existing.getCompleted() == null || !existing.getCompleted();
+        existing.setCompleted(newCompleted);
+        existing.setCompletedAt(newCompleted ? LocalDateTime.now() : null);
         return dailyTaskRepository.save(existing);
     }
 
@@ -79,7 +96,8 @@ public class DailyTaskService {
     private List<DailyTask> sortTasks(List<DailyTask> tasks) {
         return tasks.stream()
                 .sorted(Comparator
-                        .comparing(DailyTask::getSortOrder, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .comparing(DailyTask::getDate, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(DailyTask::getSortOrder, Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(DailyTask::getScheduledTime, Comparator.nullsLast(String::compareToIgnoreCase))
                         .thenComparing(DailyTask::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -497,7 +498,7 @@ public class DashboardService {
         }
 
         List<Learning> todayLearnings = learningsByDate.getOrDefault(targetDate, List.of());
-        List<DailyTask> todayTasks = dailyTaskRepository.findTasksForDateWithIncompletePrevious(targetDate, targetDate.plusDays(1));
+        List<DailyTask> todayTasks = dailyTaskRepository.findActiveTasks(LocalDateTime.now().minusHours(48));
         int todayTasksCompleted = (int) todayTasks.stream()
                 .filter(t -> Boolean.TRUE.equals(t.getCompleted()))
                 .count();
