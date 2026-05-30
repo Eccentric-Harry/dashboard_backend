@@ -8,25 +8,29 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
-import java.util.List;
+import java.time.LocalDateTime;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "daily_logs")
-public class DailyLog {
+@Document(collection = "daily_tasks")
+public class DailyTask {
 
     @Id
     private String id;
 
+    private String title;
     private LocalDate date;
+    private String scheduledTime;
+    private String notes;
 
-    private Integer githubCommits;
+    @Builder.Default
+    private Boolean completed = false;
 
-    private Integer leetCodeSolved;
+    @Builder.Default
+    private Integer sortOrder = 0;
 
-    private List<String> newLearnings;
-
-    private String moodRating;
+    @Builder.Default
+    private LocalDateTime createdAt = LocalDateTime.now();
 }
