@@ -28,6 +28,8 @@ public class DailyTask {
     @Builder.Default
     private Boolean completed = false;
 
+    private LocalDateTime completedAt;
+
     @Builder.Default
     private Integer sortOrder = 0;
 

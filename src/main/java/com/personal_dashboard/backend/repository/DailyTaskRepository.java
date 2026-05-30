@@ -6,6 +6,7 @@ import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -22,6 +23,12 @@ public interface DailyTaskRepository extends MongoRepository<DailyTask, String> 
      * Fetches tasks scheduled on the target date (inclusive/exclusive range) OR scheduled before the target date
      * that are not yet marked as completed OR were completed on or after the specified threshold.
      */
-    @Query("{ $or: [ { 'date': { $gte: ?0, $lt: ?1 } }, { 'date': { $lt: ?0 }, 'completed': { $ne: true } }, { 'date': { $lt: ?0 }, 'completed': true, 'completedAt': { $gte: ?2 } } ] }")
-    List<DailyTask> findTasksForDateWithIncompletePrevious(LocalDate dateInclusive, LocalDate nextDayExclusive, java.time.LocalDateTime completedAfterThreshold);
+    @Query("{ $or: [ { 'date': { $gte: ?0, $lt: ?1 } }, { 'date': { $lt: ?0 }, 'completed': { $ne: true } } ] }")
+    List<DailyTask> findTasksForDateWithIncompletePrevious(LocalDate dateInclusive, LocalDate nextDayExclusive);
+
+    /**
+     * Fetches tasks that are not yet completed OR completed but completed after the given threshold.
+     */
+    @Query("{ $or: [ { 'completed': { $ne: true } }, { 'completed': true, 'completedAt': { $gte: ?0 } } ] }")
+    List<DailyTask> findActiveTasks(LocalDateTime completedAtThreshold);
 }

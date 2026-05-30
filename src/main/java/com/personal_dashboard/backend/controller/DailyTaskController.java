@@ -31,11 +31,10 @@ public class DailyTaskController {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
 
     @GetMapping
-    @Operation(summary = "Get tasks for date", description = "Fetch scheduled tasks for a specific date")
+    @Operation(summary = "Get active tasks", description = "Fetch all active tasks (incomplete or completed <= 48h ago)")
     public ResponseEntity<ApiResponse<List<DailyTask>>> getTasks(
-            @RequestParam(name = "date") String dateStr) {
-        LocalDate date = LocalDate.parse(dateStr, DATE_FORMATTER);
-        List<DailyTask> tasks = dailyTaskService.getTasksForDateWithIncompletePrevious(date);
+            @RequestParam(name = "date", required = false) String dateStr) {
+        List<DailyTask> tasks = dailyTaskService.getActiveTasks();
         return ResponseEntity.ok(ApiResponse.<List<DailyTask>>builder()
                 .data(tasks)
                 .meta(buildMeta("fetch"))

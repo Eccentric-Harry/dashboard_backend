@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -497,13 +498,7 @@ public class DashboardService {
         }
 
         List<Learning> todayLearnings = learningsByDate.getOrDefault(targetDate, List.of());
-        java.time.LocalDateTime threshold;
-        if (targetDate.equals(LocalDate.now())) {
-            threshold = java.time.LocalDateTime.now().minusHours(24);
-        } else {
-            threshold = targetDate.atTime(23, 59, 59).minusHours(24);
-        }
-        List<DailyTask> todayTasks = dailyTaskRepository.findTasksForDateWithIncompletePrevious(targetDate, targetDate.plusDays(1), threshold);
+        List<DailyTask> todayTasks = dailyTaskRepository.findActiveTasks(LocalDateTime.now().minusHours(48));
         int todayTasksCompleted = (int) todayTasks.stream()
                 .filter(t -> Boolean.TRUE.equals(t.getCompleted()))
                 .count();
