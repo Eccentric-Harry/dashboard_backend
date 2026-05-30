@@ -35,6 +35,4 @@ public class DailyTask {
 
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
-
-    private LocalDateTime completedAt;
 }
