@@ -21,8 +21,6 @@ public class DailyLogService {
         return firstLogForDate(date)
                 .orElse(DailyLog.builder()
                         .date(date)
-                        .githubCommits(0)
-                        .leetCodeSolved(0)
                         .build());
     }
 
@@ -32,12 +30,6 @@ public class DailyLogService {
 
         if (request.getMoodRating() != null) {
             log.setMoodRating(request.getMoodRating());
-        }
-        if (request.getGithubCommits() != null) {
-            log.setGithubCommits(request.getGithubCommits());
-        }
-        if (request.getLeetCodeSolved() != null) {
-            log.setLeetCodeSolved(request.getLeetCodeSolved());
         }
 
         return dailyLogRepository.save(log);

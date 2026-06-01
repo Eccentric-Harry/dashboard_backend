@@ -158,10 +158,9 @@ public class DashboardService {
         // Build learning heatmap
         List<LearningHeatmapEntry> heatmapEntries = dailyLogs.stream()
                 .map(log -> {
-                    // Calculate intensity (0-4) based on learning count and commits
+                    // Calculate intensity (0-4) based on learning count
                     int intensity = calculateIntensity(
-                            log.getNewLearnings() != null ? log.getNewLearnings().size() : 0,
-                            log.getGithubCommits() != null ? log.getGithubCommits() : 0
+                            log.getNewLearnings() != null ? log.getNewLearnings().size() : 0
                     );
                     String topic = log.getNewLearnings() != null && !log.getNewLearnings().isEmpty()
                             ? log.getNewLearnings().get(0)
@@ -175,40 +174,8 @@ public class DashboardService {
                 })
                 .collect(Collectors.toList());
 
-        // Build coding stats
-        int totalCommits = dailyLogs.stream()
-                .mapToInt(log -> log.getGithubCommits() != null ? log.getGithubCommits() : 0)
-                .sum();
-
-        int totalLeetCode = dailyLogs.stream()
-                .mapToInt(log -> log.getLeetCodeSolved() != null ? log.getLeetCodeSolved() : 0)
-                .sum();
-
-        CodingStats stats = CodingStats.builder()
-                .focusedHours(calculateFocusedHours(dailyLogs))
-                .deepWorkSessions(calculateDeepWorkSessions(dailyLogs))
-                .weeklyLearningCount(calculateWeeklyLearning(dailyLogs))
-                .streakDays(calculateStreak(dailyLogs))
-                .build();
-
-        // Mock platform metrics
-        PlatformMetricPlaceholder github = PlatformMetricPlaceholder.builder()
-                .solved(totalCommits)
-                .weeklyDelta(0)
-                .target(50)
-                .build();
-
-        PlatformMetricPlaceholder leetCode = PlatformMetricPlaceholder.builder()
-                .solved(totalLeetCode)
-                .weeklyDelta(0)
-                .target(10)
-                .build();
-
         return CodingMetrics.builder()
                 .learningHeatmap(heatmapEntries)
-                .stats(stats)
-                .github(github)
-                .leetCode(leetCode)
                 .build();
     }
 
@@ -278,60 +245,12 @@ public class DashboardService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Helper: Calculate intensity (0-4) based on activity
-     */
-    private int calculateIntensity(int learnings, int commits) {
-        int total = learnings + commits;
-        if (total >= 10) return 4;
-        if (total >= 7) return 3;
-        if (total >= 4) return 2;
-        if (total >= 1) return 1;
+    private int calculateIntensity(int activityCount) {
+        if (activityCount >= 10) return 4;
+        if (activityCount >= 7) return 3;
+        if (activityCount >= 4) return 2;
+        if (activityCount >= 1) return 1;
         return 0;
-    }
-
-    /**
-     * Helper: Calculate focused hours (mock implementation)
-     */
-    private double calculateFocusedHours(List<DailyLog> logs) {
-        return logs.size() * 2.5; // Mock: 2.5 hours per day
-    }
-
-    /**
-     * Helper: Calculate deep work sessions
-     */
-    private int calculateDeepWorkSessions(List<DailyLog> logs) {
-        return (int) logs.stream()
-                .filter(log -> (log.getGithubCommits() != null && log.getGithubCommits() > 0) || 
-                               (log.getLeetCodeSolved() != null && log.getLeetCodeSolved() > 0))
-                .count();
-    }
-
-    /**
-     * Helper: Calculate weekly learning count
-     */
-    private int calculateWeeklyLearning(List<DailyLog> logs) {
-        return logs.stream()
-                .mapToInt(log -> log.getNewLearnings() != null ? log.getNewLearnings().size() : 0)
-                .sum();
-    }
-
-    /**
-     * Helper: Calculate streak (consecutive days with activity)
-     */
-    private int calculateStreak(List<DailyLog> logs) {
-        if (logs.isEmpty()) return 0;
-
-        int streak = 0;
-        for (int i = 0; i < logs.size(); i++) {
-            DailyLog log = logs.get(i);
-            if (log.getGithubCommits() != null && log.getGithubCommits() > 0) {
-                streak++;
-            } else {
-                streak = 0;
-            }
-        }
-        return streak;
     }
 
     /**
@@ -485,9 +404,7 @@ public class DashboardService {
             int tasksCompleted = (int) dayTasks.stream()
                     .filter(t -> Boolean.TRUE.equals(t.getCompleted()))
                     .count();
-            DailyLog dayLog = logsByDate.get(date);
-            int commits = dayLog != null && dayLog.getGithubCommits() != null ? dayLog.getGithubCommits() : 0;
-            int intensity = calculateIntensity(dayLearnings.size() + tasksCompleted, commits);
+            int intensity = calculateIntensity(dayLearnings.size() + tasksCompleted);
 
             timeline.add(LearningsTimelineDay.builder()
                     .date(date.format(DATE_FORMATTER))
@@ -516,12 +433,6 @@ public class DashboardService {
 
 
         int weeklyLearningCount = rangeLearnings.size();
-        int githubCommits = rangeLogs.stream()
-                .mapToInt(log -> log.getGithubCommits() != null ? log.getGithubCommits() : 0)
-                .sum();
-        int leetCodeSolved = rangeLogs.stream()
-                .mapToInt(log -> log.getLeetCodeSolved() != null ? log.getLeetCodeSolved() : 0)
-                .sum();
         int streakDays = calculateActivityStreak(timeline);
 
         LearningsTodaySummary today = LearningsTodaySummary.builder()
@@ -534,8 +445,6 @@ public class DashboardService {
         LearningsStatsSummary stats = LearningsStatsSummary.builder()
                 .weeklyLearningCount(weeklyLearningCount)
                 .streakDays(streakDays)
-                .githubCommits(githubCommits)
-                .leetCodeSolved(leetCodeSolved)
                 .build();
 
         return LearningsSummaryResponse.builder()

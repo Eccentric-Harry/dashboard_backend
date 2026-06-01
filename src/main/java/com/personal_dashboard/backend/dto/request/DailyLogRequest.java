@@ -12,6 +12,4 @@ import lombok.NoArgsConstructor;
 public class DailyLogRequest {
 
     private String moodRating;
-    private Integer githubCommits;
-    private Integer leetCodeSolved;
 }

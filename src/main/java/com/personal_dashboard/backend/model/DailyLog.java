@@ -22,10 +22,6 @@ public class DailyLog {
 
     private LocalDate date;
 
-    private Integer githubCommits;
-
-    private Integer leetCodeSolved;
-
     private List<String> newLearnings;
 
     private String moodRating;

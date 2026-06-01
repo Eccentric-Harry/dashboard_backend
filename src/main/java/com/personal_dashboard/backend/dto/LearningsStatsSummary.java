@@ -13,6 +13,4 @@ public class LearningsStatsSummary {
 
     private Integer weeklyLearningCount;
     private Integer streakDays;
-    private Integer githubCommits;
-    private Integer leetCodeSolved;
 }

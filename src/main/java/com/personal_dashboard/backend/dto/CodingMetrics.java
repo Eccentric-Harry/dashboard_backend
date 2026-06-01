@@ -14,10 +14,4 @@ import java.util.List;
 public class CodingMetrics {
 
     private List<LearningHeatmapEntry> learningHeatmap;
-
-    private CodingStats stats;
-
-    private PlatformMetricPlaceholder leetCode;
-
-    private PlatformMetricPlaceholder github;
 }
