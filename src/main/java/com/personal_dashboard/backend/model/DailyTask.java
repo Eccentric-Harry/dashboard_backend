@@ -23,6 +23,19 @@ public class DailyTask {
     private String title;
     private LocalDate date;
     private String scheduledTime;
+    private String startTime;
+    private String endTime;
+
+    @Builder.Default
+    private Boolean allDay = true;
+
+    @Builder.Default
+    private String itemType = "TASK";
+
+    @Builder.Default
+    private String category = "Personal";
+
+    private String color;
     private String notes;
 
     @Builder.Default
@@ -32,6 +45,11 @@ public class DailyTask {
 
     @Builder.Default
     private Integer sortOrder = 0;
+
+    @Builder.Default
+    private String recurrenceFrequency = "NONE";
+
+    private LocalDate recurrenceUntil;
 
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

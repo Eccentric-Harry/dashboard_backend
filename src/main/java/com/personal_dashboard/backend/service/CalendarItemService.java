@@ -1,0 +1,205 @@
+package com.personal_dashboard.backend.service;
+
+import com.personal_dashboard.backend.dto.CalendarItemOccurrence;
+import com.personal_dashboard.backend.dto.request.CalendarItemRequest;
+import com.personal_dashboard.backend.model.DailyTask;
+import com.personal_dashboard.backend.repository.DailyTaskRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+@Service
+@RequiredArgsConstructor
+public class CalendarItemService {
+
+    private static final Map<String, String> CATEGORY_COLORS = Map.of(
+            "WORK", "#9bd7ff",
+            "PERSONAL", "#c8f3a3",
+            "HEALTH", "#9ee7e8",
+            "LEARNING", "#c9bff6",
+            "FINANCE", "#ffd37d",
+            "SOCIAL", "#ffb4d2"
+    );
+
+    private final DailyTaskRepository dailyTaskRepository;
+
+    public List<CalendarItemOccurrence> getOccurrences(LocalDate startDate, LocalDate endDate) {
+        if (endDate.isBefore(startDate)) {
+            throw new IllegalArgumentException("End date must be on or after start date");
+        }
+        LocalDate endExclusive = endDate.plusDays(1);
+        return dailyTaskRepository.findCalendarCandidates(startDate, endExclusive).stream()
+                .flatMap(item -> expandItem(item, startDate, endDate).stream())
+                .sorted(Comparator
+                        .comparing(CalendarItemOccurrence::getDate)
+                        .thenComparing(item -> Boolean.TRUE.equals(item.getAllDay()) ? 0 : 1)
+                        .thenComparing(CalendarItemOccurrence::getStartTime, Comparator.nullsLast(String::compareTo))
+                        .thenComparing(CalendarItemOccurrence::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(CalendarItemOccurrence::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+    }
+
+    public DailyTask getItem(String id) {
+        return dailyTaskRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Calendar item not found with id: " + id));
+    }
+
+    public DailyTask createItem(CalendarItemRequest request) {
+        LocalDate date = LocalDate.parse(request.getDate());
+        validateRequest(request);
+        int nextOrder = dailyTaskRepository.findByDateRange(date, date.plusDays(1)).size();
+        boolean completed = Boolean.TRUE.equals(request.getCompleted());
+
+        DailyTask item = DailyTask.builder()
+                .title(request.getTitle().trim())
+                .date(date)
+                .scheduledTime(blankToNull(request.getStartTime()))
+                .startTime(blankToNull(request.getStartTime()))
+                .endTime(blankToNull(request.getEndTime()))
+                .allDay(request.getAllDay() != null ? request.getAllDay() : blankToNull(request.getStartTime()) == null)
+                .itemType(defaultText(request.getItemType(), "TASK").toUpperCase(Locale.ROOT))
+                .category(defaultText(request.getCategory(), "Personal"))
+                .color(defaultColor(request.getCategory(), request.getColor()))
+                .notes(blankToNull(request.getNotes()))
+                .completed(completed)
+                .completedAt(completed ? LocalDateTime.now() : null)
+                .sortOrder(request.getSortOrder() != null ? request.getSortOrder() : nextOrder)
+                .recurrenceFrequency(defaultText(request.getRecurrenceFrequency(), "NONE").toUpperCase(Locale.ROOT))
+                .recurrenceUntil(parseOptionalDate(request.getRecurrenceUntil()))
+                .build();
+        return dailyTaskRepository.save(item);
+    }
+
+    public DailyTask updateItem(String id, CalendarItemRequest request) {
+        validateRequest(request);
+        DailyTask existing = getItem(id);
+        boolean wasCompleted = Boolean.TRUE.equals(existing.getCompleted());
+        boolean completed = request.getCompleted() != null ? request.getCompleted() : wasCompleted;
+
+        existing.setTitle(request.getTitle().trim());
+        existing.setDate(LocalDate.parse(request.getDate()));
+        existing.setScheduledTime(blankToNull(request.getStartTime()));
+        existing.setStartTime(blankToNull(request.getStartTime()));
+        existing.setEndTime(blankToNull(request.getEndTime()));
+        existing.setAllDay(request.getAllDay() != null ? request.getAllDay() : blankToNull(request.getStartTime()) == null);
+        existing.setItemType(defaultText(request.getItemType(), "TASK").toUpperCase(Locale.ROOT));
+        existing.setCategory(defaultText(request.getCategory(), "Personal"));
+        existing.setColor(defaultColor(request.getCategory(), request.getColor()));
+        existing.setNotes(blankToNull(request.getNotes()));
+        existing.setCompleted(completed);
+        if (completed && !wasCompleted) {
+            existing.setCompletedAt(LocalDateTime.now());
+        } else if (!completed) {
+            existing.setCompletedAt(null);
+        }
+        if (request.getSortOrder() != null) {
+            existing.setSortOrder(request.getSortOrder());
+        }
+        existing.setRecurrenceFrequency(defaultText(request.getRecurrenceFrequency(), "NONE").toUpperCase(Locale.ROOT));
+        existing.setRecurrenceUntil(parseOptionalDate(request.getRecurrenceUntil()));
+        return dailyTaskRepository.save(existing);
+    }
+
+    public DailyTask toggleItem(String id) {
+        DailyTask existing = getItem(id);
+        boolean completed = existing.getCompleted() == null || !existing.getCompleted();
+        existing.setCompleted(completed);
+        existing.setCompletedAt(completed ? LocalDateTime.now() : null);
+        return dailyTaskRepository.save(existing);
+    }
+
+    public void deleteItem(String id) {
+        if (!dailyTaskRepository.existsById(id)) {
+            throw new IllegalArgumentException("Calendar item not found with id: " + id);
+        }
+        dailyTaskRepository.deleteById(id);
+    }
+
+    private List<CalendarItemOccurrence> expandItem(DailyTask item, LocalDate startDate, LocalDate endDate) {
+        String recurrence = defaultText(item.getRecurrenceFrequency(), "NONE").toUpperCase(Locale.ROOT);
+        if ("NONE".equals(recurrence)) {
+            return !item.getDate().isBefore(startDate) && !item.getDate().isAfter(endDate)
+                    ? List.of(CalendarItemOccurrence.from(item, item.getDate()))
+                    : List.of();
+        }
+
+        LocalDate recurrenceEnd = item.getRecurrenceUntil() != null && item.getRecurrenceUntil().isBefore(endDate)
+                ? item.getRecurrenceUntil()
+                : endDate;
+        if (recurrenceEnd.isBefore(startDate)) {
+            return List.of();
+        }
+
+        java.util.ArrayList<CalendarItemOccurrence> occurrences = new java.util.ArrayList<>();
+        LocalDate cursor = item.getDate();
+        int guard = 0;
+        while (cursor.isBefore(startDate) && guard++ < 5000) {
+            cursor = nextOccurrence(cursor, recurrence);
+        }
+        while (!cursor.isAfter(recurrenceEnd) && guard++ < 5000) {
+            if (!cursor.isBefore(startDate)) {
+                occurrences.add(CalendarItemOccurrence.from(item, cursor));
+            }
+            cursor = nextOccurrence(cursor, recurrence);
+        }
+        return occurrences;
+    }
+
+    private LocalDate nextOccurrence(LocalDate current, String recurrence) {
+        return switch (recurrence) {
+            case "DAILY" -> current.plusDays(1);
+            case "WEEKLY" -> current.plusWeeks(1);
+            case "MONTHLY" -> current.plusMonths(1);
+            default -> current.plusYears(100);
+        };
+    }
+
+    private void validateRequest(CalendarItemRequest request) {
+        boolean allDay = Boolean.TRUE.equals(request.getAllDay());
+        String startTime = blankToNull(request.getStartTime());
+        String endTime = blankToNull(request.getEndTime());
+        if (!allDay && startTime == null) {
+            throw new IllegalArgumentException("Start time is required for timed calendar items");
+        }
+        if (startTime != null) {
+            LocalTime start = LocalTime.parse(startTime);
+            if (endTime != null && !LocalTime.parse(endTime).isAfter(start)) {
+                throw new IllegalArgumentException("End time must be after start time");
+            }
+        }
+        LocalDate date = LocalDate.parse(request.getDate());
+        LocalDate recurrenceUntil = parseOptionalDate(request.getRecurrenceUntil());
+        if (recurrenceUntil != null && recurrenceUntil.isBefore(date)) {
+            throw new IllegalArgumentException("Repeat-until date must be on or after the start date");
+        }
+    }
+
+    private LocalDate parseOptionalDate(String value) {
+        String normalized = blankToNull(value);
+        return normalized == null ? null : LocalDate.parse(normalized);
+    }
+
+    private String defaultColor(String category, String color) {
+        String explicit = blankToNull(color);
+        if (explicit != null) {
+            return explicit;
+        }
+        return CATEGORY_COLORS.getOrDefault(defaultText(category, "Personal").toUpperCase(Locale.ROOT), "#9ee7e8");
+    }
+
+    private String defaultText(String value, String fallback) {
+        String normalized = blankToNull(value);
+        return normalized == null ? fallback : normalized;
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+}

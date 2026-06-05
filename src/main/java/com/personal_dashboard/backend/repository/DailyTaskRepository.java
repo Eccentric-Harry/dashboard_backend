@@ -19,6 +19,12 @@ public interface DailyTaskRepository extends MongoRepository<DailyTask, String> 
     @Query("{ 'date': { $gte: ?0, $lt: ?1 } }")
     List<DailyTask> findByDateRange(LocalDate startInclusive, LocalDate endExclusive);
 
+    @Query("{ $or: [ " +
+            "{ 'date': { $gte: ?0, $lt: ?1 } }, " +
+            "{ 'recurrenceFrequency': { $in: ['DAILY', 'WEEKLY', 'MONTHLY'] }, 'date': { $lt: ?1 }, $or: [ { 'recurrenceUntil': null }, { 'recurrenceUntil': { $gte: ?0 } } ] } " +
+            "] }")
+    List<DailyTask> findCalendarCandidates(LocalDate startInclusive, LocalDate endExclusive);
+
     /**
      * Fetches tasks scheduled on the target date (inclusive/exclusive range) OR scheduled before the target date
      * that are not yet marked as completed OR were completed on or after the specified threshold.

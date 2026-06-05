@@ -34,7 +34,9 @@ public class DailyTaskController {
     @Operation(summary = "Get active tasks", description = "Fetch all active tasks (incomplete or completed <= 48h ago)")
     public ResponseEntity<ApiResponse<List<DailyTask>>> getTasks(
             @RequestParam(name = "date", required = false) String dateStr) {
-        List<DailyTask> tasks = dailyTaskService.getActiveTasks();
+        List<DailyTask> tasks = dateStr != null && !dateStr.isBlank()
+                ? dailyTaskService.getTasksForDateWithIncompletePrevious(LocalDate.parse(dateStr, DATE_FORMATTER))
+                : dailyTaskService.getActiveTasks();
         return ResponseEntity.ok(ApiResponse.<List<DailyTask>>builder()
                 .data(tasks)
                 .meta(buildMeta("fetch"))

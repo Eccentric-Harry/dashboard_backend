@@ -44,10 +44,16 @@ public class DailyTaskService {
                 .title(request.getTitle())
                 .date(LocalDate.parse(request.getDate()))
                 .scheduledTime(request.getScheduledTime())
+                .startTime(normalizeTime(request.getScheduledTime()))
+                .allDay(normalizeTime(request.getScheduledTime()) == null)
+                .itemType("TASK")
+                .category("Learning")
+                .color("#c9bff6")
                 .notes(request.getNotes())
                 .completed(request.getCompleted() != null ? request.getCompleted() : false)
                 .completedAt(isCompleted ? LocalDateTime.now() : null)
                 .sortOrder(request.getSortOrder() != null ? request.getSortOrder() : nextOrder)
+                .recurrenceFrequency("NONE")
                 .build();
         return dailyTaskRepository.save(task);
     }
@@ -59,6 +65,20 @@ public class DailyTaskService {
         existing.setTitle(request.getTitle());
         existing.setDate(LocalDate.parse(request.getDate()));
         existing.setScheduledTime(request.getScheduledTime());
+        existing.setStartTime(normalizeTime(request.getScheduledTime()));
+        existing.setAllDay(normalizeTime(request.getScheduledTime()) == null);
+        if (existing.getItemType() == null) {
+            existing.setItemType("TASK");
+        }
+        if (existing.getCategory() == null) {
+            existing.setCategory("Learning");
+        }
+        if (existing.getColor() == null) {
+            existing.setColor("#c9bff6");
+        }
+        if (existing.getRecurrenceFrequency() == null) {
+            existing.setRecurrenceFrequency("NONE");
+        }
         existing.setNotes(request.getNotes());
         if (request.getCompleted() != null) {
             boolean wasCompleted = Boolean.TRUE.equals(existing.getCompleted());
@@ -101,5 +121,31 @@ public class DailyTaskService {
                         .thenComparing(DailyTask::getScheduledTime, Comparator.nullsLast(String::compareToIgnoreCase))
                         .thenComparing(DailyTask::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
+    }
+
+    private String normalizeTime(String scheduledTime) {
+        if (scheduledTime == null || scheduledTime.isBlank()) {
+            return null;
+        }
+        String trimmed = scheduledTime.trim();
+        if (trimmed.matches("\\d{2}:\\d{2}")) {
+            return trimmed;
+        }
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("^(\\d{1,2}):(\\d{2})\\s*(AM|PM)$", java.util.regex.Pattern.CASE_INSENSITIVE)
+                .matcher(trimmed);
+        if (!matcher.matches()) {
+            return trimmed;
+        }
+        int hour = Integer.parseInt(matcher.group(1));
+        String minute = matcher.group(2);
+        String period = matcher.group(3).toUpperCase();
+        if ("PM".equals(period) && hour < 12) {
+            hour += 12;
+        }
+        if ("AM".equals(period) && hour == 12) {
+            hour = 0;
+        }
+        return String.format("%02d:%s", hour, minute);
     }
 }
