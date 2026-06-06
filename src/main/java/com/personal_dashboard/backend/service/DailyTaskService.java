@@ -20,20 +20,28 @@ public class DailyTaskService {
     private final DailyTaskRepository dailyTaskRepository;
 
     public List<DailyTask> getTasksForDate(LocalDate date) {
-        return sortTasks(dailyTaskRepository.findByDateRange(date, date.plusDays(1)));
+        return sortTasks(dailyTaskRepository.findByDateRange(date, date.plusDays(1)).stream()
+                .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
+                .toList());
     }
 
     public List<DailyTask> getTasksForDateWithIncompletePrevious(LocalDate date) {
-        return sortTasks(dailyTaskRepository.findTasksForDateWithIncompletePrevious(date, date.plusDays(1)));
+        return sortTasks(dailyTaskRepository.findTasksForDateWithIncompletePrevious(date, date.plusDays(1)).stream()
+                .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
+                .toList());
     }
 
     public List<DailyTask> getActiveTasks() {
         LocalDateTime cutoff = LocalDateTime.now().minusHours(48);
-        return sortTasks(dailyTaskRepository.findActiveTasks(cutoff));
+        return sortTasks(dailyTaskRepository.findActiveTasks(cutoff).stream()
+                .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
+                .toList());
     }
 
     public List<DailyTask> getTasksForRange(LocalDate startDate, LocalDate endDate) {
-        return sortTasks(dailyTaskRepository.findByDateRange(startDate, endDate.plusDays(1)));
+        return sortTasks(dailyTaskRepository.findByDateRange(startDate, endDate.plusDays(1)).stream()
+                .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
+                .toList());
     }
 
     public DailyTask createTask(DailyTaskRequest request) {

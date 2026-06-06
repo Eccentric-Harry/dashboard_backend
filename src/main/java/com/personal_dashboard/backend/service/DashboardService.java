@@ -387,7 +387,9 @@ public class DashboardService {
         LocalDate startDate = targetDate.minusDays(13); // 14 days total
 
         List<Learning> rangeLearnings = learningRepository.findByDateRange(startDate, targetDate);
-        List<DailyTask> rangeTasks = dailyTaskRepository.findByDateRange(startDate, targetDate.plusDays(1));
+        List<DailyTask> rangeTasks = dailyTaskRepository.findByDateRange(startDate, targetDate.plusDays(1)).stream()
+                .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
+                .toList();
         List<DailyLog> rangeLogs = dailyLogRepository.findByDateRange(startDate, targetDate);
 
         Map<LocalDate, List<Learning>> learningsByDate = rangeLearnings.stream()
@@ -415,7 +417,9 @@ public class DashboardService {
         }
 
         List<Learning> todayLearnings = learningsByDate.getOrDefault(targetDate, List.of());
-        List<DailyTask> todayTasks = dailyTaskRepository.findActiveTasks(LocalDateTime.now().minusHours(48));
+        List<DailyTask> todayTasks = dailyTaskRepository.findActiveTasks(LocalDateTime.now().minusHours(48)).stream()
+                .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
+                .toList();
         int todayTasksCompleted = (int) todayTasks.stream()
                 .filter(t -> Boolean.TRUE.equals(t.getCompleted()))
                 .count();
