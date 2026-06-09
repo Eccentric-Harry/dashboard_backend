@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import nl.martijndwars.webpush.Notification;
 import nl.martijndwars.webpush.PushService;
 import nl.martijndwars.webpush.Subscription;
+import nl.martijndwars.webpush.Urgency;
 import nl.martijndwars.webpush.Utils;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.springframework.stereotype.Service;
@@ -93,7 +94,7 @@ public class PushNotificationService {
             String payload = String.format("{\"title\":\"%s\",\"body\":\"%s\",\"url\":\"%s\"}",
                     escapeJson(title), escapeJson(message), escapeJson(clickUrl));
 
-            Notification notification = new Notification(webpushSubscription, payload);
+            Notification notification = new Notification(webpushSubscription, payload, Urgency.HIGH);
 
             PushService pushService = new PushService(
                     this.vapidPublicKey,
