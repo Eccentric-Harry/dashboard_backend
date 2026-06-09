@@ -81,8 +81,11 @@ public class DailyTaskController {
 
     @PatchMapping("/{id}/toggle")
     @Operation(summary = "Toggle task completion", description = "Flip completed status")
-    public ResponseEntity<ApiResponse<DailyTask>> toggleTask(@PathVariable String id) {
-        DailyTask updated = dailyTaskService.toggleTask(id);
+    public ResponseEntity<ApiResponse<DailyTask>> toggleTask(
+            @PathVariable String id,
+            @RequestParam(required = false) String date) {
+        LocalDate occurrenceDate = (date != null && !date.isBlank()) ? LocalDate.parse(date, DATE_FORMATTER) : null;
+        DailyTask updated = dailyTaskService.toggleTask(id, occurrenceDate);
         return ResponseEntity.ok(ApiResponse.<DailyTask>builder()
                 .data(updated)
                 .meta(buildMeta("toggle"))

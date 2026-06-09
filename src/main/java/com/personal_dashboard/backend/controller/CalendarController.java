@@ -93,9 +93,15 @@ public class CalendarController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete calendar item", description = "Delete a source calendar item")
-    public ResponseEntity<ApiResponse<Void>> deleteItem(@PathVariable String id) {
-        calendarItemService.deleteItem(id);
+    @Operation(summary = "Delete calendar item", description = "Delete a source calendar item or occurrence")
+    public ResponseEntity<ApiResponse<Void>> deleteItem(
+            @PathVariable String id,
+            @RequestParam(required = false) String date) {
+        if (date != null && !date.isBlank()) {
+            calendarItemService.deleteOccurrence(id, LocalDate.parse(date, DATE_FORMATTER));
+        } else {
+            calendarItemService.deleteItem(id);
+        }
         return ResponseEntity.ok(ApiResponse.<Void>builder()
                 .data(null)
                 .meta(buildMeta("delete"))

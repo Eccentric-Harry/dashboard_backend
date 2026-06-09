@@ -405,6 +405,7 @@ public class DashboardService {
             List<Learning> dayLearnings = learningsByDate.getOrDefault(date, List.of());
             List<DailyTask> dayTasks = tasksByDate.getOrDefault(date, List.of());
             int tasksCompleted = (int) dayTasks.stream()
+                    .filter(t -> t.getExcludedDates() == null || !t.getExcludedDates().contains(finalDate))
                     .filter(t -> {
                         if (t.getRecurrenceFrequency() != null && !"NONE".equalsIgnoreCase(t.getRecurrenceFrequency())) {
                             return t.getCompletedDates() != null && t.getCompletedDates().contains(finalDate);
@@ -425,6 +426,7 @@ public class DashboardService {
         List<Learning> todayLearnings = learningsByDate.getOrDefault(targetDate, List.of());
         List<DailyTask> todayTasks = dailyTaskRepository.findActiveTasks(LocalDateTime.now().minusHours(48)).stream()
                 .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
+                .filter(t -> t.getExcludedDates() == null || !t.getExcludedDates().contains(targetDate))
                 .toList();
         int todayTasksCompleted = (int) todayTasks.stream()
                 .filter(t -> {

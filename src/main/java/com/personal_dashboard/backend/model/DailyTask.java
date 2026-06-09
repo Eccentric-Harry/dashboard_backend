@@ -56,4 +56,5 @@ public class DailyTask {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     private List<LocalDate> completedDates;
+    private List<LocalDate> excludedDates;
 }

@@ -26,9 +26,19 @@ public class DailyTaskService {
     }
 
     public List<DailyTask> getTasksForDateWithIncompletePrevious(LocalDate date) {
-        return sortTasks(dailyTaskRepository.findTasksForDateWithIncompletePrevious(date, date.plusDays(1)).stream()
+        List<DailyTask> tasks = dailyTaskRepository.findTasksForDateWithIncompletePrevious(date, date.plusDays(1)).stream()
                 .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
-                .toList());
+                .filter(t -> t.getExcludedDates() == null || !t.getExcludedDates().contains(date))
+                .map(t -> {
+                    String recurrence = t.getRecurrenceFrequency() != null ? t.getRecurrenceFrequency() : "NONE";
+                    if (!"NONE".equalsIgnoreCase(recurrence)) {
+                        boolean isCompleted = t.getCompletedDates() != null && t.getCompletedDates().contains(date);
+                        t.setCompleted(isCompleted);
+                    }
+                    return t;
+                })
+                .toList();
+        return sortTasks(tasks);
     }
 
     public List<DailyTask> getActiveTasks() {
@@ -106,11 +116,34 @@ public class DailyTaskService {
     }
 
     public DailyTask toggleTask(String id) {
+        return toggleTask(id, null);
+    }
+
+    public DailyTask toggleTask(String id, LocalDate occurrenceDate) {
         DailyTask existing = dailyTaskRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Task not found with id: " + id));
-        boolean newCompleted = existing.getCompleted() == null || !existing.getCompleted();
-        existing.setCompleted(newCompleted);
-        existing.setCompletedAt(newCompleted ? LocalDateTime.now() : null);
+        String recurrence = existing.getRecurrenceFrequency() != null ? existing.getRecurrenceFrequency() : "NONE";
+
+        if (occurrenceDate != null && !"NONE".equals(recurrence)) {
+            List<LocalDate> completedDates = existing.getCompletedDates();
+            if (completedDates == null) {
+                completedDates = new java.util.ArrayList<>();
+            } else {
+                completedDates = new java.util.ArrayList<>(completedDates);
+            }
+
+            if (completedDates.contains(occurrenceDate)) {
+                completedDates.remove(occurrenceDate);
+            } else {
+                completedDates.add(occurrenceDate);
+            }
+            existing.setCompletedDates(completedDates);
+            existing.setCompleted(completedDates.contains(occurrenceDate));
+        } else {
+            boolean newCompleted = existing.getCompleted() == null || !existing.getCompleted();
+            existing.setCompleted(newCompleted);
+            existing.setCompletedAt(newCompleted ? LocalDateTime.now() : null);
+        }
         return dailyTaskRepository.save(existing);
     }
 

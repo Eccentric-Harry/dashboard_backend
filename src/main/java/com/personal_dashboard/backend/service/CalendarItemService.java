@@ -56,6 +56,21 @@ public class CalendarItemService {
         validateRequest(request);
         int nextOrder = dailyTaskRepository.findByDateRange(date, date.plusDays(1)).size();
         boolean completed = Boolean.TRUE.equals(request.getCompleted());
+        String recurrence = defaultText(request.getRecurrenceFrequency(), "NONE").toUpperCase(Locale.ROOT);
+
+        List<LocalDate> completedDates = null;
+        boolean parentCompleted = false;
+        LocalDateTime completedAt = null;
+
+        if (!"NONE".equals(recurrence)) {
+            completedDates = new java.util.ArrayList<>();
+            if (completed) {
+                completedDates.add(date);
+            }
+        } else {
+            parentCompleted = completed;
+            completedAt = completed ? LocalDateTime.now() : null;
+        }
 
         DailyTask item = DailyTask.builder()
                 .title(request.getTitle().trim())
@@ -68,10 +83,11 @@ public class CalendarItemService {
                 .category(defaultText(request.getCategory(), "Personal"))
                 .color(defaultColor(request.getCategory(), request.getColor()))
                 .notes(blankToNull(request.getNotes()))
-                .completed(completed)
-                .completedAt(completed ? LocalDateTime.now() : null)
+                .completed(parentCompleted)
+                .completedAt(completedAt)
+                .completedDates(completedDates)
                 .sortOrder(request.getSortOrder() != null ? request.getSortOrder() : nextOrder)
-                .recurrenceFrequency(defaultText(request.getRecurrenceFrequency(), "NONE").toUpperCase(Locale.ROOT))
+                .recurrenceFrequency(recurrence)
                 .recurrenceUntil(parseOptionalDate(request.getRecurrenceUntil()))
                 .build();
         return dailyTaskRepository.save(item);
@@ -80,8 +96,7 @@ public class CalendarItemService {
     public DailyTask updateItem(String id, CalendarItemRequest request) {
         validateRequest(request);
         DailyTask existing = getItem(id);
-        boolean wasCompleted = Boolean.TRUE.equals(existing.getCompleted());
-        boolean completed = request.getCompleted() != null ? request.getCompleted() : wasCompleted;
+        String recurrence = defaultText(request.getRecurrenceFrequency(), "NONE").toUpperCase(Locale.ROOT);
 
         existing.setTitle(request.getTitle().trim());
         existing.setDate(LocalDate.parse(request.getDate()));
@@ -93,16 +108,42 @@ public class CalendarItemService {
         existing.setCategory(defaultText(request.getCategory(), "Personal"));
         existing.setColor(defaultColor(request.getCategory(), request.getColor()));
         existing.setNotes(blankToNull(request.getNotes()));
-        existing.setCompleted(completed);
-        if (completed && !wasCompleted) {
-            existing.setCompletedAt(LocalDateTime.now());
-        } else if (!completed) {
+
+        if (!"NONE".equals(recurrence)) {
+            LocalDate occurrenceDate = LocalDate.parse(request.getDate());
+            List<LocalDate> completedDates = existing.getCompletedDates();
+            if (completedDates == null) {
+                completedDates = new java.util.ArrayList<>();
+            } else {
+                completedDates = new java.util.ArrayList<>(completedDates);
+            }
+            boolean requestedCompleted = Boolean.TRUE.equals(request.getCompleted());
+            if (requestedCompleted) {
+                if (!completedDates.contains(occurrenceDate)) {
+                    completedDates.add(occurrenceDate);
+                }
+            } else {
+                completedDates.remove(occurrenceDate);
+            }
+            existing.setCompletedDates(completedDates);
+            existing.setCompleted(false);
             existing.setCompletedAt(null);
+        } else {
+            existing.setCompletedDates(null);
+            boolean wasCompleted = Boolean.TRUE.equals(existing.getCompleted());
+            boolean completed = request.getCompleted() != null ? request.getCompleted() : wasCompleted;
+            existing.setCompleted(completed);
+            if (completed && !wasCompleted) {
+                existing.setCompletedAt(LocalDateTime.now());
+            } else if (!completed) {
+                existing.setCompletedAt(null);
+            }
         }
+
         if (request.getSortOrder() != null) {
             existing.setSortOrder(request.getSortOrder());
         }
-        existing.setRecurrenceFrequency(defaultText(request.getRecurrenceFrequency(), "NONE").toUpperCase(Locale.ROOT));
+        existing.setRecurrenceFrequency(recurrence);
         existing.setRecurrenceUntil(parseOptionalDate(request.getRecurrenceUntil()));
         return dailyTaskRepository.save(existing);
     }
@@ -144,6 +185,21 @@ public class CalendarItemService {
         dailyTaskRepository.deleteById(id);
     }
 
+    public void deleteOccurrence(String id, LocalDate date) {
+        DailyTask existing = getItem(id);
+        List<LocalDate> excludedDates = existing.getExcludedDates();
+        if (excludedDates == null) {
+            excludedDates = new java.util.ArrayList<>();
+        } else {
+            excludedDates = new java.util.ArrayList<>(excludedDates);
+        }
+        if (!excludedDates.contains(date)) {
+            excludedDates.add(date);
+        }
+        existing.setExcludedDates(excludedDates);
+        dailyTaskRepository.save(existing);
+    }
+
     private List<CalendarItemOccurrence> expandItem(DailyTask item, LocalDate startDate, LocalDate endDate) {
         String recurrence = defaultText(item.getRecurrenceFrequency(), "NONE").toUpperCase(Locale.ROOT);
         if ("NONE".equals(recurrence)) {
@@ -167,7 +223,9 @@ public class CalendarItemService {
         }
         while (!cursor.isAfter(recurrenceEnd) && guard++ < 5000) {
             if (!cursor.isBefore(startDate)) {
-                occurrences.add(CalendarItemOccurrence.from(item, cursor));
+                if (item.getExcludedDates() == null || !item.getExcludedDates().contains(cursor)) {
+                    occurrences.add(CalendarItemOccurrence.from(item, cursor));
+                }
             }
             cursor = nextOccurrence(cursor, recurrence);
         }
