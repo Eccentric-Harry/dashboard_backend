@@ -108,10 +108,32 @@ public class CalendarItemService {
     }
 
     public DailyTask toggleItem(String id) {
+        return toggleItem(id, null);
+    }
+
+    public DailyTask toggleItem(String id, LocalDate occurrenceDate) {
         DailyTask existing = getItem(id);
-        boolean completed = existing.getCompleted() == null || !existing.getCompleted();
-        existing.setCompleted(completed);
-        existing.setCompletedAt(completed ? LocalDateTime.now() : null);
+        String recurrence = existing.getRecurrenceFrequency() != null ? existing.getRecurrenceFrequency() : "NONE";
+
+        if (occurrenceDate != null && !"NONE".equals(recurrence)) {
+            List<LocalDate> completedDates = existing.getCompletedDates();
+            if (completedDates == null) {
+                completedDates = new java.util.ArrayList<>();
+            } else {
+                completedDates = new java.util.ArrayList<>(completedDates);
+            }
+
+            if (completedDates.contains(occurrenceDate)) {
+                completedDates.remove(occurrenceDate);
+            } else {
+                completedDates.add(occurrenceDate);
+            }
+            existing.setCompletedDates(completedDates);
+        } else {
+            boolean completed = existing.getCompleted() == null || !existing.getCompleted();
+            existing.setCompleted(completed);
+            existing.setCompletedAt(completed ? LocalDateTime.now() : null);
+        }
         return dailyTaskRepository.save(existing);
     }
 

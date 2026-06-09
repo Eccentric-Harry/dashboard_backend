@@ -59,9 +59,16 @@ public class PushNotificationScheduler {
                 for (DailyTask item : candidates) {
                     if (item.getId() == null) continue;
 
+                    boolean isCompleted;
+                    if (item.getRecurrenceFrequency() != null && !"NONE".equals(item.getRecurrenceFrequency())) {
+                        isCompleted = item.getCompletedDates() != null && item.getCompletedDates().contains(localDate);
+                    } else {
+                        isCompleted = Boolean.TRUE.equals(item.getCompleted());
+                    }
+
                     // Skip tasks or reminders that are already completed
                     if (("TASK".equals(item.getItemType()) || "REMINDER".equals(item.getItemType())) 
-                            && Boolean.TRUE.equals(item.getCompleted())) {
+                            && isCompleted) {
                         continue;
                     }
 

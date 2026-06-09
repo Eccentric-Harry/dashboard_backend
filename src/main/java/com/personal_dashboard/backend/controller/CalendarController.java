@@ -82,9 +82,12 @@ public class CalendarController {
 
     @PatchMapping("/{id}/toggle")
     @Operation(summary = "Toggle completion", description = "Toggle completion for task-like calendar items")
-    public ResponseEntity<ApiResponse<DailyTask>> toggleItem(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<DailyTask>> toggleItem(
+            @PathVariable String id,
+            @RequestParam(required = false) String date) {
+        LocalDate occurrenceDate = (date != null && !date.isBlank()) ? LocalDate.parse(date, DATE_FORMATTER) : null;
         return ResponseEntity.ok(ApiResponse.<DailyTask>builder()
-                .data(calendarItemService.toggleItem(id))
+                .data(calendarItemService.toggleItem(id, occurrenceDate))
                 .meta(buildMeta("toggle"))
                 .build());
     }

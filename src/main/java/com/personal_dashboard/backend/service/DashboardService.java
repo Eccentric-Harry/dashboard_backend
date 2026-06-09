@@ -401,10 +401,16 @@ public class DashboardService {
 
         List<LearningsTimelineDay> timeline = new ArrayList<>();
         for (LocalDate date = startDate; !date.isAfter(targetDate); date = date.plusDays(1)) {
+            final LocalDate finalDate = date;
             List<Learning> dayLearnings = learningsByDate.getOrDefault(date, List.of());
             List<DailyTask> dayTasks = tasksByDate.getOrDefault(date, List.of());
             int tasksCompleted = (int) dayTasks.stream()
-                    .filter(t -> Boolean.TRUE.equals(t.getCompleted()))
+                    .filter(t -> {
+                        if (t.getRecurrenceFrequency() != null && !"NONE".equalsIgnoreCase(t.getRecurrenceFrequency())) {
+                            return t.getCompletedDates() != null && t.getCompletedDates().contains(finalDate);
+                        }
+                        return Boolean.TRUE.equals(t.getCompleted());
+                    })
                     .count();
             int intensity = calculateIntensity(dayLearnings.size() + tasksCompleted);
 
@@ -421,7 +427,12 @@ public class DashboardService {
                 .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
                 .toList();
         int todayTasksCompleted = (int) todayTasks.stream()
-                .filter(t -> Boolean.TRUE.equals(t.getCompleted()))
+                .filter(t -> {
+                    if (t.getRecurrenceFrequency() != null && !"NONE".equalsIgnoreCase(t.getRecurrenceFrequency())) {
+                        return t.getCompletedDates() != null && t.getCompletedDates().contains(targetDate);
+                    }
+                    return Boolean.TRUE.equals(t.getCompleted());
+                })
                 .count();
 
         Map<String, Long> categoryCounts = todayLearnings.stream()

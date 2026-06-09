@@ -34,6 +34,13 @@ public class CalendarItemOccurrence {
     private LocalDateTime createdAt;
 
     public static CalendarItemOccurrence from(DailyTask item, LocalDate occurrenceDate) {
+        boolean isCompleted;
+        if (item.getRecurrenceFrequency() != null && !"NONE".equals(item.getRecurrenceFrequency())) {
+            isCompleted = item.getCompletedDates() != null && item.getCompletedDates().contains(occurrenceDate);
+        } else {
+            isCompleted = Boolean.TRUE.equals(item.getCompleted());
+        }
+
         return CalendarItemOccurrence.builder()
                 .id(item.getId())
                 .occurrenceId(item.getId() + ":" + occurrenceDate)
@@ -47,7 +54,7 @@ public class CalendarItemOccurrence {
                 .category(item.getCategory() != null ? item.getCategory() : "Personal")
                 .color(item.getColor())
                 .notes(item.getNotes())
-                .completed(item.getCompleted())
+                .completed(isCompleted)
                 .sortOrder(item.getSortOrder())
                 .recurrenceFrequency(item.getRecurrenceFrequency() != null ? item.getRecurrenceFrequency() : "NONE")
                 .recurrenceUntil(item.getRecurrenceUntil())
