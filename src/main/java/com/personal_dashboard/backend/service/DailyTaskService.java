@@ -48,6 +48,13 @@ public class DailyTaskService {
                 .toList());
     }
 
+    public List<DailyTask> getAllTasks() {
+        log.info("Fetching all tasks");
+        return sortTasks(dailyTaskRepository.findAll().stream()
+                .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
+                .toList());
+    }
+
     public List<DailyTask> getTasksForRange(LocalDate startDate, LocalDate endDate) {
         return sortTasks(dailyTaskRepository.findByDateRange(startDate, endDate.plusDays(1)).stream()
                 .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
