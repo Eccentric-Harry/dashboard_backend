@@ -24,6 +24,7 @@ public class Learning {
     private String description;
     private String category;
     private LocalDate date;
+    private String notionUrl;
 
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
