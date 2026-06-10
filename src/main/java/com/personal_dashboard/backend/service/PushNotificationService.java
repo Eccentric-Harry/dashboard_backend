@@ -16,6 +16,12 @@ import org.springframework.stereotype.Service;
 import java.security.KeyPair;
 import java.security.Security;
 import java.util.Base64;
+import nl.martijndwars.webpush.Encoding;
+import org.apache.http.Header;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import jakarta.annotation.PreDestroy;
 
 @Slf4j
 @Service
@@ -26,6 +32,17 @@ public class PushNotificationService {
 
     private String vapidPublicKey;
     private String vapidPrivateKey;
+
+    private final CloseableHttpClient httpClient = HttpClients.createDefault();
+
+    @PreDestroy
+    public void cleanUp() {
+        try {
+            httpClient.close();
+        } catch (Exception e) {
+            log.warn("Failed to close push http client", e);
+        }
+    }
 
     static {
         // Add BouncyCastle provider for EC Cryptography needed by VAPID
@@ -102,7 +119,24 @@ public class PushNotificationService {
                     "mailto:admin@personal-dashboard.com"
             );
 
-            var response = pushService.send(notification);
+            // Select encoding: use AES128GCM for modern endpoints, legacy AESGCM only for legacy GCM/Android endpoints
+            Encoding encoding = Encoding.AES128GCM;
+            if (sub.getEndpoint().contains("/gcm/send") || sub.getEndpoint().contains("android.googleapis.com")) {
+                encoding = Encoding.AESGCM;
+            }
+
+            HttpPost post = pushService.preparePost(notification, encoding);
+
+            // Strip trailing '=' padding from the Crypto-Key header if present to satisfy strict FCM formatting requirements
+            Header cryptoKeyHeader = post.getFirstHeader("Crypto-Key");
+            if (cryptoKeyHeader != null) {
+                String val = cryptoKeyHeader.getValue();
+                if (val.endsWith("=")) {
+                    post.setHeader("Crypto-Key", val.substring(0, val.length() - 1));
+                }
+            }
+
+            var response = httpClient.execute(post);
             int statusCode = response.getStatusLine().getStatusCode();
 
             if (statusCode == 201) {
@@ -111,7 +145,19 @@ public class PushNotificationService {
                 log.warn("Subscription expired or is invalid (Status {}), cleaning up database.", statusCode);
                 pushSubscriptionRepository.delete(sub);
             } else {
-                log.error("Failed to send push notification, status code: {}", statusCode);
+                String responseBody = "";
+                if (response.getEntity() != null) {
+                    try {
+                        responseBody = org.apache.http.util.EntityUtils.toString(response.getEntity());
+                    } catch (Exception re) {
+                        log.warn("Failed to read push response body", re);
+                    }
+                }
+                log.error("Failed to send push notification, status code: {}, response: {}", statusCode, responseBody);
+                if (statusCode == 403) {
+                    log.warn("Received 403 Forbidden, cleaning up subscription to prevent infinite retry loop.");
+                    pushSubscriptionRepository.delete(sub);
+                }
             }
         } catch (Exception e) {
             log.error("Error dispatching push notification to subscription " + sub.getId(), e);

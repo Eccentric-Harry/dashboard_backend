@@ -40,6 +40,7 @@ public class LearningService {
                 .description(request.getDescription())
                 .category(request.getCategory())
                 .date(LocalDate.parse(request.getDate()))
+                .notionUrl(request.getNotionUrl())
                 .build();
 
         return learningRepository.save(learning);
@@ -55,6 +56,7 @@ public class LearningService {
         existing.setDescription(request.getDescription());
         existing.setCategory(request.getCategory());
         existing.setDate(LocalDate.parse(request.getDate()));
+        existing.setNotionUrl(request.getNotionUrl());
 
         return learningRepository.save(existing);
     }

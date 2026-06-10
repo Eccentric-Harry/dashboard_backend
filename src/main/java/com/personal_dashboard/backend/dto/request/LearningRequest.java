@@ -25,4 +25,6 @@ public class LearningRequest {
     @NotBlank(message = "Date is required")
     @Pattern(regexp = "\\d{4}-\\d{2}-\\d{2}", message = "Date must be in format YYYY-MM-DD")
     private String date;
+
+    private String notionUrl;
 }
