@@ -26,6 +26,7 @@ public class DashboardService {
     private final DailyLogRepository dailyLogRepository;
     private final LearningRepository learningRepository;
     private final DailyTaskRepository dailyTaskRepository;
+    private final LearningPursuitRepository learningPursuitRepository;
 
     private static final int CALORIE_GOAL = 2000;
     private static final int PROTEIN_GOAL = 100;
@@ -452,6 +453,17 @@ public class DashboardService {
         int weeklyLearningCount = rangeLearnings.size();
         int streakDays = calculateActivityStreak(timeline);
 
+        List<DailyTask> allTasks = dailyTaskRepository.findAll().stream()
+                .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
+                .toList();
+        long totalTasksCompleted = allTasks.stream()
+                .filter(t -> Boolean.TRUE.equals(t.getCompleted()))
+                .count();
+        long totalTasksCount = allTasks.size();
+
+        long totalLearningsCount = learningRepository.count();
+        long totalPursuitsCount = learningPursuitRepository.count();
+
         LearningsTodaySummary today = LearningsTodaySummary.builder()
                 .learningsCount(todayLearnings.size())
                 .tasksTotal(todayTasks.size())
@@ -462,6 +474,10 @@ public class DashboardService {
         LearningsStatsSummary stats = LearningsStatsSummary.builder()
                 .weeklyLearningCount(weeklyLearningCount)
                 .streakDays(streakDays)
+                .totalTasksCompleted(totalTasksCompleted)
+                .totalTasksCount(totalTasksCount)
+                .totalLearningsCount(totalLearningsCount)
+                .totalPursuitsCount(totalPursuitsCount)
                 .build();
 
         return LearningsSummaryResponse.builder()

@@ -13,4 +13,8 @@ public class LearningsStatsSummary {
 
     private Integer weeklyLearningCount;
     private Integer streakDays;
+    private Long totalTasksCompleted;
+    private Long totalTasksCount;
+    private Long totalLearningsCount;
+    private Long totalPursuitsCount;
 }
