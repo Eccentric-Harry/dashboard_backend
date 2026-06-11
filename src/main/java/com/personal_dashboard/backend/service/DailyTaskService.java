@@ -72,7 +72,7 @@ public class DailyTaskService {
                 .startTime(normalizeTime(request.getScheduledTime()))
                 .allDay(normalizeTime(request.getScheduledTime()) == null)
                 .itemType("TASK")
-                .category("Learning")
+                .category(request.getCategory() != null ? request.getCategory() : "Personal")
                 .color("#c9bff6")
                 .notes(request.getNotes())
                 .completed(request.getCompleted() != null ? request.getCompleted() : false)
@@ -95,8 +95,8 @@ public class DailyTaskService {
         if (existing.getItemType() == null) {
             existing.setItemType("TASK");
         }
-        if (existing.getCategory() == null) {
-            existing.setCategory("Learning");
+        if (request.getCategory() != null) {
+            existing.setCategory(request.getCategory());
         }
         if (existing.getColor() == null) {
             existing.setColor("#c9bff6");

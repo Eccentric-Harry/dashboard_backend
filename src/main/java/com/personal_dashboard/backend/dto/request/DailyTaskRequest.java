@@ -24,4 +24,5 @@ public class DailyTaskRequest {
     private String notes;
     private Boolean completed;
     private Integer sortOrder;
+    private String category;
 }
