@@ -20,6 +20,7 @@ public class CorsConfig implements WebMvcConfigurer {
                         "https://dashboard-6ni3iac5z-eccentric-harry-prod.vercel.app",
                         "https://dashboard-lzenpw83a-eccentric-harry-prod.vercel.app/",
                         "https://dashboard-ui-git-release-100-eccentric-harry-prod.vercel.app/",
+                        "https://harrysdashboard.vercel.app",
                         "https://dashboard-ui-eccentric-harry-prod.vercel.app/")
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
                 .allowedHeaders("*")
