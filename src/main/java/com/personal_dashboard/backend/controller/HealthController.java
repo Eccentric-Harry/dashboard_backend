@@ -43,6 +43,11 @@ public class HealthController {
                 .calories(request.getCalories())
                 .proteinGrams(request.getProteinGrams())
                 .timestamp(Instant.now())
+                .analysisMetadata(request.getAnalysisMetadata())
+                .mealItems(request.getMealItems())
+                .totalSummary(request.getTotalSummary())
+                .gapsAndWarnings(request.getGapsAndWarnings())
+                .technicalDiagnostic(request.getTechnicalDiagnostic())
                 .build();
 
         DailyFoodLog savedLog = dailyFoodLogService.addMeal(
@@ -56,6 +61,11 @@ public class HealthController {
                 .proteinGrams(entry.getProteinGrams())
                 .mealType(request.getMealType())
                 .date(request.getDate())
+                .analysisMetadata(entry.getAnalysisMetadata())
+                .mealItems(entry.getMealItems())
+                .totalSummary(entry.getTotalSummary())
+                .gapsAndWarnings(entry.getGapsAndWarnings())
+                .technicalDiagnostic(entry.getTechnicalDiagnostic())
                 .build();
 
         return ResponseEntity.status(HttpStatus.CREATED).body(buildResponse(responseDto));
@@ -75,6 +85,11 @@ public class HealthController {
                 .description(request.getDescription())
                 .calories(request.getCalories())
                 .proteinGrams(request.getProteinGrams())
+                .analysisMetadata(request.getAnalysisMetadata())
+                .mealItems(request.getMealItems())
+                .totalSummary(request.getTotalSummary())
+                .gapsAndWarnings(request.getGapsAndWarnings())
+                .technicalDiagnostic(request.getTechnicalDiagnostic())
                 .build();
 
         DailyFoodLog result = dailyFoodLogService.updateMeal(
@@ -91,6 +106,11 @@ public class HealthController {
                 .proteinGrams(request.getProteinGrams())
                 .mealType(request.getMealType())
                 .date(mealId)
+                .analysisMetadata(request.getAnalysisMetadata())
+                .mealItems(request.getMealItems())
+                .totalSummary(request.getTotalSummary())
+                .gapsAndWarnings(request.getGapsAndWarnings())
+                .technicalDiagnostic(request.getTechnicalDiagnostic())
                 .build();
 
         return ResponseEntity.ok(buildResponse(responseDto));
