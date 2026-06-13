@@ -6,6 +6,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Embedded POJO representing a single meal entry within a DailyFoodLog.
@@ -43,4 +45,11 @@ public class MealEntry {
 
     /** When the meal was logged */
     private Instant timestamp;
+
+    // Rich Detailed Nutrition Payload
+    private Map<String, Object> analysisMetadata;
+    private List<Map<String, Object>> mealItems;
+    private Map<String, Object> totalSummary;
+    private List<String> gapsAndWarnings;
+    private Map<String, Object> technicalDiagnostic;
 }

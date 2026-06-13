@@ -344,6 +344,11 @@ public class DailyFoodLogService {
                 .servingNotes(entry.getServingNotes())
                 .sourceNotes(entry.getSourceNotes())
                 .timestamp(entry.getTimestamp() != null ? entry.getTimestamp().toString() : null)
+                .analysisMetadata(entry.getAnalysisMetadata())
+                .mealItems(entry.getMealItems())
+                .totalSummary(entry.getTotalSummary())
+                .gapsAndWarnings(entry.getGapsAndWarnings())
+                .technicalDiagnostic(entry.getTechnicalDiagnostic())
                 .build();
     }
 
@@ -376,6 +381,11 @@ public class DailyFoodLogService {
                         .serving(entry.getServing())
                         .servingNotes(entry.getServingNotes())
                         .sourceNotes(entry.getSourceNotes())
+                        .analysisMetadata(entry.getAnalysisMetadata())
+                        .mealItems(entry.getMealItems())
+                        .totalSummary(entry.getTotalSummary())
+                        .gapsAndWarnings(entry.getGapsAndWarnings())
+                        .technicalDiagnostic(entry.getTechnicalDiagnostic())
                         .build());
             }
         }

@@ -1,10 +1,14 @@
 package com.personal_dashboard.backend.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
@@ -32,4 +36,19 @@ public class FoodEntryRequest {
     @NotBlank(message = "Date is required")
     @Pattern(regexp = "\\d{4}-\\d{2}-\\d{2}", message = "Date must be in format YYYY-MM-DD")
     private String date;
+
+    @JsonProperty("analysis_metadata")
+    private Map<String, Object> analysisMetadata;
+
+    @JsonProperty("meal_items")
+    private List<Map<String, Object>> mealItems;
+
+    @JsonProperty("total_summary")
+    private Map<String, Object> totalSummary;
+
+    @JsonProperty("gaps_and_warnings")
+    private List<String> gapsAndWarnings;
+
+    @JsonProperty("technical_diagnostic")
+    private Map<String, Object> technicalDiagnostic;
 }
