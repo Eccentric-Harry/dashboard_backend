@@ -25,4 +25,7 @@ public class DailyTaskRequest {
     private Boolean completed;
     private Integer sortOrder;
     private String category;
+    
+    private java.util.List<com.personal_dashboard.backend.model.SubTask> subtasks;
+    private java.util.List<String> tags;
 }

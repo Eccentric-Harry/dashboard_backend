@@ -79,6 +79,8 @@ public class DailyTaskService {
                 .completedAt(isCompleted ? LocalDateTime.now() : null)
                 .sortOrder(request.getSortOrder() != null ? request.getSortOrder() : nextOrder)
                 .recurrenceFrequency("NONE")
+                .subtasks(request.getSubtasks())
+                .tags(request.getTags())
                 .build();
         return dailyTaskRepository.save(task);
     }
@@ -117,6 +119,13 @@ public class DailyTaskService {
         }
         if (request.getSortOrder() != null) {
             existing.setSortOrder(request.getSortOrder());
+        }
+        
+        if (request.getSubtasks() != null) {
+            existing.setSubtasks(request.getSubtasks());
+        }
+        if (request.getTags() != null) {
+            existing.setTags(request.getTags());
         }
 
         return dailyTaskRepository.save(existing);

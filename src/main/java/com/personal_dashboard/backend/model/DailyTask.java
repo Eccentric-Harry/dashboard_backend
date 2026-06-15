@@ -57,4 +57,7 @@ public class DailyTask {
 
     private List<LocalDate> completedDates;
     private List<LocalDate> excludedDates;
+
+    private List<SubTask> subtasks;
+    private List<String> tags;
 }
