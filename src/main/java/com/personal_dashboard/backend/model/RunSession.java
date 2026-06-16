@@ -9,6 +9,9 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
 import java.util.List;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import java.time.Instant;
 
 @Data
 @Builder
@@ -35,4 +38,10 @@ public class RunSession {
     private List<RunSplit> splits;
 
     private List<ElevationPoint> elevationProfile;
+
+    @CreatedDate
+    private Instant createdAt;
+
+    @LastModifiedDate
+    private Instant updatedAt;
 }

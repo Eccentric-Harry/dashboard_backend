@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 @Builder
@@ -31,7 +32,7 @@ public class CalendarItemOccurrence {
     private Integer sortOrder;
     private String recurrenceFrequency;
     private LocalDate recurrenceUntil;
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     public static CalendarItemOccurrence from(DailyTask item, LocalDate occurrenceDate) {
         boolean isCompleted;

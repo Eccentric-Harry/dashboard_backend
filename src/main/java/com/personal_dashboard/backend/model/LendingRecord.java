@@ -9,6 +9,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
 
 @Data
 @Builder
@@ -31,4 +33,10 @@ public class LendingRecord {
     private String status; // "Pending" or "Repaid"
 
     private String notes;
+
+    @CreatedDate
+    private Instant createdAt;
+
+    @LastModifiedDate
+    private Instant updatedAt;
 }

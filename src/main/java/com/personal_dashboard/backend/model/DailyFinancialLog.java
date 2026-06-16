@@ -11,6 +11,8 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
 
 @Data
 @Builder
@@ -30,4 +32,10 @@ public class DailyFinancialLog {
     /** Transactions grouped by category. Keys: "Food", "To Home", etc. */
     @Builder.Default
     private Map<String, List<FinancialTransaction>> transactions = new LinkedHashMap<>();
+
+    @CreatedDate
+    private Instant createdAt;
+
+    @LastModifiedDate
+    private Instant updatedAt;
 }

@@ -9,6 +9,9 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import java.time.Instant;
 
 @Data
 @Builder
@@ -22,6 +25,10 @@ public class Prompt {
     private String content;
     private String category;
     private List<String> tags;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+
+    @CreatedDate
+    private Instant createdAt;
+
+    @LastModifiedDate
+    private Instant updatedAt;
 }

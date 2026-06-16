@@ -8,6 +8,8 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
 
 /**
  * Embedded POJO representing a single meal entry within a DailyFoodLog.
@@ -52,4 +54,10 @@ public class MealEntry {
     private Map<String, Object> totalSummary;
     private List<String> gapsAndWarnings;
     private Map<String, Object> technicalDiagnostic;
+
+    @CreatedDate
+    private Instant createdAt;
+
+    @LastModifiedDate
+    private Instant updatedAt;
 }

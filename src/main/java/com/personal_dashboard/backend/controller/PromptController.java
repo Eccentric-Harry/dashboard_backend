@@ -47,7 +47,7 @@ public class PromptController {
     public ResponseEntity<ApiResponse<PromptDTO>> createPrompt(
             @Valid @RequestBody PromptRequest request) {
 
-        LocalDateTime now = LocalDateTime.now();
+        Instant now = Instant.now();
 
         Prompt prompt = Prompt.builder()
                 .title(request.getTitle())
@@ -80,7 +80,7 @@ public class PromptController {
         existingPrompt.setContent(request.getContent());
         existingPrompt.setCategory(request.getCategory());
         existingPrompt.setTags(request.getTags());
-        existingPrompt.setUpdatedAt(LocalDateTime.now());
+        existingPrompt.setUpdatedAt(Instant.now());
 
         Prompt savedPrompt = promptRepository.save(existingPrompt);
 

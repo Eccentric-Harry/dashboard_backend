@@ -10,6 +10,9 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import java.time.Instant;
 
 @Data
 @Builder
@@ -42,4 +45,10 @@ public class LearningPursuit {
         @JsonProperty("isCompleted")
         private boolean isCompleted;
     }
+
+    @CreatedDate
+    private Instant createdAt;
+
+    @LastModifiedDate
+    private Instant updatedAt;
 }

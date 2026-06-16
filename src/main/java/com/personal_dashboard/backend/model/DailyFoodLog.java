@@ -12,6 +12,9 @@ import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import java.time.Instant;
 
 /**
  * One document per day in the daily_food_logs collection.
@@ -42,4 +45,10 @@ public class DailyFoodLog {
 
     @Builder.Default
     private HydrationData hydration = new HydrationData();
+
+    @CreatedDate
+    private Instant createdAt;
+
+    @LastModifiedDate
+    private Instant updatedAt;
 }
