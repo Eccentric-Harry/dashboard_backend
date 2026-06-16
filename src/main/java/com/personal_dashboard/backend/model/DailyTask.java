@@ -70,4 +70,18 @@ public class DailyTask {
 
     @LastModifiedDate
     private Instant updatedAt;
+
+    public String getStatus() {
+        if (this.status != null) {
+            return this.status;
+        }
+        return (this.completed != null && this.completed) ? "DONE" : "TODO";
+    }
+
+    public Boolean getCompleted() {
+        if (this.completed != null) {
+            return this.completed;
+        }
+        return "DONE".equals(this.status);
+    }
 }

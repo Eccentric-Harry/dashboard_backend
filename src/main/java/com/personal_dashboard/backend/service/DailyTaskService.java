@@ -34,6 +34,7 @@ public class DailyTaskService {
                     if (!"NONE".equalsIgnoreCase(recurrence)) {
                         boolean isCompleted = t.getCompletedDates() != null && t.getCompletedDates().contains(date);
                         t.setCompleted(isCompleted);
+                        t.setStatus(isCompleted ? "DONE" : "TODO");
                     }
                     return t;
                 })
