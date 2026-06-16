@@ -45,6 +45,9 @@ public class DailyTask {
     @Builder.Default
     private Boolean completed = false;
 
+    @Builder.Default
+    private String status = "TODO"; // TODO, IN_PROGRESS, DONE
+
     private LocalDateTime completedAt;
 
     @Builder.Default

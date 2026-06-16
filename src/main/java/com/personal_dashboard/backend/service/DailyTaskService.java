@@ -65,6 +65,13 @@ public class DailyTaskService {
         LocalDate taskDate = LocalDate.parse(request.getDate());
         int nextOrder = dailyTaskRepository.findByDateRange(taskDate, taskDate.plusDays(1)).size();
         boolean isCompleted = Boolean.TRUE.equals(request.getCompleted());
+        String status = request.getStatus() != null ? request.getStatus() : (isCompleted ? "DONE" : "TODO");
+        if (isCompleted) {
+            status = "DONE";
+        } else if ("DONE".equals(status)) {
+            isCompleted = true;
+        }
+        
         DailyTask task = DailyTask.builder()
                 .title(request.getTitle())
                 .date(LocalDate.parse(request.getDate()))
@@ -75,7 +82,8 @@ public class DailyTaskService {
                 .category(request.getCategory() != null ? request.getCategory() : "Personal")
                 .color("#c9bff6")
                 .notes(request.getNotes())
-                .completed(request.getCompleted() != null ? request.getCompleted() : false)
+                .completed(isCompleted)
+                .status(status)
                 .completedAt(isCompleted ? LocalDateTime.now() : null)
                 .sortOrder(request.getSortOrder() != null ? request.getSortOrder() : nextOrder)
                 .recurrenceFrequency("NONE")
@@ -107,6 +115,17 @@ public class DailyTaskService {
             existing.setRecurrenceFrequency("NONE");
         }
         existing.setNotes(request.getNotes());
+        if (request.getStatus() != null) {
+            existing.setStatus(request.getStatus());
+            if ("DONE".equals(request.getStatus())) {
+                request.setCompleted(true);
+            } else {
+                request.setCompleted(false);
+            }
+        } else if (request.getCompleted() != null) {
+            existing.setStatus(Boolean.TRUE.equals(request.getCompleted()) ? "DONE" : "TODO");
+        }
+
         if (request.getCompleted() != null) {
             boolean wasCompleted = Boolean.TRUE.equals(existing.getCompleted());
             boolean isCompleted = Boolean.TRUE.equals(request.getCompleted());
@@ -155,9 +174,11 @@ public class DailyTaskService {
             }
             existing.setCompletedDates(completedDates);
             existing.setCompleted(completedDates.contains(occurrenceDate));
+            existing.setStatus(completedDates.contains(occurrenceDate) ? "DONE" : "TODO");
         } else {
             boolean newCompleted = existing.getCompleted() == null || !existing.getCompleted();
             existing.setCompleted(newCompleted);
+            existing.setStatus(newCompleted ? "DONE" : "TODO");
             existing.setCompletedAt(newCompleted ? LocalDateTime.now() : null);
         }
         return dailyTaskRepository.save(existing);

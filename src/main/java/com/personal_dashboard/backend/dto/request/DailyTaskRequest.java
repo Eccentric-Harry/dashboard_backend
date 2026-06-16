@@ -23,6 +23,7 @@ public class DailyTaskRequest {
     private String scheduledTime;
     private String notes;
     private Boolean completed;
+    private String status;
     private Integer sortOrder;
     private String category;
     
