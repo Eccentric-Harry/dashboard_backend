@@ -34,7 +34,6 @@ public class DailyTaskService {
                     if (!"NONE".equalsIgnoreCase(recurrence)) {
                         boolean isCompleted = t.getCompletedDates() != null && t.getCompletedDates().contains(date);
                         t.setCompleted(isCompleted);
-                        t.setStatus(isCompleted ? "DONE" : "TODO");
                     }
                     return t;
                 })
@@ -194,6 +193,11 @@ public class DailyTaskService {
 
     private List<DailyTask> sortTasks(List<DailyTask> tasks) {
         return tasks.stream()
+                .peek(t -> {
+                    if (Boolean.TRUE.equals(t.getCompleted()) && "TODO".equals(t.getStatus())) {
+                        t.setStatus("DONE");
+                    }
+                })
                 .sorted(Comparator
                         .comparing(DailyTask::getDate, Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(DailyTask::getSortOrder, Comparator.nullsLast(Comparator.naturalOrder()))
