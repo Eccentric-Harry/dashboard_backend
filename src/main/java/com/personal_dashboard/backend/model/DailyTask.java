@@ -46,6 +46,9 @@ public class DailyTask {
     private Boolean completed = false;
 
     @Builder.Default
+    private Boolean cancelled = false;
+
+    @Builder.Default
     private String status = "TODO"; // TODO, IN_PROGRESS, DONE
 
     private LocalDateTime completedAt;
@@ -60,6 +63,7 @@ public class DailyTask {
 
 
     private List<LocalDate> completedDates;
+    private List<LocalDate> cancelledDates;
     private List<LocalDate> excludedDates;
 
     private List<SubTask> subtasks;

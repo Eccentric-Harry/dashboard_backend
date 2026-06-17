@@ -92,6 +92,18 @@ public class CalendarController {
                 .build());
     }
 
+    @PatchMapping("/{id}/toggle-cancel")
+    @Operation(summary = "Toggle cancellation", description = "Toggle cancellation for calendar items")
+    public ResponseEntity<ApiResponse<DailyTask>> toggleCancelItem(
+            @PathVariable String id,
+            @RequestParam(required = false) String date) {
+        LocalDate occurrenceDate = (date != null && !date.isBlank()) ? LocalDate.parse(date, DATE_FORMATTER) : null;
+        return ResponseEntity.ok(ApiResponse.<DailyTask>builder()
+                .data(calendarItemService.toggleCancelItem(id, occurrenceDate))
+                .meta(buildMeta("toggle-cancel"))
+                .build());
+    }
+
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete calendar item", description = "Delete a source calendar item or occurrence")
     public ResponseEntity<ApiResponse<Void>> deleteItem(

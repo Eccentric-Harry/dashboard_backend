@@ -56,19 +56,27 @@ public class CalendarItemService {
         validateRequest(request);
         int nextOrder = dailyTaskRepository.findByDateRange(date, date.plusDays(1)).size();
         boolean completed = Boolean.TRUE.equals(request.getCompleted());
+        boolean cancelled = Boolean.TRUE.equals(request.getCancelled());
         String recurrence = defaultText(request.getRecurrenceFrequency(), "NONE").toUpperCase(Locale.ROOT);
 
         List<LocalDate> completedDates = null;
+        List<LocalDate> cancelledDates = null;
         boolean parentCompleted = false;
+        boolean parentCancelled = false;
         LocalDateTime completedAt = null;
 
         if (!"NONE".equals(recurrence)) {
             completedDates = new java.util.ArrayList<>();
+            cancelledDates = new java.util.ArrayList<>();
             if (completed) {
                 completedDates.add(date);
             }
+            if (cancelled) {
+                cancelledDates.add(date);
+            }
         } else {
             parentCompleted = completed;
+            parentCancelled = cancelled;
             completedAt = completed ? LocalDateTime.now() : null;
         }
 
@@ -84,8 +92,10 @@ public class CalendarItemService {
                 .color(defaultColor(request.getCategory(), request.getColor()))
                 .notes(blankToNull(request.getNotes()))
                 .completed(parentCompleted)
+                .cancelled(parentCancelled)
                 .completedAt(completedAt)
                 .completedDates(completedDates)
+                .cancelledDates(cancelledDates)
                 .sortOrder(request.getSortOrder() != null ? request.getSortOrder() : nextOrder)
                 .recurrenceFrequency(recurrence)
                 .recurrenceUntil(parseOptionalDate(request.getRecurrenceUntil()))
@@ -128,6 +138,24 @@ public class CalendarItemService {
             existing.setCompletedDates(completedDates);
             existing.setCompleted(false);
             existing.setCompletedAt(null);
+
+            List<LocalDate> cancelledDates = existing.getCancelledDates();
+            if (cancelledDates == null) {
+                cancelledDates = new java.util.ArrayList<>();
+            } else {
+                cancelledDates = new java.util.ArrayList<>(cancelledDates);
+            }
+            boolean requestedCancelled = Boolean.TRUE.equals(request.getCancelled());
+            if (requestedCancelled) {
+                if (!cancelledDates.contains(occurrenceDate)) {
+                    cancelledDates.add(occurrenceDate);
+                }
+            } else {
+                cancelledDates.remove(occurrenceDate);
+            }
+            existing.setCancelledDates(cancelledDates);
+            existing.setCancelled(false);
+
         } else {
             existing.setCompletedDates(null);
             boolean wasCompleted = Boolean.TRUE.equals(existing.getCompleted());
@@ -138,6 +166,11 @@ public class CalendarItemService {
             } else if (!completed) {
                 existing.setCompletedAt(null);
             }
+
+            existing.setCancelledDates(null);
+            boolean wasCancelled = Boolean.TRUE.equals(existing.getCancelled());
+            boolean cancelled = request.getCancelled() != null ? request.getCancelled() : wasCancelled;
+            existing.setCancelled(cancelled);
         }
 
         if (request.getSortOrder() != null) {
@@ -174,6 +207,35 @@ public class CalendarItemService {
             boolean completed = existing.getCompleted() == null || !existing.getCompleted();
             existing.setCompleted(completed);
             existing.setCompletedAt(completed ? LocalDateTime.now() : null);
+        }
+        return dailyTaskRepository.save(existing);
+    }
+
+    public DailyTask toggleCancelItem(String id) {
+        return toggleCancelItem(id, null);
+    }
+
+    public DailyTask toggleCancelItem(String id, LocalDate occurrenceDate) {
+        DailyTask existing = getItem(id);
+        String recurrence = existing.getRecurrenceFrequency() != null ? existing.getRecurrenceFrequency() : "NONE";
+
+        if (occurrenceDate != null && !"NONE".equals(recurrence)) {
+            List<LocalDate> cancelledDates = existing.getCancelledDates();
+            if (cancelledDates == null) {
+                cancelledDates = new java.util.ArrayList<>();
+            } else {
+                cancelledDates = new java.util.ArrayList<>(cancelledDates);
+            }
+
+            if (cancelledDates.contains(occurrenceDate)) {
+                cancelledDates.remove(occurrenceDate);
+            } else {
+                cancelledDates.add(occurrenceDate);
+            }
+            existing.setCancelledDates(cancelledDates);
+        } else {
+            boolean cancelled = existing.getCancelled() == null || !existing.getCancelled();
+            existing.setCancelled(cancelled);
         }
         return dailyTaskRepository.save(existing);
     }

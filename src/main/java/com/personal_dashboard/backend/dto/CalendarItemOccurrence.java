@@ -29,6 +29,7 @@ public class CalendarItemOccurrence {
     private String color;
     private String notes;
     private Boolean completed;
+    private Boolean cancelled;
     private Integer sortOrder;
     private String recurrenceFrequency;
     private LocalDate recurrenceUntil;
@@ -36,10 +37,13 @@ public class CalendarItemOccurrence {
 
     public static CalendarItemOccurrence from(DailyTask item, LocalDate occurrenceDate) {
         boolean isCompleted;
+        boolean isCancelled = false;
         if (item.getRecurrenceFrequency() != null && !"NONE".equals(item.getRecurrenceFrequency())) {
             isCompleted = item.getCompletedDates() != null && item.getCompletedDates().contains(occurrenceDate);
+            isCancelled = item.getCancelledDates() != null && item.getCancelledDates().contains(occurrenceDate);
         } else {
             isCompleted = Boolean.TRUE.equals(item.getCompleted());
+            isCancelled = Boolean.TRUE.equals(item.getCancelled());
         }
 
         return CalendarItemOccurrence.builder()
@@ -56,6 +60,7 @@ public class CalendarItemOccurrence {
                 .color(item.getColor())
                 .notes(item.getNotes())
                 .completed(isCompleted)
+                .cancelled(isCancelled)
                 .sortOrder(item.getSortOrder())
                 .recurrenceFrequency(item.getRecurrenceFrequency() != null ? item.getRecurrenceFrequency() : "NONE")
                 .recurrenceUntil(item.getRecurrenceUntil())

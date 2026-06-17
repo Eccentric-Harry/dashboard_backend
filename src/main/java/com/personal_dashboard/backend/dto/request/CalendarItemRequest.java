@@ -32,6 +32,7 @@ public class CalendarItemRequest {
     private String color;
     private String notes;
     private Boolean completed;
+    private Boolean cancelled;
     private Integer sortOrder;
 
     @Pattern(regexp = "NONE|DAILY|WEEKLY|MONTHLY", message = "Recurrence must be NONE, DAILY, WEEKLY, or MONTHLY")
