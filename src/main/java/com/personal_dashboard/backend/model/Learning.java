@@ -8,7 +8,6 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import java.time.Instant;
@@ -28,7 +27,6 @@ public class Learning {
     private String category;
     private LocalDate date;
     private String notionUrl;
-
 
     @CreatedDate
     private Instant createdAt;

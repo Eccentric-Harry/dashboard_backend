@@ -7,7 +7,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.Instant;
 
 @Data
@@ -52,7 +51,8 @@ public class CalendarItemOccurrence {
                 .date(occurrenceDate)
                 .originalDate(item.getDate())
                 .title(item.getTitle())
-                .startTime(item.getStartTime() != null ? item.getStartTime() : normalizeLegacyTime(item.getScheduledTime()))
+                .startTime(item.getStartTime() != null ? item.getStartTime()
+                        : normalizeLegacyTime(item.getScheduledTime()))
                 .endTime(item.getEndTime())
                 .allDay(item.getAllDay() != null ? item.getAllDay() : item.getScheduledTime() == null)
                 .itemType(item.getItemType() != null ? item.getItemType() : "TASK")

@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -25,7 +24,8 @@ public class StravaActivityService {
     private final StravaActivityRepository stravaActivityRepository;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
-    private static final DateTimeFormatter STRAVA_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssZ");
+    private static final DateTimeFormatter STRAVA_TIME_FORMATTER = DateTimeFormatter
+            .ofPattern("yyyy-MM-dd'T'HH:mm:ssZ");
 
     /**
      * Get all activities sorted by date descending
@@ -77,7 +77,8 @@ public class StravaActivityService {
                 .filter(a -> a.getPaceMinPerKm() != null)
                 .mapToDouble(StravaActivity::getPaceMinPerKm)
                 .min();
-        stats.put("best5kPaceMinPerKm", best5kPace.isPresent() ? Math.round(best5kPace.getAsDouble() * 100.0) / 100.0 : null);
+        stats.put("best5kPaceMinPerKm",
+                best5kPace.isPresent() ? Math.round(best5kPace.getAsDouble() * 100.0) / 100.0 : null);
 
         // Format best 5K pace as "M:SS"
         if (best5kPace.isPresent()) {
@@ -150,7 +151,8 @@ public class StravaActivityService {
                 .stravaEmbedId(request.getStravaEmbedId())
                 .stravaToken(request.getStravaToken())
                 .source(request.getStravaEmbedId() != null && !request.getStravaEmbedId().isBlank()
-                        ? "strava-embed" : "manual")
+                        ? "strava-embed"
+                        : "manual")
                 .build();
 
         StravaActivity saved = stravaActivityRepository.save(activity);
@@ -179,7 +181,8 @@ public class StravaActivityService {
         String movingTime = formatSecondsToTime(dto.getMovingTimeRaw());
 
         Double pace = null;
-        if (("Run".equalsIgnoreCase(dto.getSportType()) || "Walk".equalsIgnoreCase(dto.getSportType())) && distanceKm > 0) {
+        if (("Run".equalsIgnoreCase(dto.getSportType()) || "Walk".equalsIgnoreCase(dto.getSportType()))
+                && distanceKm > 0) {
             pace = movingTimeMinutes / distanceKm;
             pace = Math.round(pace * 100.0) / 100.0;
         }
@@ -256,7 +259,8 @@ public class StravaActivityService {
      * Supports "MM:SS" (e.g., "26:32") and "H:MM:SS" (e.g., "2:21:52")
      */
     public static double parseMovingTimeToMinutes(String movingTime) {
-        if (movingTime == null || movingTime.isBlank()) return 0;
+        if (movingTime == null || movingTime.isBlank())
+            return 0;
 
         String[] parts = movingTime.split(":");
         if (parts.length == 2) {
@@ -279,7 +283,8 @@ public class StravaActivityService {
      * Compute streak of consecutive weeks with at least one activity
      */
     private int computeWeeklyStreak(List<StravaActivity> activitiesSortedDesc) {
-        if (activitiesSortedDesc.isEmpty()) return 0;
+        if (activitiesSortedDesc.isEmpty())
+            return 0;
 
         Set<Long> activeWeeks = activitiesSortedDesc.stream()
                 .map(a -> {

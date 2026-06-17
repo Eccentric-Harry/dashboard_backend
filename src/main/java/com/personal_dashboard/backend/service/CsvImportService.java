@@ -1,6 +1,5 @@
 package com.personal_dashboard.backend.service;
 
-import com.opencsv.CSVParser;
 import com.opencsv.CSVParserBuilder;
 import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;
@@ -59,9 +58,9 @@ public class CsvImportService {
         int skippedDuplicates = 0;
 
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()));
-             CSVReader csvReader = new CSVReaderBuilder(reader)
-                     .withCSVParser(new CSVParserBuilder().withSeparator(',').build())
-                     .build()) {
+                CSVReader csvReader = new CSVReaderBuilder(reader)
+                        .withCSVParser(new CSVParserBuilder().withSeparator(',').build())
+                        .build()) {
 
             String[] header = csvReader.readNext();
             Map<String, Integer> headerIndex = buildHeaderIndex(header);
@@ -145,7 +144,8 @@ public class CsvImportService {
                     .serving(emptyToNull(serving))
                     .servingNotes(emptyToNull(servingNotes))
                     .sourceNotes(emptyToNull(sourceNotes))
-                    .importKey(buildImportKey(description, date, mealType, calories, protein, serving, notes, sourceNotes))
+                    .importKey(
+                            buildImportKey(description, date, mealType, calories, protein, serving, notes, sourceNotes))
                     .timestamp(Instant.now())
                     .build();
 
@@ -161,10 +161,10 @@ public class CsvImportService {
         Random random = new Random(42); // Seed for reproducibility
 
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()));
-             CSVReader csvReader = new CSVReaderBuilder(reader)
-                     .withCSVParser(new CSVParserBuilder().withSeparator(',').build())
-                     .withSkipLines(1)
-                     .build()) {
+                CSVReader csvReader = new CSVReaderBuilder(reader)
+                        .withCSVParser(new CSVParserBuilder().withSeparator(',').build())
+                        .withSkipLines(1)
+                        .build()) {
 
             String[] line;
             while ((line = csvReader.readNext()) != null) {
@@ -295,8 +295,9 @@ public class CsvImportService {
         return sanitize(header).toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
     }
 
-    private String buildImportKey(String description, LocalDate date, String mealType, Integer calories, Integer protein,
-                                  String serving, String notes, String sourceNotes) {
+    private String buildImportKey(String description, LocalDate date, String mealType, Integer calories,
+            Integer protein,
+            String serving, String notes, String sourceNotes) {
         String keySource = String.join("|",
                 "food-log",
                 date.toString(),
@@ -314,13 +315,20 @@ public class CsvImportService {
     private String normalizeMealType(String mealType) {
         String normalized = mealType.toLowerCase().trim();
 
-        if (normalized.equals("breakfast")) return "Breakfast";
-        if (normalized.equals("lunch")) return "Lunch";
-        if (normalized.equals("dinner")) return "Dinner";
-        if (normalized.equals("snack")) return "Snack";
-        if (normalized.equals("midnight") || normalized.equals("mid night")) return "Midnight";
-        if (normalized.contains("post workout") || normalized.contains("post_workout")) return "Post Workout";
-        if (normalized.equals("mid-morning") || normalized.equals("midmorning")) return "Mid-Morning";
+        if (normalized.equals("breakfast"))
+            return "Breakfast";
+        if (normalized.equals("lunch"))
+            return "Lunch";
+        if (normalized.equals("dinner"))
+            return "Dinner";
+        if (normalized.equals("snack"))
+            return "Snack";
+        if (normalized.equals("midnight") || normalized.equals("mid night"))
+            return "Midnight";
+        if (normalized.contains("post workout") || normalized.contains("post_workout"))
+            return "Post Workout";
+        if (normalized.equals("mid-morning") || normalized.equals("midmorning"))
+            return "Mid-Morning";
 
         return "Snack"; // Default fallback
     }

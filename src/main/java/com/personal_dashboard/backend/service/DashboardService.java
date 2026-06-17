@@ -391,6 +391,7 @@ public class DashboardService {
         /**
          * Learnings hub summary: today stats, 7-day timeline, coding counters.
          */
+        @SuppressWarnings("unused")
         public LearningsSummaryResponse getLearningsSummary(LocalDate targetDate) {
                 LocalDate startDate = targetDate.minusDays(13); // 14 days total
 

@@ -17,7 +17,6 @@ import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -110,7 +109,8 @@ class LendingControllerTest {
         when(lendingRecordRepository.findById("test-id")).thenReturn(Optional.of(lendingRecord));
         when(lendingRecordRepository.save(any(LendingRecord.class))).thenReturn(updatedRecord);
 
-        ResponseEntity<ApiResponse<LendingRecordDTO>> response = lendingController.updateLendingRecord("test-id", request);
+        ResponseEntity<ApiResponse<LendingRecordDTO>> response = lendingController.updateLendingRecord("test-id",
+                request);
 
         assertNotNull(response);
         assertEquals(HttpStatus.OK, response.getStatusCode());

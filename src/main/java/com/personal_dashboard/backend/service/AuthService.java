@@ -1,7 +1,6 @@
 package com.personal_dashboard.backend.service;
 
 import com.personal_dashboard.backend.model.AuthToken;
-import com.personal_dashboard.backend.model.Passcode;
 import com.personal_dashboard.backend.repository.AuthTokenRepository;
 import com.personal_dashboard.backend.repository.PasscodeRepository;
 import lombok.RequiredArgsConstructor;
