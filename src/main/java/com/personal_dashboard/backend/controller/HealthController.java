@@ -50,6 +50,9 @@ public class HealthController {
                                 .technicalDiagnostic(request.getTechnicalDiagnostic())
                                 .build();
 
+                // Save the newly added entry to MongoDB
+                dailyFoodLogService.addMeal(request.getDate(), request.getMealType(), entry);
+
                 // Return the newly added entry as a FoodEntryDTO (backward compat)
                 FoodEntryDTO responseDto = FoodEntryDTO.builder()
                                 .id(entry.getId())
