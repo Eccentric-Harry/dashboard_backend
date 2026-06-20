@@ -157,9 +157,13 @@ public class CalendarItemService {
             if (requestedCompleted) {
                 if (!completedDates.contains(occurrenceDate)) {
                     completedDates.add(occurrenceDate);
+                    history.add(TaskHistoryEvent.builder().timestamp(Instant.now()).message("Marked occurrence on " + occurrenceDate + " as completed").build());
                 }
             } else {
-                completedDates.remove(occurrenceDate);
+                if (completedDates.contains(occurrenceDate)) {
+                    completedDates.remove(occurrenceDate);
+                    history.add(TaskHistoryEvent.builder().timestamp(Instant.now()).message("Marked occurrence on " + occurrenceDate + " as incomplete").build());
+                }
             }
             existing.setCompletedDates(completedDates);
             existing.setCompleted(false);
@@ -189,8 +193,10 @@ public class CalendarItemService {
             existing.setCompleted(completed);
             if (completed && !wasCompleted) {
                 existing.setCompletedAt(LocalDateTime.now());
-            } else if (!completed) {
+                history.add(TaskHistoryEvent.builder().timestamp(Instant.now()).message("Marked as completed").build());
+            } else if (!completed && wasCompleted) {
                 existing.setCompletedAt(null);
+                history.add(TaskHistoryEvent.builder().timestamp(Instant.now()).message("Marked as incomplete").build());
             }
 
             existing.setCancelledDates(null);
@@ -215,6 +221,13 @@ public class CalendarItemService {
         DailyTask existing = getItem(id);
         String recurrence = existing.getRecurrenceFrequency() != null ? existing.getRecurrenceFrequency() : "NONE";
 
+        List<TaskHistoryEvent> history = existing.getHistory();
+        if (history == null) {
+            history = new java.util.ArrayList<>();
+        } else {
+            history = new java.util.ArrayList<>(history);
+        }
+
         if (occurrenceDate != null && !"NONE".equals(recurrence)) {
             List<LocalDate> completedDates = existing.getCompletedDates();
             if (completedDates == null) {
@@ -225,15 +238,23 @@ public class CalendarItemService {
 
             if (completedDates.contains(occurrenceDate)) {
                 completedDates.remove(occurrenceDate);
+                history.add(TaskHistoryEvent.builder().timestamp(Instant.now()).message("Marked occurrence on " + occurrenceDate + " as incomplete").build());
             } else {
                 completedDates.add(occurrenceDate);
+                history.add(TaskHistoryEvent.builder().timestamp(Instant.now()).message("Marked occurrence on " + occurrenceDate + " as completed").build());
             }
             existing.setCompletedDates(completedDates);
         } else {
             boolean completed = existing.getCompleted() == null || !existing.getCompleted();
             existing.setCompleted(completed);
             existing.setCompletedAt(completed ? LocalDateTime.now() : null);
+            if (completed) {
+                history.add(TaskHistoryEvent.builder().timestamp(Instant.now()).message("Marked as completed").build());
+            } else {
+                history.add(TaskHistoryEvent.builder().timestamp(Instant.now()).message("Marked as incomplete").build());
+            }
         }
+        existing.setHistory(history);
         return dailyTaskRepository.save(existing);
     }
 
