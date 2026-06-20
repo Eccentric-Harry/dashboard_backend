@@ -12,6 +12,8 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Comparator;
 import java.util.List;
+import java.time.Instant;
+import com.personal_dashboard.backend.model.TaskHistoryEvent;
 import java.util.Locale;
 import java.util.Map;
 
@@ -108,8 +110,30 @@ public class CalendarItemService {
         DailyTask existing = getItem(id);
         String recurrence = defaultText(request.getRecurrenceFrequency(), "NONE").toUpperCase(Locale.ROOT);
 
-        existing.setTitle(request.getTitle().trim());
-        existing.setDate(LocalDate.parse(request.getDate()));
+        List<TaskHistoryEvent> history = existing.getHistory();
+        if (history == null) {
+            history = new java.util.ArrayList<>();
+        }
+
+        String newTitle = request.getTitle().trim();
+        if (!newTitle.equals(existing.getTitle())) {
+            history.add(TaskHistoryEvent.builder()
+                    .timestamp(Instant.now())
+                    .message("Task title updated from \"" + existing.getTitle() + "\" to \"" + newTitle + "\"")
+                    .build());
+            existing.setTitle(newTitle);
+        }
+
+        LocalDate newDate = LocalDate.parse(request.getDate());
+        if (existing.getDate() != null && !newDate.equals(existing.getDate())) {
+            history.add(TaskHistoryEvent.builder()
+                    .timestamp(Instant.now())
+                    .message("Moved from " + existing.getDate() + " to " + newDate)
+                    .build());
+        }
+        existing.setDate(newDate);
+
+        existing.setHistory(history);
         existing.setScheduledTime(blankToNull(request.getStartTime()));
         existing.setStartTime(blankToNull(request.getStartTime()));
         existing.setEndTime(blankToNull(request.getEndTime()));
