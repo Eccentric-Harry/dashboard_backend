@@ -8,6 +8,8 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.Instant;
+import java.util.List;
+import com.personal_dashboard.backend.model.TaskHistoryEvent;
 
 @Data
 @Builder
@@ -32,6 +34,7 @@ public class CalendarItemOccurrence {
     private Integer sortOrder;
     private String recurrenceFrequency;
     private LocalDate recurrenceUntil;
+    private List<TaskHistoryEvent> history;
     private Instant createdAt;
 
     public static CalendarItemOccurrence from(DailyTask item, LocalDate occurrenceDate) {
@@ -64,6 +67,7 @@ public class CalendarItemOccurrence {
                 .sortOrder(item.getSortOrder())
                 .recurrenceFrequency(item.getRecurrenceFrequency() != null ? item.getRecurrenceFrequency() : "NONE")
                 .recurrenceUntil(item.getRecurrenceUntil())
+                .history(item.getHistory())
                 .createdAt(item.getCreatedAt())
                 .build();
     }

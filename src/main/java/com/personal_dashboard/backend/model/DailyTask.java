@@ -68,6 +68,7 @@ public class DailyTask {
 
     private List<SubTask> subtasks;
     private List<String> tags;
+    private List<TaskHistoryEvent> history;
 
     @CreatedDate
     private Instant createdAt;
