@@ -113,6 +113,8 @@ public class CalendarItemService {
         List<TaskHistoryEvent> history = existing.getHistory();
         if (history == null) {
             history = new java.util.ArrayList<>();
+        } else {
+            history = new java.util.ArrayList<>(history);
         }
 
         String newTitle = request.getTitle().trim();
