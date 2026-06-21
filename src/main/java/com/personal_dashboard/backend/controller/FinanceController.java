@@ -61,10 +61,12 @@ public class FinanceController {
                 Transaction savedTransaction = transactionRepository.save(transaction);
 
                 // Update DailyFinancialLog
+                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
                 String logId = request.getDate();
-                DailyFinancialLog dailyLog = dailyFinancialLogRepository.findById(logId)
+                DailyFinancialLog dailyLog = dailyFinancialLogRepository.findByUserIdAndDateString(userId, logId)
                                 .orElse(DailyFinancialLog.builder()
-                                                .id(logId)
+                                                .userId(userId)
+                                                .dateString(logId)
                                                 .date(dateInstant)
                                                 .dailyTotals(new FinancialTotals())
                                                 .transactions(new LinkedHashMap<>())
@@ -124,19 +126,20 @@ public class FinanceController {
                 Instant endDate = Instant.now();
                 Instant startDate = endDate.minus(Duration.ofDays(days));
 
+                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
                 List<Transaction> transactions;
 
                 if (type != null && !type.isEmpty() && category != null && !category.isEmpty()) {
-                        transactions = transactionRepository.findByTypeAndDateBetween(type, startDate, endDate);
+                        transactions = transactionRepository.findByUserIdAndTypeAndDateBetween(userId, type, startDate, endDate);
                         transactions = transactions.stream()
                                         .filter(t -> t.getCategory().equalsIgnoreCase(category))
                                         .toList();
                 } else if (category != null && !category.isEmpty()) {
-                        transactions = transactionRepository.findByCategoryAndDateBetween(category, startDate, endDate);
+                        transactions = transactionRepository.findByUserIdAndCategoryAndDateBetween(userId, category, startDate, endDate);
                 } else if (type != null && !type.isEmpty()) {
-                        transactions = transactionRepository.findByTypeAndDateBetween(type, startDate, endDate);
+                        transactions = transactionRepository.findByUserIdAndTypeAndDateBetween(userId, type, startDate, endDate);
                 } else {
-                        transactions = transactionRepository.findByDateBetween(startDate, endDate);
+                        transactions = transactionRepository.findByUserIdAndDateBetween(userId, startDate, endDate);
                 }
 
                 List<TransactionDTO> dtos = transactions.stream()
@@ -171,7 +174,8 @@ public class FinanceController {
                 Instant endDate = Instant.now();
                 Instant startDate = endDate.minus(Duration.ofDays(days));
 
-                List<DailyFinancialLog> logs = dailyFinancialLogRepository.findByDateBetween(startDate, endDate);
+                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+                List<DailyFinancialLog> logs = dailyFinancialLogRepository.findByUserIdAndDateBetween(userId, startDate, endDate);
 
                 ApiMeta meta = ApiMeta.builder()
                                 .requestId(UUID.randomUUID().toString())
@@ -189,7 +193,8 @@ public class FinanceController {
 
         @GetMapping("/slice-repayments")
         public ResponseEntity<ApiResponse<List<SliceRepayment>>> getSliceRepayments() {
-                List<SliceRepayment> repayments = sliceRepaymentRepository.findAll();
+                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+                List<SliceRepayment> repayments = sliceRepaymentRepository.findByUserId(userId);
 
                 ApiMeta meta = ApiMeta.builder()
                                 .requestId(UUID.randomUUID().toString())
@@ -207,7 +212,8 @@ public class FinanceController {
 
         @DeleteMapping("/transactions/{id}")
         public ResponseEntity<ApiResponse<Void>> deleteTransaction(@PathVariable String id) {
-                Transaction transaction = transactionRepository.findById(id)
+                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+                Transaction transaction = transactionRepository.findByIdAndUserId(id, userId)
                                 .orElseThrow(() -> new RuntimeException("Transaction not found: " + id));
 
                 removeTransactionFromLog(transaction);
@@ -232,7 +238,8 @@ public class FinanceController {
                         @PathVariable String id,
                         @Valid @RequestBody TransactionRequest request) {
 
-                Transaction existingTransaction = transactionRepository.findById(id)
+                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+                Transaction existingTransaction = transactionRepository.findByIdAndUserId(id, userId)
                                 .orElseThrow(() -> new RuntimeException("Transaction not found"));
 
                 // 1. Remove from old log (using current state)
@@ -281,8 +288,9 @@ public class FinanceController {
         }
 
         private void removeTransactionFromLog(Transaction transaction) {
+                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
                 String dateStr = transaction.getDate().atZone(ZoneId.systemDefault()).toLocalDate().toString();
-                dailyFinancialLogRepository.findById(dateStr).ifPresent(log -> {
+                dailyFinancialLogRepository.findByUserIdAndDateString(userId, dateStr).ifPresent(log -> {
                         boolean removed = false;
                         for (List<FinancialTransaction> list : log.getTransactions().values()) {
                                 if (list.removeIf(t -> t.getId().equals(transaction.getId()))) {
@@ -304,10 +312,12 @@ public class FinanceController {
         }
 
         private void addTransactionToLog(Transaction transaction) {
+                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
                 String dateStr = transaction.getDate().atZone(ZoneId.systemDefault()).toLocalDate().toString();
-                DailyFinancialLog dailyLog = dailyFinancialLogRepository.findById(dateStr)
+                DailyFinancialLog dailyLog = dailyFinancialLogRepository.findByUserIdAndDateString(userId, dateStr)
                                 .orElse(DailyFinancialLog.builder()
-                                                .id(dateStr)
+                                                .userId(userId)
+                                                .dateString(dateStr)
                                                 .date(transaction.getDate())
                                                 .dailyTotals(new FinancialTotals())
                                                 .transactions(new LinkedHashMap<>())

@@ -19,17 +19,20 @@ public class LearningService {
 
     public List<Learning> getLearningsForDate(LocalDate date) {
         log.info("Fetching learnings for date: {}", date);
-        return learningRepository.findByDateRange(date, date);
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        return learningRepository.findByUserIdAndDateRange(userId, date, date);
     }
 
     public List<Learning> getLearningsForRange(LocalDate startDate, LocalDate endDate) {
         log.info("Fetching learnings between {} and {}", startDate, endDate);
-        return learningRepository.findByDateRange(startDate, endDate);
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        return learningRepository.findByUserIdAndDateRange(userId, startDate, endDate);
     }
 
     public List<Learning> getAllLearnings() {
         log.info("Fetching all learnings");
-        return learningRepository.findAll();
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        return learningRepository.findByUserId(userId);
     }
 
     public Learning createLearning(LearningRequest request) {
@@ -49,7 +52,8 @@ public class LearningService {
     public Learning updateLearning(String id, LearningRequest request) {
         log.info("Updating learning id: {}", id);
 
-        Learning existing = learningRepository.findById(id)
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        Learning existing = learningRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new IllegalArgumentException("Learning not found with id: " + id));
 
         existing.setTitle(request.getTitle());
@@ -63,9 +67,9 @@ public class LearningService {
 
     public void deleteLearning(String id) {
         log.info("Deleting learning id: {}", id);
-        if (!learningRepository.existsById(id)) {
-            throw new IllegalArgumentException("Learning not found with id: " + id);
-        }
-        learningRepository.deleteById(id);
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        Learning existing = learningRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new IllegalArgumentException("Learning not found with id: " + id));
+        learningRepository.delete(existing);
     }
 }

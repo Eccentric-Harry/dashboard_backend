@@ -11,6 +11,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.personal_dashboard.backend.model.UserAccount;
+import com.personal_dashboard.backend.repository.UserAccountRepository;
+
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
@@ -23,6 +26,81 @@ import java.util.UUID;
 public class AuthController {
 
     private final AuthService authService;
+    private final UserAccountRepository userAccountRepository;
+
+    @PostMapping("/signup")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> signup(
+            @RequestBody Map<String, String> body) {
+        String username = body.get("username");
+        String displayName = body.get("displayName");
+        String passcode = body.get("passcode");
+
+        if (username == null || username.isBlank() || passcode == null || passcode.isBlank()) {
+            return badRequest("Username and passcode are required");
+        }
+
+        Optional<String> tokenOpt = authService.signup(username, displayName, passcode);
+        if (tokenOpt.isEmpty()) {
+            return badRequest("Signup failed: username might already exist or format is invalid (minimum passcode length 4)");
+        }
+
+        ApiMeta meta = ApiMeta.builder()
+                .requestId(UUID.randomUUID().toString())
+                .timestamp(Instant.now().toString())
+                .source("auth-signup")
+                .build();
+
+        Map<String, Object> data = Map.of(
+            "token", tokenOpt.get(),
+            "username", username.trim().toLowerCase(),
+            "displayName", displayName != null && !displayName.isBlank() ? displayName.trim() : username.trim()
+        );
+
+        return ResponseEntity.ok(
+                ApiResponse.<Map<String, Object>>builder()
+                        .data(data)
+                        .meta(meta)
+                        .build());
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> login(
+            @RequestBody Map<String, String> body) {
+        String username = body.get("username");
+        String passcode = body.get("passcode");
+
+        if (username == null || username.isBlank() || passcode == null || passcode.isBlank()) {
+            return badRequest("Username and passcode are required");
+        }
+
+        Optional<String> tokenOpt = authService.login(username, passcode);
+        if (tokenOpt.isEmpty()) {
+            return unauthorized("Invalid username or passcode");
+        }
+
+        String sanitizedUsername = username.trim().toLowerCase();
+        String displayName = userAccountRepository.findById(sanitizedUsername)
+                .map(UserAccount::getDisplayName)
+                .orElse(sanitizedUsername);
+
+        ApiMeta meta = ApiMeta.builder()
+                .requestId(UUID.randomUUID().toString())
+                .timestamp(Instant.now().toString())
+                .source("auth-login")
+                .build();
+
+        Map<String, Object> data = Map.of(
+            "token", tokenOpt.get(),
+            "username", sanitizedUsername,
+            "displayName", displayName
+        );
+
+        return ResponseEntity.ok(
+                ApiResponse.<Map<String, Object>>builder()
+                        .data(data)
+                        .meta(meta)
+                        .build());
+    }
 
     @PostMapping("/verify")
     public ResponseEntity<ApiResponse<Map<String, Object>>> verifyPasscode(

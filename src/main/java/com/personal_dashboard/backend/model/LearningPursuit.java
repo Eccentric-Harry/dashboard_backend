@@ -19,10 +19,12 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "learning_pursuits")
-public class LearningPursuit {
+public class LearningPursuit implements UserOwnedDocument {
 
     @Id
     private String id;
+
+    private String userId;
 
     private String title;
     private String category;

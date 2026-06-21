@@ -3,6 +3,8 @@ package com.personal_dashboard.backend.service;
 import com.personal_dashboard.backend.dto.request.DailyTaskRequest;
 import com.personal_dashboard.backend.model.DailyTask;
 import com.personal_dashboard.backend.repository.DailyTaskRepository;
+import com.personal_dashboard.backend.security.UserContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,6 +20,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,6 +37,7 @@ class DailyTaskServiceTest {
 
     @BeforeEach
     void setUp() {
+        UserContext.setUserId("test-user");
         incompleteTask = DailyTask.builder()
                 .id("1")
                 .title("Incomplete Task")
@@ -51,6 +55,11 @@ class DailyTaskServiceTest {
                 .build();
     }
 
+    @AfterEach
+    void tearDown() {
+        UserContext.clear();
+    }
+
     @Test
     void testCreateTask_Incomplete() {
         DailyTaskRequest request = DailyTaskRequest.builder()
@@ -59,7 +68,7 @@ class DailyTaskServiceTest {
                 .completed(false)
                 .build();
 
-        when(dailyTaskRepository.findByDateRange(any(), any())).thenReturn(new ArrayList<>());
+        when(dailyTaskRepository.findByUserIdAndDateRange(eq("test-user"), any(), any())).thenReturn(new ArrayList<>());
         when(dailyTaskRepository.save(any(DailyTask.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         DailyTask result = dailyTaskService.createTask(request);
@@ -78,7 +87,7 @@ class DailyTaskServiceTest {
                 .completed(true)
                 .build();
 
-        when(dailyTaskRepository.findByDateRange(any(), any())).thenReturn(new ArrayList<>());
+        when(dailyTaskRepository.findByUserIdAndDateRange(eq("test-user"), any(), any())).thenReturn(new ArrayList<>());
         when(dailyTaskRepository.save(any(DailyTask.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         DailyTask result = dailyTaskService.createTask(request);
@@ -98,7 +107,7 @@ class DailyTaskServiceTest {
                 .completed(true)
                 .build();
 
-        when(dailyTaskRepository.findById("1")).thenReturn(Optional.of(incompleteTask));
+        when(dailyTaskRepository.findByIdAndUserId("1", "test-user")).thenReturn(Optional.of(incompleteTask));
         when(dailyTaskRepository.save(any(DailyTask.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         DailyTask result = dailyTaskService.updateTask("1", request);
@@ -117,7 +126,7 @@ class DailyTaskServiceTest {
                 .completed(false)
                 .build();
 
-        when(dailyTaskRepository.findById("2")).thenReturn(Optional.of(completedTask));
+        when(dailyTaskRepository.findByIdAndUserId("2", "test-user")).thenReturn(Optional.of(completedTask));
         when(dailyTaskRepository.save(any(DailyTask.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         DailyTask result = dailyTaskService.updateTask("2", request);
@@ -129,7 +138,7 @@ class DailyTaskServiceTest {
 
     @Test
     void testToggleTask() {
-        when(dailyTaskRepository.findById("1")).thenReturn(Optional.of(incompleteTask));
+        when(dailyTaskRepository.findByIdAndUserId("1", "test-user")).thenReturn(Optional.of(incompleteTask));
         when(dailyTaskRepository.save(any(DailyTask.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         DailyTask result = dailyTaskService.toggleTask("1");
@@ -139,7 +148,7 @@ class DailyTaskServiceTest {
         assertNotNull(result.getCompletedAt());
 
         // Toggle back
-        when(dailyTaskRepository.findById("1")).thenReturn(Optional.of(result));
+        when(dailyTaskRepository.findByIdAndUserId("1", "test-user")).thenReturn(Optional.of(result));
         DailyTask toggledBack = dailyTaskService.toggleTask("1");
 
         assertNotNull(toggledBack);
@@ -150,12 +159,12 @@ class DailyTaskServiceTest {
     @Test
     void testGetActiveTasks() {
         List<DailyTask> activeTasks = List.of(incompleteTask, completedTask);
-        when(dailyTaskRepository.findActiveTasks(any(LocalDateTime.class))).thenReturn(activeTasks);
+        when(dailyTaskRepository.findActiveTasks(eq("test-user"), any(LocalDateTime.class))).thenReturn(activeTasks);
 
         List<DailyTask> result = dailyTaskService.getActiveTasks();
 
         assertEquals(2, result.size());
-        verify(dailyTaskRepository, times(1)).findActiveTasks(any(LocalDateTime.class));
+        verify(dailyTaskRepository, times(1)).findActiveTasks(eq("test-user"), any(LocalDateTime.class));
     }
 
     @Test
@@ -175,7 +184,7 @@ class DailyTaskServiceTest {
                 .build();
 
         List<DailyTask> unsorted = List.of(task1, task2);
-        when(dailyTaskRepository.findActiveTasks(any(LocalDateTime.class))).thenReturn(unsorted);
+        when(dailyTaskRepository.findActiveTasks(eq("test-user"), any(LocalDateTime.class))).thenReturn(unsorted);
 
         List<DailyTask> sorted = dailyTaskService.getActiveTasks();
 

@@ -32,7 +32,8 @@ public class LendingController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<LendingRecordDTO>>> getAllLendingRecords() {
-        List<LendingRecord> records = lendingRecordRepository.findAll(Sort.by(Sort.Direction.DESC, "date"));
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        List<LendingRecord> records = lendingRecordRepository.findByUserId(userId, Sort.by(Sort.Direction.DESC, "date"));
 
         List<LendingRecordDTO> dtos = records.stream()
                 .map(this::mapToDTO)
@@ -89,7 +90,8 @@ public class LendingController {
             @PathVariable String id,
             @Valid @RequestBody LendingRecordRequest request) {
 
-        LendingRecord existingRecord = lendingRecordRepository.findById(id)
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        LendingRecord existingRecord = lendingRecordRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new RuntimeException("Lending record not found: " + id));
 
         Instant dateInstant = parseDate(request.getDate());
@@ -120,7 +122,8 @@ public class LendingController {
 
     @PatchMapping("/{id}/toggle")
     public ResponseEntity<ApiResponse<LendingRecordDTO>> toggleLendingRecordStatus(@PathVariable String id) {
-        LendingRecord existingRecord = lendingRecordRepository.findById(id)
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        LendingRecord existingRecord = lendingRecordRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new RuntimeException("Lending record not found: " + id));
 
         if ("Repaid".equalsIgnoreCase(existingRecord.getStatus())) {
@@ -147,7 +150,8 @@ public class LendingController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteLendingRecord(@PathVariable String id) {
-        LendingRecord existingRecord = lendingRecordRepository.findById(id)
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        LendingRecord existingRecord = lendingRecordRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new RuntimeException("Lending record not found: " + id));
 
         lendingRecordRepository.delete(existingRecord);

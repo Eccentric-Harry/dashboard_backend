@@ -17,10 +17,12 @@ import org.springframework.data.annotation.LastModifiedDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "lending_records")
-public class LendingRecord {
+public class LendingRecord implements UserOwnedDocument {
 
     @Id
     private String id;
+
+    private String userId;
 
     private String borrower;
 

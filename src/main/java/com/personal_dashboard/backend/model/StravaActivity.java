@@ -17,10 +17,12 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "strava_activities")
-public class StravaActivity {
+public class StravaActivity implements UserOwnedDocument {
 
     @Id
     private String id;
+
+    private String userId;
 
     private String stravaEmbedId;
 

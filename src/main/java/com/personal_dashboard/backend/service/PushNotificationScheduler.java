@@ -54,7 +54,7 @@ public class PushNotificationScheduler {
                 LocalDate localDate = localTime.toLocalDate();
 
                 // Fetch calendar items that might occur on this day
-                List<DailyTask> candidates = dailyTaskRepository.findCalendarCandidates(localDate, localDate.plusDays(1));
+                List<DailyTask> candidates = dailyTaskRepository.findCalendarCandidates(sub.getUserId(), localDate, localDate.plusDays(1));
 
                 for (DailyTask item : candidates) {
                     if (item.getId() == null) continue;
@@ -102,6 +102,7 @@ public class PushNotificationScheduler {
                             // Lock first to prevent concurrent dispatch
                             PushedOccurrenceLog logEntry = PushedOccurrenceLog.builder()
                                     .id(logId)
+                                    .userId(sub.getUserId())
                                     .taskId(item.getId())
                                     .occurrenceDate(localDate)
                                     .pushedAt(LocalDateTime.now())

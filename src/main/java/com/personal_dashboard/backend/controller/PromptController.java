@@ -27,7 +27,8 @@ public class PromptController {
 
         @GetMapping
         public ResponseEntity<ApiResponse<List<PromptDTO>>> getAllPrompts() {
-                List<Prompt> prompts = promptRepository.findAll(Sort.by(Sort.Direction.DESC, "updatedAt"));
+                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+                List<Prompt> prompts = promptRepository.findByUserId(userId, Sort.by(Sort.Direction.DESC, "updatedAt"));
 
                 List<PromptDTO> dtos = prompts.stream()
                                 .map(this::mapToDTO)
@@ -72,7 +73,8 @@ public class PromptController {
                         @PathVariable String id,
                         @Valid @RequestBody PromptRequest request) {
 
-                Prompt existingPrompt = promptRepository.findById(id)
+                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+                Prompt existingPrompt = promptRepository.findByIdAndUserId(id, userId)
                                 .orElseThrow(() -> new RuntimeException("Prompt not found: " + id));
 
                 existingPrompt.setTitle(request.getTitle());
@@ -93,7 +95,8 @@ public class PromptController {
 
         @DeleteMapping("/{id}")
         public ResponseEntity<ApiResponse<Void>> deletePrompt(@PathVariable String id) {
-                Prompt existingPrompt = promptRepository.findById(id)
+                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+                Prompt existingPrompt = promptRepository.findByIdAndUserId(id, userId)
                                 .orElseThrow(() -> new RuntimeException("Prompt not found: " + id));
 
                 promptRepository.delete(existingPrompt);

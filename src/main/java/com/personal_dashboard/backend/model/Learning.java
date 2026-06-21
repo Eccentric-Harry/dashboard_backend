@@ -17,10 +17,12 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "learnings")
-public class Learning {
+public class Learning implements UserOwnedDocument {
 
     @Id
     private String id;
+
+    private String userId;
 
     private String title;
     private String description;

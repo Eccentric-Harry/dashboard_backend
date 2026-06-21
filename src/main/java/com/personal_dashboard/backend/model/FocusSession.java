@@ -16,7 +16,7 @@ import org.springframework.data.annotation.LastModifiedDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "focus_sessions")
-public class FocusSession {
+public class FocusSession implements UserOwnedDocument {
 
     @Id
     private String id;

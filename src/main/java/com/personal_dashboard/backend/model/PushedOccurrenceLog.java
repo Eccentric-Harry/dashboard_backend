@@ -18,11 +18,13 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "pushed_occurrence_logs")
-public class PushedOccurrenceLog {
+public class PushedOccurrenceLog implements UserOwnedDocument {
 
     @Id
-    private String id; // format: subscriptionId:taskId:occurrenceDate
+    private String id;
 
+    private String userId;
+    private String subscriptionId;
     private String taskId;
     private LocalDate occurrenceDate;
 

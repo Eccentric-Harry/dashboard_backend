@@ -5,6 +5,8 @@ import com.personal_dashboard.backend.dto.LendingRecordDTO;
 import com.personal_dashboard.backend.dto.request.LendingRecordRequest;
 import com.personal_dashboard.backend.model.LendingRecord;
 import com.personal_dashboard.backend.repository.LendingRecordRepository;
+import com.personal_dashboard.backend.security.UserContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +24,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +40,7 @@ class LendingControllerTest {
 
     @BeforeEach
     void setUp() {
+        UserContext.setUserId("test-user");
         lendingRecord = LendingRecord.builder()
                 .id("test-id")
                 .borrower("Alice")
@@ -48,10 +52,15 @@ class LendingControllerTest {
                 .build();
     }
 
+    @AfterEach
+    void tearDown() {
+        UserContext.clear();
+    }
+
     @Test
     void testGetAllLendingRecords() {
         List<LendingRecord> list = List.of(lendingRecord);
-        when(lendingRecordRepository.findAll(any(Sort.class))).thenReturn(list);
+        when(lendingRecordRepository.findByUserId(eq("test-user"), any(Sort.class))).thenReturn(list);
 
         ResponseEntity<ApiResponse<List<LendingRecordDTO>>> response = lendingController.getAllLendingRecords();
 
@@ -106,7 +115,7 @@ class LendingControllerTest {
                 .notes("Friend Updated")
                 .build();
 
-        when(lendingRecordRepository.findById("test-id")).thenReturn(Optional.of(lendingRecord));
+        when(lendingRecordRepository.findByIdAndUserId("test-id", "test-user")).thenReturn(Optional.of(lendingRecord));
         when(lendingRecordRepository.save(any(LendingRecord.class))).thenReturn(updatedRecord);
 
         ResponseEntity<ApiResponse<LendingRecordDTO>> response = lendingController.updateLendingRecord("test-id",
@@ -130,7 +139,7 @@ class LendingControllerTest {
                 .status("Repaid")
                 .build();
 
-        when(lendingRecordRepository.findById("test-id")).thenReturn(Optional.of(lendingRecord));
+        when(lendingRecordRepository.findByIdAndUserId("test-id", "test-user")).thenReturn(Optional.of(lendingRecord));
         when(lendingRecordRepository.save(any(LendingRecord.class))).thenReturn(toggledRecord);
 
         ResponseEntity<ApiResponse<LendingRecordDTO>> response = lendingController.toggleLendingRecordStatus("test-id");
@@ -144,7 +153,7 @@ class LendingControllerTest {
 
     @Test
     void testDeleteLendingRecord() {
-        when(lendingRecordRepository.findById("test-id")).thenReturn(Optional.of(lendingRecord));
+        when(lendingRecordRepository.findByIdAndUserId("test-id", "test-user")).thenReturn(Optional.of(lendingRecord));
         doNothing().when(lendingRecordRepository).delete(any(LendingRecord.class));
 
         ResponseEntity<ApiResponse<Void>> response = lendingController.deleteLendingRecord("test-id");

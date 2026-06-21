@@ -4,31 +4,23 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "rdh_cache")
-public class RdhCacheEntry implements UserOwnedDocument {
+@Document(collection = "users")
+public class UserAccount {
     @Id
     private String id;
 
-    private String userId;
-    
-    private Object data;
-    
-    private Instant lastUpdated;
-    
-    private String status;
-    
-    private String source;
+    private String displayName;
 
     @CreatedDate
     private Instant createdAt;

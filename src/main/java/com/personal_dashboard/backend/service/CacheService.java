@@ -27,8 +27,11 @@ public class CacheService {
      */
     public void saveCacheData(String id, Object data, String source) {
         try {
+            String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+            String scopedId = userId + ":" + id;
             RdhCacheEntry entry = RdhCacheEntry.builder()
-                    .id(id)
+                    .id(scopedId)
+                    .userId(userId)
                     .data(data)
                     .lastUpdated(Instant.now())
                     .status("SUCCESS")
@@ -36,7 +39,7 @@ public class CacheService {
                     .build();
             
             rdhCacheRepository.save(entry);
-            log.info("Saved data to RDH cache for ID: {}", id);
+            log.info("Saved data to RDH cache for ID: {}", scopedId);
         } catch (Exception e) {
             log.error("Error saving data to RDH cache for ID: {}", id, e);
             throw new RuntimeException("Failed to save to RDH cache", e);
@@ -52,13 +55,15 @@ public class CacheService {
      */
     public <T> Optional<T> getCacheData(String id, Class<T> clazz) {
         try {
-            Optional<RdhCacheEntry> entryOpt = rdhCacheRepository.findById(id);
+            String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+            String scopedId = userId + ":" + id;
+            Optional<RdhCacheEntry> entryOpt = rdhCacheRepository.findById(scopedId);
             if (entryOpt.isPresent() && entryOpt.get().getData() != null) {
-                log.info("Found cached data for ID: {} (updated: {})", id, entryOpt.get().getLastUpdated());
+                log.info("Found cached data for ID: {} (updated: {})", scopedId, entryOpt.get().getLastUpdated());
                 T mappedData = objectMapper.convertValue(entryOpt.get().getData(), clazz);
                 return Optional.of(mappedData);
             }
-            log.warn("No cached data found for ID: {}", id);
+            log.warn("No cached data found for ID: {}", scopedId);
             return Optional.empty();
         } catch (Exception e) {
             log.error("Failed to retrieve or map cached data for ID: {} to class: {}", id, clazz.getSimpleName(), e);

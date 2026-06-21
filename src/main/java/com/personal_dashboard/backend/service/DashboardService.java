@@ -47,7 +47,8 @@ public class DashboardService {
                                 : 0;
 
                 // Fetch health record for the day
-                Optional<DailyHealthRecord> healthRecord = dailyHealthRecordRepository.findByDate(targetDate);
+                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+                Optional<DailyHealthRecord> healthRecord = dailyHealthRecordRepository.findByUserIdAndDate(userId, targetDate);
 
                 // Build DailyFoodIntake
                 DailyFoodIntake dailyFood = DailyFoodIntake.builder()
@@ -101,7 +102,9 @@ public class DashboardService {
                 LocalDate monthEnd = currentMonth.atEndOfMonth();
 
                 // Fetch all transactions for the month
-                List<Transaction> transactions = transactionRepository.findByDateBetween(
+                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+                List<Transaction> transactions = transactionRepository.findByUserIdAndDateBetween(
+                                userId,
                                 monthStart.atStartOfDay(ZoneId.systemDefault()).toInstant(),
                                 monthEnd.atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant());
 
@@ -157,7 +160,8 @@ public class DashboardService {
         public CodingMetrics aggregateCodingData(LocalDate targetDate) {
                 LocalDate sevenDaysAgo = targetDate.minusDays(6); // Include target date = 7 days total
 
-                List<DailyLog> dailyLogs = dailyLogRepository.findByDateRange(sevenDaysAgo, targetDate);
+                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+                List<DailyLog> dailyLogs = dailyLogRepository.findByUserIdAndDateRange(userId, sevenDaysAgo, targetDate);
 
                 // Build learning heatmap
                 List<LearningHeatmapEntry> heatmapEntries = dailyLogs.stream()
@@ -309,7 +313,7 @@ public class DashboardService {
 
                 // Fill in actual data from daily logs
                 for (DailyFoodLog log : dailyLogs) {
-                        String dateKey = log.getMealId() != null ? log.getMealId() : log.getId();
+                        String dateKey = log.getDateString();
                         if (log.getDailyTotals() != null) {
                                 dailyCalories.put(dateKey, log.getDailyTotals().getTotalCalories());
                                 dailyProtein.put(dateKey, log.getDailyTotals().getTotalProteinGrams());
@@ -320,7 +324,7 @@ public class DashboardService {
                 String todayKey = targetDate.format(DATE_FORMATTER);
                 Map<String, Integer> mealTypeBreakdown = new LinkedHashMap<>();
                 DailyFoodLog todayLog = dailyLogs.stream()
-                                .filter(log -> todayKey.equals(log.getId()))
+                                .filter(log -> todayKey.equals(log.getDateString()))
                                 .findFirst()
                                 .orElse(null);
 
@@ -354,7 +358,9 @@ public class DashboardService {
                 LocalDate monthStart = month.atDay(1);
                 LocalDate monthEnd = month.atEndOfMonth();
 
-                List<Transaction> transactions = transactionRepository.findByDateBetween(
+                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+                List<Transaction> transactions = transactionRepository.findByUserIdAndDateBetween(
+                                userId,
                                 monthStart.atStartOfDay(ZoneId.systemDefault()).toInstant(),
                                 monthEnd.atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant());
 
@@ -395,12 +401,13 @@ public class DashboardService {
         public LearningsSummaryResponse getLearningsSummary(LocalDate targetDate) {
                 LocalDate startDate = targetDate.minusDays(13); // 14 days total
 
-                List<Learning> rangeLearnings = learningRepository.findByDateRange(startDate, targetDate);
-                List<DailyTask> rangeTasks = dailyTaskRepository.findByDateRange(startDate, targetDate.plusDays(1))
+                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+                List<Learning> rangeLearnings = learningRepository.findByUserIdAndDateRange(userId, startDate, targetDate);
+                List<DailyTask> rangeTasks = dailyTaskRepository.findByUserIdAndDateRange(userId, startDate, targetDate.plusDays(1))
                                 .stream()
                                 .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
                                 .toList();
-                List<DailyLog> rangeLogs = dailyLogRepository.findByDateRange(startDate, targetDate);
+                List<DailyLog> rangeLogs = dailyLogRepository.findByUserIdAndDateRange(userId, startDate, targetDate);
 
                 Map<LocalDate, List<Learning>> learningsByDate = rangeLearnings.stream()
                                 .collect(Collectors.groupingBy(Learning::getDate));
@@ -437,7 +444,7 @@ public class DashboardService {
                 }
 
                 List<Learning> todayLearnings = learningsByDate.getOrDefault(targetDate, List.of());
-                List<DailyTask> todayTasks = dailyTaskRepository.findActiveTasks(LocalDateTime.now().minusHours(48))
+                List<DailyTask> todayTasks = dailyTaskRepository.findActiveTasks(userId, LocalDateTime.now().minusHours(48))
                                 .stream()
                                 .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
                                 .filter(t -> t.getExcludedDates() == null || !t.getExcludedDates().contains(targetDate))
@@ -466,7 +473,7 @@ public class DashboardService {
                 int weeklyLearningCount = rangeLearnings.size();
                 int streakDays = calculateActivityStreak(timeline);
 
-                List<DailyTask> allTasks = dailyTaskRepository.findAll().stream()
+                List<DailyTask> allTasks = dailyTaskRepository.findByUserId(userId).stream()
                                 .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
                                 .toList();
                 long totalTasksCompleted = allTasks.stream()
@@ -474,8 +481,8 @@ public class DashboardService {
                                 .count();
                 long totalTasksCount = allTasks.size();
 
-                long totalLearningsCount = learningRepository.count();
-                long totalPursuitsCount = learningPursuitRepository.count();
+                long totalLearningsCount = learningRepository.countByUserId(userId);
+                long totalPursuitsCount = learningPursuitRepository.countByUserId(userId);
 
                 LearningsTodaySummary today = LearningsTodaySummary.builder()
                                 .learningsCount(todayLearnings.size())

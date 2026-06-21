@@ -19,6 +19,7 @@ public class Passcode {
     @Id
     private String id;
     private String hash;
+    private String userId;
 
     @CreatedDate
     private Instant createdAt;

@@ -28,8 +28,9 @@ public class FocusSessionController {
     @Operation(summary = "Get current focus session", description = "Returns the currently active or paused session")
     public ResponseEntity<ApiResponse<FocusSession>> getCurrentSession(
             @RequestParam(required = false, defaultValue = "default") String userId) {
-        log.info("REST request to get current focus session for userId={}", userId);
-        var session = service.getCurrentSession(userId);
+        String activeUserId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        log.info("REST request to get current focus session for userId={}", activeUserId);
+        var session = service.getCurrentSession(activeUserId);
         ApiResponse<FocusSession> response = ApiResponse.<FocusSession>builder()
                 .data(session.orElse(null))
                 .meta(buildMeta("current"))
@@ -42,11 +43,12 @@ public class FocusSessionController {
     public ResponseEntity<ApiResponse<FocusSession>> startSession(
             @RequestBody Map<String, Object> body,
             @RequestParam(required = false, defaultValue = "default") String userId) {
+        String activeUserId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
         String pursuit = (String) body.getOrDefault("activePursuit", "Coding");
         int duration = body.containsKey("durationMinutes") ? ((Number) body.get("durationMinutes")).intValue() : 25;
 
-        log.info("REST request to start focus session: pursuit={}, duration={}m, userId={}", pursuit, duration, userId);
-        FocusSession session = service.startSession(pursuit, duration, userId);
+        log.info("REST request to start focus session: pursuit={}, duration={}m, userId={}", pursuit, duration, activeUserId);
+        FocusSession session = service.startSession(pursuit, duration, activeUserId);
         ApiResponse<FocusSession> response = ApiResponse.<FocusSession>builder()
                 .data(session)
                 .meta(buildMeta("start"))
@@ -58,8 +60,9 @@ public class FocusSessionController {
     @Operation(summary = "Pause focus session", description = "Pause the currently running session")
     public ResponseEntity<ApiResponse<FocusSession>> pauseSession(
             @RequestParam(required = false, defaultValue = "default") String userId) {
-        log.info("REST request to pause focus session for userId={}", userId);
-        FocusSession session = service.pauseSession(userId);
+        String activeUserId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        log.info("REST request to pause focus session for userId={}", activeUserId);
+        FocusSession session = service.pauseSession(activeUserId);
         ApiResponse<FocusSession> response = ApiResponse.<FocusSession>builder()
                 .data(session)
                 .meta(buildMeta("pause"))
@@ -71,8 +74,9 @@ public class FocusSessionController {
     @Operation(summary = "Resume focus session", description = "Resume a paused session")
     public ResponseEntity<ApiResponse<FocusSession>> resumeSession(
             @RequestParam(required = false, defaultValue = "default") String userId) {
-        log.info("REST request to resume focus session for userId={}", userId);
-        FocusSession session = service.resumeSession(userId);
+        String activeUserId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        log.info("REST request to resume focus session for userId={}", activeUserId);
+        FocusSession session = service.resumeSession(activeUserId);
         ApiResponse<FocusSession> response = ApiResponse.<FocusSession>builder()
                 .data(session)
                 .meta(buildMeta("resume"))
@@ -84,8 +88,9 @@ public class FocusSessionController {
     @Operation(summary = "Cancel focus session", description = "Cancel the active or paused session")
     public ResponseEntity<ApiResponse<FocusSession>> cancelSession(
             @RequestParam(required = false, defaultValue = "default") String userId) {
-        log.info("REST request to cancel focus session for userId={}", userId);
-        FocusSession session = service.cancelSession(userId);
+        String activeUserId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        log.info("REST request to cancel focus session for userId={}", activeUserId);
+        FocusSession session = service.cancelSession(activeUserId);
         ApiResponse<FocusSession> response = ApiResponse.<FocusSession>builder()
                 .data(session)
                 .meta(buildMeta("cancel"))
@@ -97,8 +102,9 @@ public class FocusSessionController {
     @Operation(summary = "Complete focus session", description = "Mark the running session as completed")
     public ResponseEntity<ApiResponse<FocusSession>> completeSession(
             @RequestParam(required = false, defaultValue = "default") String userId) {
-        log.info("REST request to complete focus session for userId={}", userId);
-        FocusSession session = service.completeSession(userId);
+        String activeUserId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        log.info("REST request to complete focus session for userId={}", activeUserId);
+        FocusSession session = service.completeSession(activeUserId);
         ApiResponse<FocusSession> response = ApiResponse.<FocusSession>builder()
                 .data(session)
                 .meta(buildMeta("complete"))
