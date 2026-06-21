@@ -17,9 +17,10 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "prompts")
-public class Prompt {
+public class Prompt implements UserOwnedDocument {
     @Id
     private String id;
+    private String userId;
     private String title;
     private String content;
     private String category;

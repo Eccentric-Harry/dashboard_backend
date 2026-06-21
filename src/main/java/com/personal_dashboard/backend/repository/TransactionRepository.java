@@ -16,7 +16,15 @@ public interface TransactionRepository extends MongoRepository<Transaction, Stri
 
     List<Transaction> findByDateBetween(Instant startDate, Instant endDate);
 
+    java.util.Optional<Transaction> findByIdAndUserId(String id, String userId);
+
+    List<Transaction> findByUserIdAndDateBetween(String userId, Instant startDate, Instant endDate);
+
     List<Transaction> findByTypeAndDateBetween(String type, Instant startDate, Instant endDate);
 
+    List<Transaction> findByUserIdAndTypeAndDateBetween(String userId, String type, Instant startDate, Instant endDate);
+
     List<Transaction> findByCategoryAndDateBetween(String category, Instant startDate, Instant endDate);
+
+    List<Transaction> findByUserIdAndCategoryAndDateBetween(String userId, String category, Instant startDate, Instant endDate);
 }

@@ -15,10 +15,12 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "slice_repayments")
-public class SliceRepayment {
+public class SliceRepayment implements UserOwnedDocument {
 
     @Id
     private String id;
+
+    private String userId;
 
     private String dueDate;
 

@@ -1,5 +1,6 @@
 package com.personal_dashboard.backend.config;
 
+import com.personal_dashboard.backend.security.UserContext;
 import com.personal_dashboard.backend.service.AuthService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -16,7 +17,7 @@ import java.io.IOException;
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 @RequiredArgsConstructor
-public class AuthFilter extends OncePerRequestFilter {
+public class TokenAuthFilter extends OncePerRequestFilter {
 
     private static final String ALLOWED_ORIGINS =
             "http://localhost:3000,http://localhost:5173,http://localhost:5174,http://127.0.0.1:3000,http://127.0.0.1:5173,https://dashboard-ui-flame-psi.vercel.app,https://harrysdashboard.vercel.app";
@@ -41,7 +42,7 @@ public class AuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (path.startsWith("/api/v1/")) {
+        if (path.startsWith("/api/")) {
             String authHeader = request.getHeader("Authorization");
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
                 writeCorsError(request, response, "Missing or invalid Authorization header");
@@ -49,10 +50,19 @@ public class AuthFilter extends OncePerRequestFilter {
             }
 
             String token = authHeader.substring(7);
-            if (!authService.isValidToken(token)) {
+            var authToken = authService.validateToken(token);
+            if (authToken.isEmpty()) {
                 writeCorsError(request, response, "Invalid or expired token");
                 return;
             }
+
+            try {
+                UserContext.setUserId(authToken.get().getUserId());
+                filterChain.doFilter(request, response);
+            } finally {
+                UserContext.clear();
+            }
+            return;
         }
 
         filterChain.doFilter(request, response);

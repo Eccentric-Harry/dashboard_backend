@@ -12,7 +12,13 @@ public interface RunSessionRepository extends MongoRepository<RunSession, String
 
     List<RunSession> findByDate(LocalDate date);
 
+    List<RunSession> findByUserIdAndDate(String userId, LocalDate date);
+
     List<RunSession> findByDateBetween(LocalDate startDate, LocalDate endDate);
 
+    List<RunSession> findByUserIdAndDateBetween(String userId, LocalDate startDate, LocalDate endDate);
+
     List<RunSession> findByTitle(String title);
+
+    List<RunSession> findByUserIdAndTitle(String userId, String title);
 }

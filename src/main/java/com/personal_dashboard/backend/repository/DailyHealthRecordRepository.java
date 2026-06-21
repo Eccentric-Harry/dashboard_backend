@@ -14,4 +14,8 @@ public interface DailyHealthRecordRepository extends MongoRepository<DailyHealth
     Optional<DailyHealthRecord> findByDate(LocalDate date);
 
     List<DailyHealthRecord> findByDateBetween(LocalDate startDate, LocalDate endDate);
+
+    Optional<DailyHealthRecord> findByUserIdAndDate(String userId, LocalDate date);
+
+    List<DailyHealthRecord> findByUserIdAndDateBetween(String userId, LocalDate startDate, LocalDate endDate);
 }

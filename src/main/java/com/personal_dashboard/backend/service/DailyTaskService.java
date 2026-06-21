@@ -20,13 +20,15 @@ public class DailyTaskService {
     private final DailyTaskRepository dailyTaskRepository;
 
     public List<DailyTask> getTasksForDate(LocalDate date) {
-        return sortTasks(dailyTaskRepository.findByDateRange(date, date.plusDays(1)).stream()
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        return sortTasks(dailyTaskRepository.findByUserIdAndDateRange(userId, date, date.plusDays(1)).stream()
                 .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
                 .toList());
     }
 
     public List<DailyTask> getTasksForDateWithIncompletePrevious(LocalDate date) {
-        List<DailyTask> tasks = dailyTaskRepository.findTasksForDateWithIncompletePrevious(date, date.plusDays(1)).stream()
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        List<DailyTask> tasks = dailyTaskRepository.findTasksForDateWithIncompletePrevious(userId, date, date.plusDays(1)).stream()
                 .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
                 .filter(t -> t.getExcludedDates() == null || !t.getExcludedDates().contains(date))
                 .map(t -> {
@@ -43,27 +45,31 @@ public class DailyTaskService {
 
     public List<DailyTask> getActiveTasks() {
         LocalDateTime cutoff = LocalDateTime.now().minusHours(48);
-        return sortTasks(dailyTaskRepository.findActiveTasks(cutoff).stream()
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        return sortTasks(dailyTaskRepository.findActiveTasks(userId, cutoff).stream()
                 .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
                 .toList());
     }
 
     public List<DailyTask> getAllTasks() {
         log.info("Fetching all tasks");
-        return sortTasks(dailyTaskRepository.findAll().stream()
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        return sortTasks(dailyTaskRepository.findByUserId(userId).stream()
                 .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
                 .toList());
     }
 
     public List<DailyTask> getTasksForRange(LocalDate startDate, LocalDate endDate) {
-        return sortTasks(dailyTaskRepository.findByDateRange(startDate, endDate.plusDays(1)).stream()
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        return sortTasks(dailyTaskRepository.findByUserIdAndDateRange(userId, startDate, endDate.plusDays(1)).stream()
                 .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
                 .toList());
     }
 
     public DailyTask createTask(DailyTaskRequest request) {
         LocalDate taskDate = LocalDate.parse(request.getDate());
-        int nextOrder = dailyTaskRepository.findByDateRange(taskDate, taskDate.plusDays(1)).size();
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        int nextOrder = dailyTaskRepository.findByUserIdAndDateRange(userId, taskDate, taskDate.plusDays(1)).size();
         boolean isCompleted = Boolean.TRUE.equals(request.getCompleted());
         String status = request.getStatus() != null ? request.getStatus() : (isCompleted ? "DONE" : "TODO");
         if (isCompleted) {
@@ -73,6 +79,7 @@ public class DailyTaskService {
         }
         
         DailyTask task = DailyTask.builder()
+                .userId(userId)
                 .title(request.getTitle())
                 .date(LocalDate.parse(request.getDate()))
                 .scheduledTime(request.getScheduledTime())
@@ -94,7 +101,8 @@ public class DailyTaskService {
     }
 
     public DailyTask updateTask(String id, DailyTaskRequest request) {
-        DailyTask existing = dailyTaskRepository.findById(id)
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        DailyTask existing = dailyTaskRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new IllegalArgumentException("Task not found with id: " + id));
 
         existing.setTitle(request.getTitle());
@@ -155,7 +163,8 @@ public class DailyTaskService {
     }
 
     public DailyTask toggleTask(String id, LocalDate occurrenceDate) {
-        DailyTask existing = dailyTaskRepository.findById(id)
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        DailyTask existing = dailyTaskRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new IllegalArgumentException("Task not found with id: " + id));
         String recurrence = existing.getRecurrenceFrequency() != null ? existing.getRecurrenceFrequency() : "NONE";
 
@@ -185,10 +194,10 @@ public class DailyTaskService {
     }
 
     public void deleteTask(String id) {
-        if (!dailyTaskRepository.existsById(id)) {
-            throw new IllegalArgumentException("Task not found with id: " + id);
-        }
-        dailyTaskRepository.deleteById(id);
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        DailyTask existing = dailyTaskRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new IllegalArgumentException("Task not found with id: " + id));
+        dailyTaskRepository.delete(existing);
     }
 
     private List<DailyTask> sortTasks(List<DailyTask> tasks) {

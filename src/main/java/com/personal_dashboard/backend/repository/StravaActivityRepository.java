@@ -13,9 +13,17 @@ public interface StravaActivityRepository extends MongoRepository<StravaActivity
 
     List<StravaActivity> findAllByOrderByDateDesc();
 
+    List<StravaActivity> findByUserIdOrderByDateDesc(String userId);
+
     List<StravaActivity> findByDateBetween(LocalDate startDate, LocalDate endDate);
+
+    List<StravaActivity> findByUserIdAndDateBetween(String userId, LocalDate startDate, LocalDate endDate);
 
     List<StravaActivity> findBySportType(String sportType);
 
+    List<StravaActivity> findByUserIdAndSportType(String userId, String sportType);
+
     Optional<StravaActivity> findByStravaEmbedId(String stravaEmbedId);
+
+    Optional<StravaActivity> findByUserIdAndStravaEmbedId(String userId, String stravaEmbedId);
 }

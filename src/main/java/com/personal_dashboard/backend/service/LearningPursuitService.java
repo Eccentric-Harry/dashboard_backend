@@ -26,7 +26,8 @@ public class LearningPursuitService {
 
     public List<LearningPursuit> getAllPursuits() {
         log.info("Retrieving all learning pursuits");
-        return repository.findAll();
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        return repository.findByUserId(userId);
     }
 
     public LearningPursuit createPursuit(PursuitRequest request) {
@@ -63,7 +64,8 @@ public class LearningPursuitService {
     public LearningPursuit toggleStep(String pursuitId, String stepId) {
         log.info("Toggling subtask step {} within pursuit {}", stepId, pursuitId);
 
-        LearningPursuit pursuit = repository.findById(pursuitId)
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        LearningPursuit pursuit = repository.findByIdAndUserId(pursuitId, userId)
                 .orElseThrow(() -> new IllegalArgumentException("Pursuit not found with id: " + pursuitId));
 
         boolean stepFound = false;
@@ -89,6 +91,7 @@ public class LearningPursuitService {
             
             // 1. Create a Learning log in learnings database collection
             Learning learning = Learning.builder()
+                    .userId(userId)
                     .title(pursuit.getTitle())
                     .category(pursuit.getCategory())
                     .date(LocalDate.now())
@@ -98,7 +101,7 @@ public class LearningPursuitService {
             learningRepository.save(learning);
 
             // 2. Remove it from learning_pursuits queue collection
-            repository.deleteById(pursuitId);
+            repository.delete(pursuit);
 
             // Set state to COMPLETED and return the final representation to client
             pursuit.setStatus("COMPLETED");
@@ -111,15 +114,16 @@ public class LearningPursuitService {
 
     public void deletePursuit(String id) {
         log.info("Deleting learning pursuit: {}", id);
-        if (!repository.existsById(id)) {
-            throw new IllegalArgumentException("Pursuit not found with id: " + id);
-        }
-        repository.deleteById(id);
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        LearningPursuit existing = repository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new IllegalArgumentException("Pursuit not found with id: " + id));
+        repository.delete(existing);
     }
 
     public LearningPursuit updatePursuit(String id, PursuitRequest request) {
         log.info("Updating learning pursuit metadata for id: {}", id);
-        LearningPursuit existing = repository.findById(id)
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        LearningPursuit existing = repository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new IllegalArgumentException("Pursuit not found with id: " + id));
 
         existing.setTitle(request.getTitle().trim());
@@ -130,7 +134,8 @@ public class LearningPursuitService {
 
     public LearningPursuit deleteStep(String pursuitId, String stepId) {
         log.info("Deleting step {} from pursuit {}", stepId, pursuitId);
-        LearningPursuit pursuit = repository.findById(pursuitId)
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        LearningPursuit pursuit = repository.findByIdAndUserId(pursuitId, userId)
                 .orElseThrow(() -> new IllegalArgumentException("Pursuit not found with id: " + pursuitId));
 
         boolean removed = pursuit.getSteps().removeIf(step -> step.getId().equals(stepId));
@@ -150,6 +155,7 @@ public class LearningPursuitService {
             log.info("Subtasks deletion resulted in all remaining steps completed. Moving to All Learnings.");
             
             Learning learning = Learning.builder()
+                    .userId(userId)
                     .title(pursuit.getTitle())
                     .category(pursuit.getCategory())
                     .date(LocalDate.now())
@@ -157,7 +163,7 @@ public class LearningPursuitService {
                     .notionUrl(pursuit.getNotionUrl())
                     .build();
             learningRepository.save(learning);
-            repository.deleteById(pursuitId);
+            repository.delete(pursuit);
             
             pursuit.setStatus("COMPLETED");
             return pursuit;
@@ -173,7 +179,8 @@ public class LearningPursuitService {
             throw new IllegalArgumentException("Step text cannot be blank");
         }
 
-        LearningPursuit pursuit = repository.findById(pursuitId)
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        LearningPursuit pursuit = repository.findByIdAndUserId(pursuitId, userId)
                 .orElseThrow(() -> new IllegalArgumentException("Pursuit not found with id: " + pursuitId));
 
         boolean found = false;

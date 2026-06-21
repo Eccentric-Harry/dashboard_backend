@@ -28,7 +28,8 @@ public class SubscriptionController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<SubscriptionDTO>>> getSubscriptions() {
-        List<Subscription> subscriptions = subscriptionRepository.findAll();
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        List<Subscription> subscriptions = subscriptionRepository.findByUserId(userId);
 
         List<SubscriptionDTO> dtos = subscriptions.stream()
                 .map(sub -> SubscriptionDTO.builder()

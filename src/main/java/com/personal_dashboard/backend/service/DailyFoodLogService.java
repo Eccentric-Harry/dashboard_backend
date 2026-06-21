@@ -43,12 +43,14 @@ public class DailyFoodLogService {
             entry.setTimestamp(Instant.now());
         }
 
-        DailyFoodLog dailyLog = dailyFoodLogRepository.findById(mealId).orElse(null);
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        DailyFoodLog dailyLog = dailyFoodLogRepository.findByUserIdAndDateString(userId, dateStr).orElse(null);
 
         if (dailyLog == null) {
             // Create a new daily document
             dailyLog = DailyFoodLog.builder()
-                    .id(mealId)
+                    .userId(userId)
+                    .dateString(dateStr)
                     .mealId(mealId)
                     .date(date)
                     .dailyTotals(new DailyTotals())
@@ -77,7 +79,8 @@ public class DailyFoodLogService {
      * Returns the updated daily log, or null if nothing was found.
      */
     public DailyFoodLog removeMeal(String mealId, String entryId) {
-        DailyFoodLog dailyLog = dailyFoodLogRepository.findById(mealId).orElse(null);
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        DailyFoodLog dailyLog = dailyFoodLogRepository.findByUserIdAndDateString(userId, mealId).orElse(null);
         if (dailyLog == null || dailyLog.getMeals() == null) {
             return null;
         }
@@ -108,7 +111,8 @@ public class DailyFoodLogService {
      * Update a specific meal entry within a daily log.
      */
     public DailyFoodLog updateMeal(String mealId, String entryId, String newMealType, MealEntry updatedEntry) {
-        DailyFoodLog dailyLog = dailyFoodLogRepository.findById(mealId).orElse(null);
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        DailyFoodLog dailyLog = dailyFoodLogRepository.findByUserIdAndDateString(userId, mealId).orElse(null);
         if (dailyLog == null || dailyLog.getMeals() == null) {
             return null;
         }
@@ -193,9 +197,11 @@ public class DailyFoodLogService {
      * Helper to get or create a daily log.
      */
     private DailyFoodLog getDailyLogInternal(String dateStr) {
-        return dailyFoodLogRepository.findById(dateStr)
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        return dailyFoodLogRepository.findByUserIdAndDateString(userId, dateStr)
                 .orElseGet(() -> DailyFoodLog.builder()
-                        .id(dateStr)
+                        .userId(userId)
+                        .dateString(dateStr)
                         .mealId(dateStr)
                         .date(LocalDate.parse(dateStr, DATE_FORMATTER))
                         .dailyTotals(new DailyTotals())
@@ -212,9 +218,11 @@ public class DailyFoodLogService {
      * Returns an empty skeleton if no log exists.
      */
     public DailyFoodLog getDailyLog(String dateStr) {
-        return dailyFoodLogRepository.findById(dateStr)
-                .orElse(DailyFoodLog.builder()
-                        .id(dateStr)
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        return dailyFoodLogRepository.findByUserIdAndDateString(userId, dateStr)
+                .orElseGet(() -> DailyFoodLog.builder()
+                        .userId(userId)
+                        .dateString(dateStr)
                         .mealId(dateStr)
                         .date(LocalDate.parse(dateStr, DATE_FORMATTER))
                         .dailyTotals(new DailyTotals())
@@ -226,16 +234,18 @@ public class DailyFoodLogService {
      * Get daily food logs for a date range (inclusive).
      */
     public List<DailyFoodLog> getDailyLogsForRange(LocalDate startDate, LocalDate endDate) {
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
         String startMealId = startDate.format(DATE_FORMATTER);
         String endMealId = endDate.format(DATE_FORMATTER);
-        return dailyFoodLogRepository.findByMealIdRange(startMealId, endMealId);
+        return dailyFoodLogRepository.findByUserIdAndDateStringRange(userId, startMealId, endMealId);
     }
 
     /**
      * Check if a meal with the given importKey already exists in any daily log for the given date.
      */
     public boolean existsByImportKey(String dateStr, String importKey) {
-        DailyFoodLog dailyLog = dailyFoodLogRepository.findById(dateStr).orElse(null);
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        DailyFoodLog dailyLog = dailyFoodLogRepository.findByUserIdAndDateString(userId, dateStr).orElse(null);
         if (dailyLog == null || dailyLog.getMeals() == null) {
             return false;
         }
@@ -292,12 +302,14 @@ public class DailyFoodLogService {
                 .totalProteinGrams(log.getDailyTotals() != null ? log.getDailyTotals().getTotalProteinGrams() : 0)
                 .build();
 
+        String dateStr = log.getDateString();
+
         return DailyFoodLogDTO.builder()
-                .mealId(log.getMealId())
-                .date(log.getMealId() != null ? log.getMealId() : log.getId())
+                .mealId(log.getDateString())
+                .date(dateStr)
                 .dailyTotals(totalsDto)
                 .meals(mealsDto)
-                .hydration(toHydrationDto(log.getMealId() != null ? log.getMealId() : log.getId(), log.getHydration()))
+                .hydration(toHydrationDto(dateStr, log.getHydration()))
                 .build();
     }
 
@@ -360,7 +372,7 @@ public class DailyFoodLogService {
         List<FoodEntryDTO> result = new ArrayList<>();
         if (log.getMeals() == null) return result;
 
-        String dateStr = log.getMealId() != null ? log.getMealId() : log.getId();
+        String dateStr = log.getDateString();
 
         for (Map.Entry<String, List<MealEntry>> mealGroup : log.getMeals().entrySet()) {
             String mealType = mealGroup.getKey();

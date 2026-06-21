@@ -18,10 +18,12 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "run_sessions")
-public class RunSession {
+public class RunSession implements UserOwnedDocument {
 
     @Id
     private String id;
+
+    private String userId;
 
     private String title;
 

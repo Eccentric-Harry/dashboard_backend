@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
@@ -17,10 +18,15 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "daily_health_records")
-public class DailyHealthRecord {
+@CompoundIndex(name = "user_date_unique", def = "{'userId': 1, 'dateString': 1}", unique = true)
+public class DailyHealthRecord implements UserOwnedDocument {
 
     @Id
     private String id;
+
+    private String userId;
+
+    private String dateString;
 
     private LocalDate date;
 

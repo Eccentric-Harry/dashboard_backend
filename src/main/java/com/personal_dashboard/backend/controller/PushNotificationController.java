@@ -46,8 +46,9 @@ public class PushNotificationController {
     @PostMapping("/subscribe")
     @Operation(summary = "Register browser push client", description = "Store a new subscription endpoint with cryptography credentials")
     public ResponseEntity<ApiResponse<PushSubscription>> subscribe(@Valid @RequestBody PushSubscriptionRequest request) {
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
         // Prevent duplicate endpoint entries
-        Optional<PushSubscription> existing = pushSubscriptionRepository.findByEndpoint(request.getEndpoint());
+        Optional<PushSubscription> existing = pushSubscriptionRepository.findByUserIdAndEndpoint(userId, request.getEndpoint());
         PushSubscription saved;
 
         if (existing.isPresent()) {
@@ -58,6 +59,7 @@ public class PushNotificationController {
             saved = pushSubscriptionRepository.save(entity);
         } else {
             PushSubscription newSub = PushSubscription.builder()
+                    .userId(userId)
                     .endpoint(request.getEndpoint())
                     .p256dh(request.getP256dh())
                     .auth(request.getAuth())
@@ -75,7 +77,8 @@ public class PushNotificationController {
     @PostMapping("/unsubscribe")
     @Operation(summary = "Unregister browser push client", description = "Delete a subscription endpoint to disable future push alerts")
     public ResponseEntity<ApiResponse<Void>> unsubscribe(@RequestParam String endpoint) {
-        Optional<PushSubscription> existing = pushSubscriptionRepository.findByEndpoint(endpoint);
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        Optional<PushSubscription> existing = pushSubscriptionRepository.findByUserIdAndEndpoint(userId, endpoint);
         existing.ifPresent(pushSubscriptionRepository::delete);
 
         return ResponseEntity.ok(ApiResponse.<Void>builder()

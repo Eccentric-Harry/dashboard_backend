@@ -18,15 +18,19 @@ public class DailyLogService {
     private final DailyLogRepository dailyLogRepository;
 
     public DailyLog getOrEmptyForDate(LocalDate date) {
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
         return firstLogForDate(date)
                 .orElse(DailyLog.builder()
+                        .userId(userId)
                         .date(date)
+                        .dateString(date.toString())
                         .build());
     }
 
     public DailyLog upsertForDate(LocalDate date, DailyLogRequest request) {
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
         DailyLog log = firstLogForDate(date)
-                .orElse(DailyLog.builder().date(date).build());
+                .orElse(DailyLog.builder().userId(userId).date(date).dateString(date.toString()).build());
 
         if (request.getMoodRating() != null) {
             log.setMoodRating(request.getMoodRating());
@@ -40,6 +44,8 @@ public class DailyLogService {
     }
 
     private Optional<DailyLog> firstLogForDate(LocalDate date) {
-        return dailyLogRepository.findByDateRange(date, date).stream().findFirst();
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        return dailyLogRepository.findByUserIdAndDateRange(userId, date, date).stream().findFirst();
     }
+
 }

@@ -37,7 +37,8 @@ public class CalendarItemService {
             throw new IllegalArgumentException("End date must be on or after start date");
         }
         LocalDate endExclusive = endDate.plusDays(1);
-        return dailyTaskRepository.findCalendarCandidates(startDate, endExclusive).stream()
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        return dailyTaskRepository.findCalendarCandidates(userId, startDate, endExclusive).stream()
                 .flatMap(item -> expandItem(item, startDate, endDate).stream())
                 .sorted(Comparator
                         .comparing(CalendarItemOccurrence::getDate)
@@ -49,14 +50,16 @@ public class CalendarItemService {
     }
 
     public DailyTask getItem(String id) {
-        return dailyTaskRepository.findById(id)
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        return dailyTaskRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new IllegalArgumentException("Calendar item not found with id: " + id));
     }
 
     public DailyTask createItem(CalendarItemRequest request) {
         LocalDate date = LocalDate.parse(request.getDate());
         validateRequest(request);
-        int nextOrder = dailyTaskRepository.findByDateRange(date, date.plusDays(1)).size();
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        int nextOrder = dailyTaskRepository.findByUserIdAndDateRange(userId, date, date.plusDays(1)).size();
         boolean completed = Boolean.TRUE.equals(request.getCompleted());
         boolean cancelled = Boolean.TRUE.equals(request.getCancelled());
         String recurrence = defaultText(request.getRecurrenceFrequency(), "NONE").toUpperCase(Locale.ROOT);
@@ -83,6 +86,7 @@ public class CalendarItemService {
         }
 
         DailyTask item = DailyTask.builder()
+                .userId(userId)
                 .title(request.getTitle().trim())
                 .date(date)
                 .scheduledTime(blankToNull(request.getStartTime()))
@@ -288,10 +292,10 @@ public class CalendarItemService {
     }
 
     public void deleteItem(String id) {
-        if (!dailyTaskRepository.existsById(id)) {
-            throw new IllegalArgumentException("Calendar item not found with id: " + id);
-        }
-        dailyTaskRepository.deleteById(id);
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        DailyTask existing = dailyTaskRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new IllegalArgumentException("Calendar item not found with id: " + id));
+        dailyTaskRepository.delete(existing);
     }
 
     public void deleteOccurrence(String id, LocalDate date) {

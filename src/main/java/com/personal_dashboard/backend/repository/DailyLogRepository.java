@@ -14,6 +14,11 @@ public interface DailyLogRepository extends MongoRepository<DailyLog, String> {
     @Query("{ 'date': { $gte: ?0, $lte: ?1 } }")
     List<DailyLog> findByDateRange(LocalDate startDate, LocalDate endDate);
 
+    @Query("{ 'userId': ?0, 'date': { $gte: ?1, $lte: ?2 } }")
+    List<DailyLog> findByUserIdAndDateRange(String userId, LocalDate startDate, LocalDate endDate);
+
     List<DailyLog> findByDateIn(java.util.Collection<LocalDate> dates);
+
+    List<DailyLog> findByUserIdAndDateIn(String userId, java.util.Collection<LocalDate> dates);
 
 }

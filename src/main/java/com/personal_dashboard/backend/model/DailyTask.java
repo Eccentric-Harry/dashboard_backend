@@ -19,10 +19,12 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "daily_tasks")
-public class DailyTask {
+public class DailyTask implements UserOwnedDocument {
 
     @Id
     private String id;
+
+    private String userId;
 
     private String title;
     private LocalDate date;

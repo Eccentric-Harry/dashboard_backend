@@ -19,6 +19,7 @@ public class AuthToken {
     @Id
     private String id;
     private String token;
+    private String userId;
     @CreatedDate
     private Instant createdAt;
     @LastModifiedDate

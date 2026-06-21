@@ -16,10 +16,12 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "push_subscriptions")
-public class PushSubscription {
+public class PushSubscription implements UserOwnedDocument {
 
     @Id
     private String id;
+
+    private String userId;
 
     private String endpoint;
     private String p256dh;

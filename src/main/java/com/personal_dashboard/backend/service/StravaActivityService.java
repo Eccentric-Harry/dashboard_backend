@@ -31,21 +31,24 @@ public class StravaActivityService {
      * Get all activities sorted by date descending
      */
     public List<StravaActivity> getAllActivities() {
-        return stravaActivityRepository.findAllByOrderByDateDesc();
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        return stravaActivityRepository.findByUserIdOrderByDateDesc(userId);
     }
 
     /**
      * Get activities in a date range
      */
     public List<StravaActivity> getActivitiesByDateRange(LocalDate start, LocalDate end) {
-        return stravaActivityRepository.findByDateBetween(start, end);
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        return stravaActivityRepository.findByUserIdAndDateBetween(userId, start, end);
     }
 
     /**
      * Compute aggregated stats for dashboard cards
      */
     public Map<String, Object> getActivityStats() {
-        List<StravaActivity> activities = stravaActivityRepository.findAllByOrderByDateDesc();
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        List<StravaActivity> activities = stravaActivityRepository.findByUserIdOrderByDateDesc(userId);
 
         Map<String, Object> stats = new LinkedHashMap<>();
 
@@ -139,7 +142,9 @@ public class StravaActivityService {
             }
         }
 
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
         StravaActivity activity = StravaActivity.builder()
+                .userId(userId)
                 .date(date)
                 .activityName(request.getActivityName())
                 .sportType(request.getSportType())
@@ -187,7 +192,9 @@ public class StravaActivityService {
             pace = Math.round(pace * 100.0) / 100.0;
         }
 
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
         StravaActivity activity = StravaActivity.builder()
+                .userId(userId)
                 .activityName(dto.getName())
                 .sportType(dto.getSportType())
                 .date(date)
@@ -222,6 +229,7 @@ public class StravaActivityService {
      * Bulk create activities (for initial seeding)
      */
     public List<StravaActivity> bulkCreateActivities(List<StravaActivityRequest> requests) {
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
         List<StravaActivity> activities = requests.stream().map(request -> {
             LocalDate date = LocalDate.parse(request.getDate(), DATE_FORMATTER);
             double movingTimeMinutes = parseMovingTimeToMinutes(request.getMovingTime());
@@ -235,6 +243,7 @@ public class StravaActivityService {
             }
 
             return StravaActivity.builder()
+                    .userId(userId)
                     .date(date)
                     .activityName(request.getActivityName())
                     .sportType(request.getSportType())
