@@ -34,18 +34,21 @@ public class AuthService {
     }
 
     public Optional<String> signup(String username, String displayName, String passcode) {
-        if (username == null || passcode == null || passcode.trim().length() < 4) {
-            return Optional.empty();
+        if (username == null || username.trim().isEmpty()) {
+            throw new IllegalArgumentException("Username is required");
+        }
+        if (passcode == null || passcode.trim().length() < 4) {
+            throw new IllegalArgumentException("Passcode must be at least 4 characters long");
         }
         String sanitizedUsername = username.trim().toLowerCase();
         if (sanitizedUsername.length() < 3 || sanitizedUsername.length() > 20 || !sanitizedUsername.matches("^[a-zA-Z0-9_-]+$")) {
             log.warn("Invalid username format: {}", sanitizedUsername);
-            return Optional.empty();
+            throw new IllegalArgumentException("Username must be 3-20 characters (alphanumeric, hyphens, or underscores)");
         }
 
         if (userAccountRepository.existsById(sanitizedUsername)) {
             log.warn("Username already exists: {}", sanitizedUsername);
-            return Optional.empty();
+            throw new IllegalArgumentException("Username is already taken");
         }
 
         // Create UserAccount

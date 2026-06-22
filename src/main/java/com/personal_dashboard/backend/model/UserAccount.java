@@ -22,6 +22,20 @@ public class UserAccount {
 
     private String displayName;
 
+    private String avatarUrl;
+    private String email;
+    private String bio;
+    private String phoneNumber;
+    private Integer age;
+    private Double weight;
+    private Double height;
+    private Integer targetCalories;
+    private Integer targetProtein;
+
+    private String timezone;
+    private String workingHours;
+    private String title;
+
     @CreatedDate
     private Instant createdAt;
 

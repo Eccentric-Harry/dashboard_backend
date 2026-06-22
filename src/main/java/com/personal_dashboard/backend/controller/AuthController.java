@@ -39,9 +39,15 @@ public class AuthController {
             return badRequest("Username and passcode are required");
         }
 
-        Optional<String> tokenOpt = authService.signup(username, displayName, passcode);
+        Optional<String> tokenOpt;
+        try {
+            tokenOpt = authService.signup(username, displayName, passcode);
+        } catch (IllegalArgumentException e) {
+            return badRequest(e.getMessage());
+        }
+
         if (tokenOpt.isEmpty()) {
-            return badRequest("Signup failed: username might already exist or format is invalid (minimum passcode length 4)");
+            return badRequest("Signup failed. Please try again.");
         }
 
         ApiMeta meta = ApiMeta.builder()
