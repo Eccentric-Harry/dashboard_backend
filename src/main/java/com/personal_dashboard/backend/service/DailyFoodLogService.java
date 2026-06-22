@@ -361,6 +361,11 @@ public class DailyFoodLogService {
                 .totalSummary(entry.getTotalSummary())
                 .gapsAndWarnings(entry.getGapsAndWarnings())
                 .technicalDiagnostic(entry.getTechnicalDiagnostic())
+                .acneImpactAssessment(entry.getAcneImpactAssessment())
+                .recompositionAssessment(entry.getRecompositionAssessment())
+                .satietyAndEnergyProfile(entry.getSatietyAndEnergyProfile())
+                .nutritionalBalanceDiagnostic(entry.getNutritionalBalanceDiagnostic())
+                .dailyContext(entry.getDailyContext())
                 .build();
     }
 
@@ -398,6 +403,11 @@ public class DailyFoodLogService {
                         .totalSummary(entry.getTotalSummary())
                         .gapsAndWarnings(entry.getGapsAndWarnings())
                         .technicalDiagnostic(entry.getTechnicalDiagnostic())
+                        .acneImpactAssessment(entry.getAcneImpactAssessment())
+                        .recompositionAssessment(entry.getRecompositionAssessment())
+                        .satietyAndEnergyProfile(entry.getSatietyAndEnergyProfile())
+                        .nutritionalBalanceDiagnostic(entry.getNutritionalBalanceDiagnostic())
+                        .dailyContext(entry.getDailyContext())
                         .build());
             }
         }

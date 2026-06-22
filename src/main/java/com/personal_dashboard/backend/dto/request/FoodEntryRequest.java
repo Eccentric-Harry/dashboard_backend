@@ -47,8 +47,23 @@ public class FoodEntryRequest {
     private Map<String, Object> totalSummary;
 
     @JsonProperty("gaps_and_warnings")
-    private List<String> gapsAndWarnings;
+    private List<Object> gapsAndWarnings;
 
     @JsonProperty("technical_diagnostic")
     private Map<String, Object> technicalDiagnostic;
+
+    @JsonProperty("acne_impact_assessment")
+    private Map<String, Object> acneImpactAssessment;
+
+    @JsonProperty("recomposition_assessment")
+    private Map<String, Object> recompositionAssessment;
+
+    @JsonProperty("satiety_and_energy_profile")
+    private Map<String, Object> satietyAndEnergyProfile;
+
+    @JsonProperty("nutritional_balance_diagnostic")
+    private Map<String, Object> nutritionalBalanceDiagnostic;
+
+    @JsonProperty("daily_context")
+    private Map<String, Object> dailyContext;
 }

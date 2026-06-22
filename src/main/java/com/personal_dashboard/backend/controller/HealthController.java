@@ -48,6 +48,11 @@ public class HealthController {
                                 .totalSummary(request.getTotalSummary())
                                 .gapsAndWarnings(request.getGapsAndWarnings())
                                 .technicalDiagnostic(request.getTechnicalDiagnostic())
+                                .acneImpactAssessment(request.getAcneImpactAssessment())
+                                .recompositionAssessment(request.getRecompositionAssessment())
+                                .satietyAndEnergyProfile(request.getSatietyAndEnergyProfile())
+                                .nutritionalBalanceDiagnostic(request.getNutritionalBalanceDiagnostic())
+                                .dailyContext(request.getDailyContext())
                                 .build();
 
                 // Save the newly added entry to MongoDB
@@ -66,6 +71,11 @@ public class HealthController {
                                 .totalSummary(entry.getTotalSummary())
                                 .gapsAndWarnings(entry.getGapsAndWarnings())
                                 .technicalDiagnostic(entry.getTechnicalDiagnostic())
+                                .acneImpactAssessment(entry.getAcneImpactAssessment())
+                                .recompositionAssessment(entry.getRecompositionAssessment())
+                                .satietyAndEnergyProfile(entry.getSatietyAndEnergyProfile())
+                                .nutritionalBalanceDiagnostic(entry.getNutritionalBalanceDiagnostic())
+                                .dailyContext(entry.getDailyContext())
                                 .build();
 
                 return ResponseEntity.status(HttpStatus.CREATED).body(buildResponse(responseDto));
@@ -90,6 +100,11 @@ public class HealthController {
                                 .totalSummary(request.getTotalSummary())
                                 .gapsAndWarnings(request.getGapsAndWarnings())
                                 .technicalDiagnostic(request.getTechnicalDiagnostic())
+                                .acneImpactAssessment(request.getAcneImpactAssessment())
+                                .recompositionAssessment(request.getRecompositionAssessment())
+                                .satietyAndEnergyProfile(request.getSatietyAndEnergyProfile())
+                                .nutritionalBalanceDiagnostic(request.getNutritionalBalanceDiagnostic())
+                                .dailyContext(request.getDailyContext())
                                 .build();
 
                 DailyFoodLog result = dailyFoodLogService.updateMeal(
@@ -111,6 +126,11 @@ public class HealthController {
                                 .totalSummary(request.getTotalSummary())
                                 .gapsAndWarnings(request.getGapsAndWarnings())
                                 .technicalDiagnostic(request.getTechnicalDiagnostic())
+                                .acneImpactAssessment(request.getAcneImpactAssessment())
+                                .recompositionAssessment(request.getRecompositionAssessment())
+                                .satietyAndEnergyProfile(request.getSatietyAndEnergyProfile())
+                                .nutritionalBalanceDiagnostic(request.getNutritionalBalanceDiagnostic())
+                                .dailyContext(request.getDailyContext())
                                 .build();
 
                 return ResponseEntity.ok(buildResponse(responseDto));

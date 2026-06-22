@@ -52,8 +52,13 @@ public class MealEntry {
     private Map<String, Object> analysisMetadata;
     private List<Map<String, Object>> mealItems;
     private Map<String, Object> totalSummary;
-    private List<String> gapsAndWarnings;
+    private List<Object> gapsAndWarnings;
     private Map<String, Object> technicalDiagnostic;
+    private Map<String, Object> acneImpactAssessment;
+    private Map<String, Object> recompositionAssessment;
+    private Map<String, Object> satietyAndEnergyProfile;
+    private Map<String, Object> nutritionalBalanceDiagnostic;
+    private Map<String, Object> dailyContext;
 
     @CreatedDate
     private Instant createdAt;
