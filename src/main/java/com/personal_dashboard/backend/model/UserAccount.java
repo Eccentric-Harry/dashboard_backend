@@ -35,6 +35,7 @@ public class UserAccount {
     private String timezone;
     private String workingHours;
     private String title;
+    private String status;
 
     @CreatedDate
     private Instant createdAt;

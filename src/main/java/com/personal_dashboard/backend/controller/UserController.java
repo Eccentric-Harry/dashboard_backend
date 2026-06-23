@@ -75,6 +75,7 @@ public class UserController {
         existing.setTimezone(updated.getTimezone());
         existing.setWorkingHours(updated.getWorkingHours());
         existing.setTitle(updated.getTitle());
+        existing.setStatus(updated.getStatus());
         existing.setUpdatedAt(Instant.now());
 
         UserAccount saved = userAccountRepository.save(existing);
