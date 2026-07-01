@@ -67,9 +67,22 @@ public class CalendarItemOccurrence {
                 .sortOrder(item.getSortOrder())
                 .recurrenceFrequency(item.getRecurrenceFrequency() != null ? item.getRecurrenceFrequency() : "NONE")
                 .recurrenceUntil(item.getRecurrenceUntil())
-                .history(item.getHistory())
+                .history(filterHistory(item.getHistory(), item.getRecurrenceFrequency(), occurrenceDate))
                 .createdAt(item.getCreatedAt())
                 .build();
+    }
+
+    private static List<TaskHistoryEvent> filterHistory(List<TaskHistoryEvent> history, String recurrenceFrequency, LocalDate occurrenceDate) {
+        if (history == null) {
+            return null;
+        }
+        if (recurrenceFrequency != null && !"NONE".equals(recurrenceFrequency)) {
+            String dateStr = occurrenceDate.toString();
+            return history.stream()
+                    .filter(event -> event.getMessage() != null && event.getMessage().contains(dateStr))
+                    .collect(java.util.stream.Collectors.toList());
+        }
+        return history;
     }
 
     private static String normalizeLegacyTime(String scheduledTime) {
