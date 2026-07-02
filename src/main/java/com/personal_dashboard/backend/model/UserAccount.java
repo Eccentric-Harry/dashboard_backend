@@ -10,6 +10,7 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
+import java.util.List;
 
 @Data
 @Builder
@@ -32,6 +33,16 @@ public class UserAccount {
     private Integer targetCalories;
     private Integer targetProtein;
 
+    // Enhanced Health Biometrics
+    private PhysicalMetrics physicalMetrics;
+    private ActivityLevel activityLevel;
+    private FitnessGoal fitnessGoal;
+    private List<String> medicalConditions;
+    private DynamicTargets dynamicTargets;
+    private Double bmi;
+    private Double bmr;
+    private Double tdee;
+
     private String timezone;
     private String workingHours;
     private String title;
@@ -42,4 +53,26 @@ public class UserAccount {
 
     @LastModifiedDate
     private Instant updatedAt;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PhysicalMetrics {
+        private Integer age;
+        private String gender;
+        private Double height;
+        private Double weight;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class DynamicTargets {
+        private Integer calculatedCalories;
+        private Integer calculatedProtein;
+        private Integer calculatedCarbs;
+        private Integer calculatedFat;
+    }
 }

@@ -43,6 +43,9 @@ public class DailyFoodLog implements UserOwnedDocument {
     @Builder.Default
     private DailyTotals dailyTotals = new DailyTotals();
 
+    private Integer calorieGoal;
+    private Integer proteinGoal;
+
     /** Meals grouped by mealType. Keys: "Breakfast", "Lunch", "Dinner", "Snack", etc. */
     @Builder.Default
     private Map<String, List<MealEntry>> meals = new LinkedHashMap<>();

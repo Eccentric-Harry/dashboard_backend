@@ -51,16 +51,19 @@ public class DashboardService {
                 Optional<DailyHealthRecord> healthRecord = dailyHealthRecordRepository.findByUserIdAndDate(userId, targetDate);
 
                 // Build DailyFoodIntake
+                int calorieGoal = dailyLog.getCalorieGoal() != null ? dailyLog.getCalorieGoal() : CALORIE_GOAL;
+                int proteinGoal = dailyLog.getProteinGoal() != null ? dailyLog.getProteinGoal() : PROTEIN_GOAL;
+
                 DailyFoodIntake dailyFood = DailyFoodIntake.builder()
                                 .date(targetDate.format(DATE_FORMATTER))
                                 .calories(totalCalories)
-                                .calorieGoal(CALORIE_GOAL)
+                                .calorieGoal(calorieGoal)
                                 .proteinGrams(totalProtein)
-                                .proteinGoalGrams(PROTEIN_GOAL)
+                                .proteinGoalGrams(proteinGoal)
                                 .build();
 
                 // Build circular goals
-                List<CircularProgressMetric> circularGoals = buildCircularGoals(totalCalories, totalProtein);
+                List<CircularProgressMetric> circularGoals = buildCircularGoals(totalCalories, totalProtein, calorieGoal, proteinGoal);
 
                 // Build sleep hours list
                 List<SleepEntry> sleepHours = healthRecord
@@ -190,23 +193,23 @@ public class DashboardService {
         /**
          * Helper: Build circular progress metrics for health
          */
-        private List<CircularProgressMetric> buildCircularGoals(int calories, int protein) {
+        private List<CircularProgressMetric> buildCircularGoals(int calories, int protein, int calorieGoal, int proteinGoal) {
                 List<CircularProgressMetric> goals = new ArrayList<>();
 
                 goals.add(CircularProgressMetric.builder()
                                 .label("Calories")
                                 .value(calories)
-                                .target(CALORIE_GOAL)
+                                .target(calorieGoal)
                                 .unit("kcal")
-                                .progressPercent((double) calories / CALORIE_GOAL * 100)
+                                .progressPercent(calorieGoal > 0 ? (double) calories / calorieGoal * 100 : 0)
                                 .build());
 
                 goals.add(CircularProgressMetric.builder()
                                 .label("Protein")
                                 .value(protein)
-                                .target(PROTEIN_GOAL)
+                                .target(proteinGoal)
                                 .unit("g")
-                                .progressPercent((double) protein / PROTEIN_GOAL * 100)
+                                .progressPercent(proteinGoal > 0 ? (double) protein / proteinGoal * 100 : 0)
                                 .build());
 
                 return goals;
@@ -328,6 +331,10 @@ public class DashboardService {
                                 .findFirst()
                                 .orElse(null);
 
+                if (todayLog == null) {
+                        todayLog = dailyFoodLogService.getDailyLog(todayKey);
+                }
+
                 if (todayLog != null && todayLog.getMeals() != null) {
                         for (Map.Entry<String, java.util.List<MealEntry>> mealGroup : todayLog.getMeals().entrySet()) {
                                 int mealCalories = mealGroup.getValue().stream()
@@ -337,6 +344,9 @@ public class DashboardService {
                         }
                 }
 
+                int calorieGoal = todayLog != null && todayLog.getCalorieGoal() != null ? todayLog.getCalorieGoal() : CALORIE_GOAL;
+                int proteinGoal = todayLog != null && todayLog.getProteinGoal() != null ? todayLog.getProteinGoal() : PROTEIN_GOAL;
+
                 // Build response
                 Map<String, Object> response = new LinkedHashMap<>();
                 response.put("date", targetDate.format(DATE_FORMATTER));
@@ -345,8 +355,8 @@ public class DashboardService {
                 response.put("mealTypeBreakdown", mealTypeBreakdown);
                 response.put("todayTotalCalories", dailyCalories.getOrDefault(todayKey, 0));
                 response.put("todayTotalProtein", dailyProtein.getOrDefault(todayKey, 0));
-                response.put("calorieGoal", CALORIE_GOAL);
-                response.put("proteinGoal", PROTEIN_GOAL);
+                response.put("calorieGoal", calorieGoal);
+                response.put("proteinGoal", proteinGoal);
 
                 return response;
         }

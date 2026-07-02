@@ -24,6 +24,10 @@ public class DailyFoodLogDTO {
 
     private HydrationRecordDTO hydration;
 
+    private Integer calorieGoal;
+
+    private Integer proteinGoal;
+
 
     @Data
     @Builder

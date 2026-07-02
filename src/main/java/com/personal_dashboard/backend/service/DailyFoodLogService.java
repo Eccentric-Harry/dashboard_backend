@@ -6,6 +6,7 @@ import com.personal_dashboard.backend.dto.HydrationRecordDTO;
 import com.personal_dashboard.backend.dto.MealEntryDTO;
 import com.personal_dashboard.backend.model.*;
 import com.personal_dashboard.backend.repository.DailyFoodLogRepository;
+import com.personal_dashboard.backend.repository.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 public class DailyFoodLogService {
 
     private final DailyFoodLogRepository dailyFoodLogRepository;
+    private final UserAccountRepository userAccountRepository;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
 
@@ -57,6 +59,8 @@ public class DailyFoodLogService {
                     .meals(new LinkedHashMap<>())
                     .build();
         }
+
+        ensureGoalsInitialized(dailyLog, null);
 
         // Ensure meals map is initialized
         if (dailyLog.getMeals() == null) {
@@ -193,12 +197,31 @@ public class DailyFoodLogService {
         return dailyFoodLogRepository.save(dailyLog);
     }
 
+    private void ensureGoalsInitialized(DailyFoodLog log, UserAccount user) {
+        if (log.getCalorieGoal() == null || log.getProteinGoal() == null) {
+            if (user == null && userAccountRepository != null) {
+                user = userAccountRepository.findById(log.getUserId()).orElse(null);
+            }
+            if (user != null) {
+                if (log.getCalorieGoal() == null) {
+                    log.setCalorieGoal(user.getTargetCalories() != null ? user.getTargetCalories() : 2000);
+                }
+                if (log.getProteinGoal() == null) {
+                    log.setProteinGoal(user.getTargetProtein() != null ? user.getTargetProtein() : 100);
+                }
+            } else {
+                if (log.getCalorieGoal() == null) log.setCalorieGoal(2000);
+                if (log.getProteinGoal() == null) log.setProteinGoal(100);
+            }
+        }
+    }
+
     /**
      * Helper to get or create a daily log.
      */
     private DailyFoodLog getDailyLogInternal(String dateStr) {
         String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
-        return dailyFoodLogRepository.findByUserIdAndDateString(userId, dateStr)
+        DailyFoodLog dailyLog = dailyFoodLogRepository.findByUserIdAndDateString(userId, dateStr)
                 .orElseGet(() -> DailyFoodLog.builder()
                         .userId(userId)
                         .dateString(dateStr)
@@ -208,6 +231,8 @@ public class DailyFoodLogService {
                         .meals(new LinkedHashMap<>())
                         .hydration(new HydrationData())
                         .build());
+        ensureGoalsInitialized(dailyLog, null);
+        return dailyLog;
     }
 
 
@@ -219,7 +244,7 @@ public class DailyFoodLogService {
      */
     public DailyFoodLog getDailyLog(String dateStr) {
         String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
-        return dailyFoodLogRepository.findByUserIdAndDateString(userId, dateStr)
+        DailyFoodLog dailyLog = dailyFoodLogRepository.findByUserIdAndDateString(userId, dateStr)
                 .orElseGet(() -> DailyFoodLog.builder()
                         .userId(userId)
                         .dateString(dateStr)
@@ -228,6 +253,8 @@ public class DailyFoodLogService {
                         .dailyTotals(new DailyTotals())
                         .meals(new LinkedHashMap<>())
                         .build());
+        ensureGoalsInitialized(dailyLog, null);
+        return dailyLog;
     }
 
     /**
@@ -287,6 +314,7 @@ public class DailyFoodLogService {
      * Convert a DailyFoodLog to its DTO representation.
      */
     public DailyFoodLogDTO toDto(DailyFoodLog log) {
+        ensureGoalsInitialized(log, null);
         Map<String, List<MealEntryDTO>> mealsDto = new LinkedHashMap<>();
         if (log.getMeals() != null) {
             for (Map.Entry<String, List<MealEntry>> entry : log.getMeals().entrySet()) {
@@ -310,6 +338,8 @@ public class DailyFoodLogService {
                 .dailyTotals(totalsDto)
                 .meals(mealsDto)
                 .hydration(toHydrationDto(dateStr, log.getHydration()))
+                .calorieGoal(log.getCalorieGoal())
+                .proteinGoal(log.getProteinGoal())
                 .build();
     }
 
