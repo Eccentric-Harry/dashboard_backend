@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class GeminiNutritionService {
 
-    private static final String GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+    private static final String GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent";
 
     @Value("${gemini.api.key:GEMINI_KEY_NOT_SET}")
     private String apiKey;

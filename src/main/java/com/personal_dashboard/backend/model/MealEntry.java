@@ -55,6 +55,7 @@ public class MealEntry {
     private List<Object> gapsAndWarnings;
     private Map<String, Object> technicalDiagnostic;
     private Map<String, Object> acneImpactAssessment;
+    private Map<String, Object> healthAnalysis;
     private Map<String, Object> recompositionAssessment;
     private Map<String, Object> satietyAndEnergyProfile;
     private Map<String, Object> nutritionalBalanceDiagnostic;

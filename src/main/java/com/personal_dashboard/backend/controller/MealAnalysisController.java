@@ -127,6 +127,7 @@ public class MealAnalysisController {
                 .totalSummary(buildTotalSummaryMap(totals))
                 .recompositionAssessment(overallAssessmentMap)
                 .acneImpactAssessment(medicalAnalysisMap)
+                .healthAnalysis(medicalAnalysisMap)
                 .dailyContext(dailyTargetProgressMap)
                 .build();
 

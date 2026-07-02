@@ -55,6 +55,9 @@ public class MealEntryDTO {
     @JsonProperty("acne_impact_assessment")
     private Map<String, Object> acneImpactAssessment;
 
+    @JsonProperty("health_analysis")
+    private Map<String, Object> healthAnalysis;
+
     @JsonProperty("recomposition_assessment")
     private Map<String, Object> recompositionAssessment;
 
