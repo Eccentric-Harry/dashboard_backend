@@ -27,6 +27,7 @@ public class DashboardService {
         private final LearningRepository learningRepository;
         private final DailyTaskRepository dailyTaskRepository;
         private final LearningPursuitRepository learningPursuitRepository;
+        private final com.personal_dashboard.backend.repository.UserAccountRepository userAccountRepository;
 
         private static final int CALORIE_GOAL = 2000;
         private static final int PROTEIN_GOAL = 100;
@@ -62,8 +63,25 @@ public class DashboardService {
                                 .proteinGoalGrams(proteinGoal)
                                 .build();
 
-                // Build circular goals
-                List<CircularProgressMetric> circularGoals = buildCircularGoals(totalCalories, totalProtein, calorieGoal, proteinGoal);
+                // Build circular goals — include Carbs and Fat when user profile has DynamicTargets
+                DailyTotals totals = dailyLog.getDailyTotals();
+                int totalCarbs = totals != null && totals.getTotalCarbsGrams() != null ? totals.getTotalCarbsGrams() : 0;
+                int totalFat = totals != null && totals.getTotalFatGrams() != null ? totals.getTotalFatGrams() : 0;
+
+                // Try to load user profile for dynamic macro targets
+                com.personal_dashboard.backend.model.UserAccount userProfile =
+                        userAccountRepository.findById(userId).orElse(null);
+                int carbsGoal = 0;
+                int fatGoal = 0;
+                if (userProfile != null && userProfile.getDynamicTargets() != null) {
+                    com.personal_dashboard.backend.model.UserAccount.DynamicTargets dt = userProfile.getDynamicTargets();
+                    if (dt.getCalculatedCarbs() != null) carbsGoal = dt.getCalculatedCarbs();
+                    if (dt.getCalculatedFat() != null) fatGoal = dt.getCalculatedFat();
+                }
+
+                List<CircularProgressMetric> circularGoals = buildCircularGoals(
+                        totalCalories, totalProtein, calorieGoal, proteinGoal,
+                        totalCarbs, carbsGoal, totalFat, fatGoal);
 
                 // Build sleep hours list
                 List<SleepEntry> sleepHours = healthRecord
@@ -191,9 +209,13 @@ public class DashboardService {
         }
 
         /**
-         * Helper: Build circular progress metrics for health
+         * Helper: Build circular progress metrics for health.
+         * Includes Calories, Protein, Carbs, and Fat rings.
+         * Carbs and Fat are only shown when targets > 0 (i.e., user has set DynamicTargets).
          */
-        private List<CircularProgressMetric> buildCircularGoals(int calories, int protein, int calorieGoal, int proteinGoal) {
+        private List<CircularProgressMetric> buildCircularGoals(
+                int calories, int protein, int calorieGoal, int proteinGoal,
+                int carbs, int carbsGoal, int fat, int fatGoal) {
                 List<CircularProgressMetric> goals = new ArrayList<>();
 
                 goals.add(CircularProgressMetric.builder()
@@ -211,6 +233,26 @@ public class DashboardService {
                                 .unit("g")
                                 .progressPercent(proteinGoal > 0 ? (double) protein / proteinGoal * 100 : 0)
                                 .build());
+
+                if (carbsGoal > 0) {
+                        goals.add(CircularProgressMetric.builder()
+                                        .label("Carbs")
+                                        .value(carbs)
+                                        .target(carbsGoal)
+                                        .unit("g")
+                                        .progressPercent((double) carbs / carbsGoal * 100)
+                                        .build());
+                }
+
+                if (fatGoal > 0) {
+                        goals.add(CircularProgressMetric.builder()
+                                        .label("Fat")
+                                        .value(fat)
+                                        .target(fatGoal)
+                                        .unit("g")
+                                        .progressPercent((double) fat / fatGoal * 100)
+                                        .build());
+                }
 
                 return goals;
         }

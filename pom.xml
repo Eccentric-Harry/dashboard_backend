@@ -87,6 +87,24 @@
 			<artifactId>jose4j</artifactId>
 			<version>0.9.6</version>
 		</dependency>
+		<!-- Google AI Gemini SDK -->
+		<dependency>
+			<groupId>com.google.cloud</groupId>
+			<artifactId>google-cloud-vertexai</artifactId>
+			<version>1.14.0</version>
+			<exclusions>
+				<!-- Exclude grpc transport to keep it lightweight for API-key-based REST usage -->
+				<exclusion>
+					<groupId>io.grpc</groupId>
+					<artifactId>grpc-netty-shaded</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<!-- Jackson for Gemini JSON response parsing -->
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+		</dependency>
 	</dependencies>
 
 	<build>

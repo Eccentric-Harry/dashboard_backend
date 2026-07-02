@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 /**
  * Embedded POJO holding aggregated daily nutrition totals.
+ * Extended to include full macro/micro fields from the Gemini AI pipeline.
  */
 @Data
 @Builder
@@ -19,4 +20,19 @@ public class DailyTotals {
 
     @Builder.Default
     private Integer totalProteinGrams = 0;
+
+    @Builder.Default
+    private Integer totalCarbsGrams = 0;
+
+    @Builder.Default
+    private Integer totalFatGrams = 0;
+
+    @Builder.Default
+    private Double totalFiberGrams = 0.0;
+
+    @Builder.Default
+    private Double totalSugarGrams = 0.0;
+
+    @Builder.Default
+    private Double totalSodiumMg = 0.0;
 }

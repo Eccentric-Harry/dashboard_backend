@@ -287,10 +287,17 @@ public class DailyFoodLogService {
 
     /**
      * Recalculate dailyTotals by summing all meals.
+     * Calories and protein are read from first-class fields.
+     * Carbs, fat, fiber, sugar, sodium are extracted from the Gemini-populated mealItems payload.
      */
     public void recalculateTotals(DailyFoodLog log) {
         int totalCalories = 0;
         int totalProtein = 0;
+        int totalCarbs = 0;
+        int totalFat = 0;
+        double totalFiber = 0.0;
+        double totalSugar = 0.0;
+        double totalSodium = 0.0;
 
         if (log.getMeals() != null) {
             for (List<MealEntry> entries : log.getMeals().values()) {
@@ -298,6 +305,17 @@ public class DailyFoodLogService {
                     for (MealEntry entry : entries) {
                         totalCalories += entry.getCalories() != null ? entry.getCalories() : 0;
                         totalProtein += entry.getProteinGrams() != null ? entry.getProteinGrams() : 0;
+
+                        // Aggregate macro/micro from mealItems (Gemini-populated)
+                        if (entry.getMealItems() != null) {
+                            for (Map<String, Object> item : entry.getMealItems()) {
+                                totalCarbs += toInt(item.get("carbs"));
+                                totalFat += toInt(item.get("fat"));
+                                totalFiber += toDouble(item.get("fiber"));
+                                totalSugar += toDouble(item.get("sugar"));
+                                totalSodium += toDouble(item.get("sodium"));
+                            }
+                        }
                     }
                 }
             }
@@ -308,7 +326,25 @@ public class DailyFoodLogService {
         }
         log.getDailyTotals().setTotalCalories(totalCalories);
         log.getDailyTotals().setTotalProteinGrams(totalProtein);
+        log.getDailyTotals().setTotalCarbsGrams(totalCarbs);
+        log.getDailyTotals().setTotalFatGrams(totalFat);
+        log.getDailyTotals().setTotalFiberGrams(totalFiber);
+        log.getDailyTotals().setTotalSugarGrams(totalSugar);
+        log.getDailyTotals().setTotalSodiumMg(totalSodium);
     }
+
+    /** Safe int extraction from a Map value (Number or null). */
+    private int toInt(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        return 0;
+    }
+
+    /** Safe double extraction from a Map value (Number or null). */
+    private double toDouble(Object value) {
+        if (value instanceof Number) return ((Number) value).doubleValue();
+        return 0.0;
+    }
+
 
     /**
      * Convert a DailyFoodLog to its DTO representation.
