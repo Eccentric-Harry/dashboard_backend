@@ -80,9 +80,13 @@ public class GeminiNutritionService {
 
         // Add text instruction part
         String textInstruction = """
-                You are a precise food identification assistant.
-                Analyse the provided meal image and/or description.
-                Identify all distinct food items and estimate their portion sizes/weights.
+                You are a precise clinical food identification and portion estimation assistant.
+                
+                Take your time to think step-by-step, analyzing the image and text description carefully:
+                1. Carefully examine all visual elements of the image: check colors, textures, shapes, container sizes, and layers to identify every single food item, beverage, dressing, sauce, side dish, or topping.
+                2. Read and fully cross-reference the user's text description. If the text mentions any ingredient or detail (e.g., "cooked in butter", "used almond milk", "added olive oil"), prioritize this context and incorporate it into the identified items list, even if it is visually obscured or hidden.
+                3. Estimate the weight or portion size of each item as accurately as possible using clinical nutrition standards, taking plate size and perspective into account. Do not skip or omit any item, no matter how small (e.g., garnishes, spreads, oils, condiments).
+                4. Think step-by-step to compile a complete, detailed list of ingredients.
                 
                 Return ONLY a valid JSON object — no markdown, no explanation, no extra text:
                 {
@@ -118,20 +122,20 @@ public class GeminiNutritionService {
         String userProfileSummary = buildUserProfileSummary(user);
 
         String prompt = """
-                You are an expert clinical nutritionist AI.
+                You are a senior clinical nutritionist AI.
+                
+                Take your time to perform a rigorous step-by-step nutritional and metabolic analysis:
+                1. Break down the identified food list. Calculate highly precise macro (protein, carbs, fat, fiber) and micro (sugar, sodium, saturated fat) nutrition values for each ingredient using clinical database standards.
+                2. Compile a detailed sum of all food metrics to calculate precise meal totals.
+                3. Cross-reference the meal's nutrient totals with the USER PROFILE targets (calories, macros, physical metrics, fitness goals, and activity level) to determine the exact percentage of daily targets met.
+                4. Extensively analyze the user's medical conditions (e.g., diabetes, hypertension, high cholesterol) against the calculated micro and macro levels (e.g., sugar, sodium, saturated fat). Detail specific clinical findings, potential metabolic risks, and actionable dietary recommendations tailored to their conditions. (If no medical conditions are listed, you must skip or return an empty medical_analysis array).
+                5. Provide a comprehensive, professional meal assessment: evaluate meal quality, describe its alignment with their physical targets and fitness goals, and list concrete clinical strengths, concerns, and improvements.
                 
                 USER PROFILE:
                 %s
                 
                 IDENTIFIED FOOD ITEMS FROM VISUAL ANALYSIS:
                 %s
-                
-                TASK:
-                1. Calculate precise macro and micro nutrition for each item listed.
-                2. Sum up meal totals.
-                3. Calculate percentage of user's daily targets consumed by this meal.
-                4. Evaluate any medical risks based on the user's conditions (if none listed, skip medicalAnalysis array).
-                5. Provide an overall meal assessment.
                 
                 Return ONLY a valid JSON object with this EXACT structure — no markdown, no explanation:
                 {
