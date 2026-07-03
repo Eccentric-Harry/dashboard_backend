@@ -9,7 +9,7 @@ import com.personal_dashboard.backend.model.UserAccount;
 import com.personal_dashboard.backend.repository.UserAccountRepository;
 import com.personal_dashboard.backend.security.UserContext;
 import com.personal_dashboard.backend.service.DailyFoodLogService;
-import com.personal_dashboard.backend.service.GeminiNutritionService;
+import com.personal_dashboard.backend.service.NutritionPipelineService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
 @Tag(name = "Meal Analysis", description = "AI-powered two-stage meal nutrition pipeline via Gemini")
 public class MealAnalysisController {
 
-    private final GeminiNutritionService geminiNutritionService;
+    private final NutritionPipelineService nutritionPipelineService;
     private final DailyFoodLogService dailyFoodLogService;
     private final UserAccountRepository userAccountRepository;
 
@@ -87,7 +87,7 @@ public class MealAnalysisController {
         // ── Run Two-Stage Gemini Pipeline ────────────────────────────────
         GeminiAnalysisResult analysis;
         try {
-            analysis = geminiNutritionService.analyzeWithTwoStage(
+            analysis = nutritionPipelineService.analyzeWithTwoStage(
                     hasImage ? file : null,
                     hasText ? description : null,
                     userProfile);
