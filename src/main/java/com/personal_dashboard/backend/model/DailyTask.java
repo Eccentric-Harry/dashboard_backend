@@ -77,7 +77,6 @@ public class DailyTask implements UserOwnedDocument {
 
     private Instant lastSyncedAt;
 
-    @org.springframework.data.annotation.Version
     private Long versionToken;
 
     @CreatedDate
