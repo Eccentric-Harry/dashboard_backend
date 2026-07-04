@@ -72,6 +72,13 @@ public class DailyTask implements UserOwnedDocument {
     private List<String> tags;
     private List<TaskHistoryEvent> history;
 
+    @org.springframework.data.mongodb.core.index.Indexed(sparse = true)
+    private String googleEventId;
+
+    private Instant lastSyncedAt;
+
+    private Long versionToken;
+
     @CreatedDate
     private Instant createdAt;
 

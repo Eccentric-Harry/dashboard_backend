@@ -16,6 +16,8 @@ public interface DailyTaskRepository extends MongoRepository<DailyTask, String> 
 
     java.util.Optional<DailyTask> findByIdAndUserId(String id, String userId);
 
+    java.util.Optional<DailyTask> findByGoogleEventIdAndUserId(String googleEventId, String userId);
+
     /**
      * Inclusive start, exclusive end (end = last day + 1). Works for BSON Date fields;
      * derived Between omits the last day and same-day ranges return nothing.
