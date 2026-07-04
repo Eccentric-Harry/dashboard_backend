@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.annotation.PostConstruct;
 
@@ -76,11 +77,13 @@ public class NutritionPipelineService {
 
         String textInstruction = buildStage1Prompt(textDescription);
         String stage1Json = processMealAnalysis(imageBytes, textInstruction);
+        stage1Json = cleanJsonResponse(stage1Json);
         log.info("[NutritionPipeline] Stage 1 complete. Items: {}", stage1Json);
 
         log.info("[NutritionPipeline] Starting Stage 2 — clinical nutrition analysis");
         String stage2Prompt = buildStage2Prompt(stage1Json, userProfile);
         String stage2Json = processMealAnalysis(null, stage2Prompt);
+        stage2Json = cleanJsonResponse(stage2Json);
         log.info("[NutritionPipeline] Stage 2 complete.");
 
         return objectMapper.readValue(stage2Json, GeminiAnalysisResult.class);
@@ -112,9 +115,9 @@ public class NutritionPipelineService {
         } catch (HttpClientErrorException.TooManyRequests e) {
             log.warn("[MealAnalysis] Gemini rate-limit hit. Switching to fallback provider: Groq.");
             return fallbackProvider.analyzeFoodImage(imageBytes, prompt);
-        } catch (HttpClientErrorException e) {
-            if (e.getStatusCode().value() == 429) {
-                log.warn("[MealAnalysis] Gemini rate-limit hit. Switching to fallback provider: Groq.");
+        } catch (HttpStatusCodeException e) {
+            if (e.getStatusCode().value() == 429 || e.getStatusCode().value() == 503) {
+                log.warn("[MealAnalysis] Gemini busy or unavailable ({}). Switching to fallback provider: Groq.", e.getStatusCode().value());
                 return fallbackProvider.analyzeFoodImage(imageBytes, prompt);
             }
             throw e;
@@ -899,5 +902,19 @@ public class NutritionPipelineService {
                         goalFatG      - consumedFatG,
                         goalSodiumMg  - consumedSodiumMg
                 );
+    }
+
+    private String cleanJsonResponse(String rawResponse) {
+        if (rawResponse == null) return "{}";
+        String cleaned = rawResponse.trim();
+        if (cleaned.startsWith("```json")) {
+            cleaned = cleaned.substring(7);
+        } else if (cleaned.startsWith("```")) {
+            cleaned = cleaned.substring(3);
+        }
+        if (cleaned.endsWith("```")) {
+            cleaned = cleaned.substring(0, cleaned.length() - 3);
+        }
+        return cleaned.trim();
     }
 }

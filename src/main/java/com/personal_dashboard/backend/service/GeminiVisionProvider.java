@@ -57,7 +57,11 @@ public class GeminiVisionProvider implements VisionProvider {
                     "contents", List.of(Map.of("parts", parts)),
                     "generationConfig", Map.of(
                             "temperature", 0.1,
-                            "maxOutputTokens", 4096));
+                            "maxOutputTokens", 8192,
+                            "responseMimeType", "application/json",
+                            "thinkingConfig", Map.of(
+                                    "thinkingBudget", 0
+                            )));
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);

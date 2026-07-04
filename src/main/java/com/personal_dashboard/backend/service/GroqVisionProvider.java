@@ -61,7 +61,8 @@ public class GroqVisionProvider implements VisionProvider {
             body.put("model", model);
             body.put("messages", List.of(message));
             body.put("temperature", 0.1);
-            body.put("max_tokens", 4096);
+            body.put("max_tokens", 8192);
+            body.put("response_format", Map.of("type", "json_object"));
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
