@@ -9,6 +9,7 @@ import com.personal_dashboard.backend.model.UserAccount;
 import com.personal_dashboard.backend.repository.GoogleSyncStoreRepository;
 import com.personal_dashboard.backend.repository.UserAccountRepository;
 import com.personal_dashboard.backend.util.EncryptionUtils;
+import com.personal_dashboard.backend.util.TimeZoneUtils;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -416,9 +417,10 @@ public class GoogleCalendarClient {
         event.put("description", task.getNotes() != null ? task.getNotes() : "");
 
         // Fetch user timezone
-        String timeZoneStr = userAccountRepository.findById(userId)
+        String rawTimeZoneStr = userAccountRepository.findById(userId)
                 .map(UserAccount::getTimezone)
                 .orElse(ZoneId.systemDefault().getId());
+        String timeZoneStr = TimeZoneUtils.normalizeTimeZone(rawTimeZoneStr);
 
         ObjectNode start = objectMapper.createObjectNode();
         ObjectNode end = objectMapper.createObjectNode();

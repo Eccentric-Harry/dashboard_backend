@@ -17,6 +17,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import com.personal_dashboard.backend.util.TimeZoneUtils;
 
 @Slf4j
 @Component
@@ -42,7 +43,8 @@ public class PushNotificationScheduler {
                 // Determine the timezone of the device
                 ZoneId zoneId;
                 try {
-                    zoneId = ZoneId.of(sub.getTimezone() != null ? sub.getTimezone() : "UTC");
+                    String rawTz = sub.getTimezone();
+                    zoneId = ZoneId.of(rawTz != null ? TimeZoneUtils.normalizeTimeZone(rawTz) : "UTC");
                 } catch (Exception tzEx) {
                     log.warn("Invalid timezone '{}' for subscription {}, falling back to UTC.", sub.getTimezone(), sub.getId());
                     zoneId = ZoneId.of("UTC");

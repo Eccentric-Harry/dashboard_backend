@@ -22,12 +22,12 @@ import java.util.Map;
 public class CalendarItemService {
 
     private static final Map<String, String> CATEGORY_COLORS = Map.of(
-            "WORK", "#9bd7ff",
-            "PERSONAL", "#c8f3a3",
-            "HEALTH", "#9ee7e8",
-            "LEARNING", "#c9bff6",
-            "FINANCE", "#ffd37d",
-            "SOCIAL", "#ffb4d2"
+            "WORK", "#2563eb",
+            "PERSONAL", "#7c3aed",
+            "HEALTH", "#10b981",
+            "LEARNING", "#0d9488",
+            "FINANCE", "#d97706",
+            "SOCIAL", "#db2777"
     );
 
     private final DailyTaskRepository dailyTaskRepository;
@@ -384,7 +384,7 @@ public class CalendarItemService {
         if (explicit != null) {
             return explicit;
         }
-        return CATEGORY_COLORS.getOrDefault(defaultText(category, "Personal").toUpperCase(Locale.ROOT), "#9ee7e8");
+        return CATEGORY_COLORS.getOrDefault(defaultText(category, "Personal").toUpperCase(Locale.ROOT), "#7c3aed");
     }
 
     private String defaultText(String value, String fallback) {
