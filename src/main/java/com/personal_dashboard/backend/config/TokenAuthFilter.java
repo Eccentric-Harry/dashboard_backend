@@ -37,7 +37,9 @@ public class TokenAuthFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
 
-        if (path.startsWith("/api/v1/auth/")) {
+        if (path.startsWith("/api/v1/auth/")
+                || path.equals("/api/v1/google-calendar/auth/callback")
+                || path.startsWith("/api/webhooks/")) {
             filterChain.doFilter(request, response);
             return;
         }
