@@ -199,9 +199,9 @@ public class DailyTaskService {
         DailyTask existing = dailyTaskRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new IllegalArgumentException("Task not found with id: " + id));
         // Soft delete: never hard-remove, so a later pull cannot resurrect it.
-        // The tombstoned save drives outbound cancellation to linked Google remotes.
+        // The soft-deleted save drives outbound cancellation to linked Google remotes.
         if (Boolean.TRUE.equals(existing.getDeleted())) {
-            return; // idempotent — already tombstoned
+            return; // idempotent — already soft-deleted
         }
         existing.setDeleted(true);
         existing.setDeletedAt(java.time.Instant.now());
@@ -210,7 +210,7 @@ public class DailyTaskService {
 
     private List<DailyTask> sortTasks(List<DailyTask> tasks) {
         return tasks.stream()
-                // Tombstoned tasks are retained in Mongo indefinitely but never surfaced.
+                // Soft-deleted tasks are retained in Mongo indefinitely but never surfaced.
                 .filter(t -> !Boolean.TRUE.equals(t.getDeleted()))
                 .peek(t -> {
                     if (Boolean.TRUE.equals(t.getCompleted()) && "TODO".equals(t.getStatus())) {

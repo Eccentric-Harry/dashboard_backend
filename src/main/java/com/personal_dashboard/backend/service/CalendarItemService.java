@@ -39,7 +39,7 @@ public class CalendarItemService {
         LocalDate endExclusive = endDate.plusDays(1);
         String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
         return dailyTaskRepository.findCalendarCandidates(userId, startDate, endExclusive).stream()
-                // Tombstoned items are retained indefinitely but never surfaced.
+                // Soft-deleted items are retained indefinitely but never surfaced.
                 .filter(item -> !Boolean.TRUE.equals(item.getDeleted()))
                 .flatMap(item -> expandItem(item, startDate, endDate).stream())
                 .sorted(Comparator
@@ -298,7 +298,7 @@ public class CalendarItemService {
         String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
         DailyTask existing = dailyTaskRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new IllegalArgumentException("Calendar item not found with id: " + id));
-        // Soft delete (tombstone) — retained indefinitely so a later pull cannot
+        // Soft delete (soft-delete) — retained indefinitely so a later pull cannot
         // resurrect it; the save drives outbound cancellation to Google remotes.
         if (Boolean.TRUE.equals(existing.getDeleted())) {
             return; // idempotent

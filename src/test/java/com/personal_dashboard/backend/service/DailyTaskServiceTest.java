@@ -95,7 +95,7 @@ class DailyTaskServiceTest {
         assertNotNull(result.getOrigin());
         assertTrue(result.getOrigin().isLocal());
         assertNull(result.getOrigin().getAccountId());
-        // Tombstone flag defaults to not-deleted.
+        // Soft-delete flag defaults to not-deleted.
         assertEquals(Boolean.FALSE, result.getDeleted());
     }
 
@@ -186,14 +186,14 @@ class DailyTaskServiceTest {
         // Never hard-removed…
         verify(dailyTaskRepository, never()).delete(any());
         verify(dailyTaskRepository, never()).deleteById(any());
-        // …instead tombstoned via save.
+        // …instead soft-deleted via save.
         assertTrue(incompleteTask.getDeleted());
         assertNotNull(incompleteTask.getDeletedAt());
         verify(dailyTaskRepository, times(1)).save(incompleteTask);
     }
 
     @Test
-    void testDeleteTask_AlreadyTombstonedIsNoop() {
+    void testDeleteTask_AlreadyDeletedIsNoop() {
         incompleteTask.setDeleted(true);
         incompleteTask.setDeletedAt(java.time.Instant.now());
         when(dailyTaskRepository.findByIdAndUserId("1", "test-user")).thenReturn(Optional.of(incompleteTask));
@@ -205,13 +205,13 @@ class DailyTaskServiceTest {
     }
 
     @Test
-    void testReads_ExcludeTombstonedTasks() {
-        DailyTask tombstoned = DailyTask.builder()
+    void testReads_ExcludeSoftDeletedTasks() {
+        DailyTask softDeleted = DailyTask.builder()
                 .id("9").title("Deleted").date(LocalDate.of(2026, 5, 30))
                 .deleted(true).deletedAt(java.time.Instant.now())
                 .build();
         when(dailyTaskRepository.findActiveTasks(eq("test-user"), any(LocalDateTime.class)))
-                .thenReturn(List.of(incompleteTask, tombstoned, completedTask));
+                .thenReturn(List.of(incompleteTask, softDeleted, completedTask));
 
         List<DailyTask> result = dailyTaskService.getActiveTasks();
 

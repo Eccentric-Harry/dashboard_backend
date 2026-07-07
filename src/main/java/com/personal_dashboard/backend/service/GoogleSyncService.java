@@ -184,10 +184,10 @@ public class GoogleSyncService {
 
                 if ("cancelled".equalsIgnoreCase(status)) {
                     mappingOpt.ifPresent(mapping -> {
-                        // Tombstone the local task (never hard-delete) and KEEP the mapping so a
-                        // later full resync still resolves this googleEventId to the tombstone
+                        // Soft-delete the local task (never hard-delete) and KEEP the mapping so a
+                        // later full resync still resolves this googleEventId to the soft-delete
                         // instead of re-creating the event. Runs under GoogleSyncContext bypass,
-                        // so the tombstoned save is not pushed back to Google.
+                        // so the soft-deleted save is not pushed back to Google.
                         DailyTask task = dailyTaskRepository.findById(mapping.getTaskId()).orElse(null);
                         if (task != null && !Boolean.TRUE.equals(task.getDeleted())) {
                             log.info("Inbound: Tombstoning local task {} for cancelled Google event {}",
@@ -211,7 +211,7 @@ public class GoogleSyncService {
                 // ── Dedup precedence: googleEventId → iCalUID → create ──────────────────
                 // Matching on googleEventId alone duplicates shared invites, so fall back
                 // to the RFC 5545 iCalUID (which is stable across calendars/accounts)
-                // before ever creating a new local task. Both lookups include tombstones.
+                // before ever creating a new local task. Both lookups include soft-deleted records.
                 CalendarSyncMapping mapping = mappingOpt.orElse(null);
                 DailyTask existingTask = null;
                 if (mapping != null) {
@@ -222,11 +222,11 @@ public class GoogleSyncService {
                 }
 
                 // ── Resurrection guard ─────────────────────────────────────────────────
-                // A match that is tombstoned is NEVER revived or duplicated, even on a full
+                // A match that is soft-deleted is NEVER revived or duplicated, even on a full
                 // 410 resync. Ensure a CANCELLED mapping links this googleEventId so the
                 // next pull short-circuits on it, then skip.
                 if (existingTask != null && Boolean.TRUE.equals(existingTask.getDeleted())) {
-                    log.info("Inbound: Event {} resolves to tombstoned task {} (matched by {}). Leaving deleted — no resurrection.",
+                    log.info("Inbound: Event {} resolves to soft-deleted task {} (matched by {}). Leaving deleted — no resurrection.",
                             googleEventId, existingTask.getId(), mapping != null ? "googleEventId" : "iCalUID");
                     if (mapping == null) {
                         mappingRepository.save(newMapping(existingTask.getId(), userId, calendarEmail,

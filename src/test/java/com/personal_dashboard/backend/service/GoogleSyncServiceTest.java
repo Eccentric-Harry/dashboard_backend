@@ -26,7 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * Dedup precedence + tombstone resurrection guard (commit 3).
+ * Dedup precedence + soft-delete resurrection guard (commit 3).
  * Drives the public syncCalendar() with a mocked Google client and repositories.
  */
 @ExtendWith(MockitoExtension.class)
@@ -66,7 +66,7 @@ class GoogleSyncServiceTest {
         when(googleCalendarClient.listEvents(any(), any(), any())).thenReturn(resp);
     }
 
-    private DailyTask tombstonedTask(String id, String iCalUID) {
+    private DailyTask softDeletedTask(String id, String iCalUID) {
         DailyTask t = DailyTask.builder()
                 .id(id).userId(USER).title("Gone").iCalUID(iCalUID)
                 .origin(EventOrigin.google(EMAIL, "primary"))
@@ -78,28 +78,28 @@ class GoogleSyncServiceTest {
     // ── Guardrail #1: deleted event does not resurrect on full resync ──────────
 
     @Test
-    void tombstonedTask_matchedByGoogleEventId_isNotResurrected() throws Exception {
-        DailyTask tomb = tombstonedTask("T1", "uid-1");
+    void softDeletedTask_matchedByGoogleEventId_isNotResurrected() throws Exception {
+        DailyTask removed = softDeletedTask("T1", "uid-1");
         CalendarSyncMapping mapping = CalendarSyncMapping.builder()
                 .id("T1:" + EMAIL).taskId("T1").userId(USER).calendarEmail(EMAIL)
                 .googleEventId("G1").syncState("CANCELLED").build();
         when(mappingRepository.findByGoogleEventIdAndUserId("G1", USER)).thenReturn(Optional.of(mapping));
-        when(dailyTaskRepository.findById("T1")).thenReturn(Optional.of(tomb));
+        when(dailyTaskRepository.findById("T1")).thenReturn(Optional.of(removed));
         stubSinglePull(event("G1", "confirmed", "uid-1"));
 
         service.syncCalendar(USER, EMAIL, true);
 
-        // No task write at all — the tombstone stays deleted, nothing re-created.
+        // No task write at all — the soft-deleted task stays deleted, nothing re-created.
         verify(dailyTaskRepository, never()).save(any());
-        assertTrue(tomb.getDeleted());
+        assertTrue(removed.getDeleted());
     }
 
     @Test
-    void tombstonedTask_matchedByICalUID_isNotResurrectedAndLinkedCancelled() throws Exception {
-        DailyTask tomb = tombstonedTask("T1", "uid-1");
+    void softDeletedTask_matchedByICalUID_isNotResurrectedAndLinkedCancelled() throws Exception {
+        DailyTask removed = softDeletedTask("T1", "uid-1");
         // No mapping for this googleEventId → falls through to iCalUID lookup.
         when(mappingRepository.findByGoogleEventIdAndUserId("G2", USER)).thenReturn(Optional.empty());
-        when(dailyTaskRepository.findByUserAndICalUID(USER, "uid-1")).thenReturn(List.of(tomb));
+        when(dailyTaskRepository.findByUserAndICalUID(USER, "uid-1")).thenReturn(List.of(removed));
         stubSinglePull(event("G2", "confirmed", "uid-1"));
 
         service.syncCalendar(USER, EMAIL, true);

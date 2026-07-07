@@ -91,7 +91,7 @@ public class DailyTask implements UserOwnedDocument {
     private EventOrigin origin;
 
     /**
-     * Tombstone flag. Deleted events are never hard-removed from Mongo; they are
+     * Soft-delete flag. Deleted events are never hard-removed from Mongo; they are
      * flagged here so a later full resync cannot resurrect them. Retention is
      * indefinite (no purge job). Wired into delete/pull flows in commit 2.
      */

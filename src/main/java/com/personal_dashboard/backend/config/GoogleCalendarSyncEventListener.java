@@ -64,13 +64,13 @@ public class GoogleCalendarSyncEventListener extends AbstractMongoEventListener<
                     Optional<CalendarSyncMapping> existingMapping = mappingRepository.findById(mappingId);
 
                     if (Boolean.TRUE.equals(task.getDeleted())) {
-                        // ── Tombstone propagation ────────────────────────────────────────────
+                        // ── Soft-delete propagation ────────────────────────────────────────────
                         // The task was soft-deleted locally. Cancel the remote copy but KEEP the
                         // mapping (syncState=CANCELLED) so dedup can still resolve a reappearing
-                        // event to this tombstone rather than re-creating it.
+                        // event to this soft-delete rather than re-creating it.
                         if (existingMapping.isPresent()) {
                             CalendarSyncMapping mapping = existingMapping.get();
-                            log.info("Outbound: Cancelling Google Event {} for tombstoned task '{}' ({})",
+                            log.info("Outbound: Cancelling Google Event {} for soft-deleted task '{}' ({})",
                                     mapping.getGoogleEventId(), task.getTitle(), calendarEmail);
                             googleCalendarClient.deleteEvent(storeId, mapping.getGoogleEventId());
 
