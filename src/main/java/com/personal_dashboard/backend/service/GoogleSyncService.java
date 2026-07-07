@@ -184,9 +184,22 @@ public class GoogleSyncService {
 
                 if ("cancelled".equalsIgnoreCase(status)) {
                     mappingOpt.ifPresent(mapping -> {
-                        log.info("Inbound: Deleting local task for cancelled Google event: {}", googleEventId);
-                        dailyTaskRepository.deleteById(mapping.getTaskId());
-                        mappingRepository.deleteByTaskId(mapping.getTaskId());
+                        // Tombstone the local task (never hard-delete) and KEEP the mapping so a
+                        // later full resync still resolves this googleEventId to the tombstone
+                        // instead of re-creating the event. Runs under GoogleSyncContext bypass,
+                        // so the tombstoned save is not pushed back to Google.
+                        DailyTask task = dailyTaskRepository.findById(mapping.getTaskId()).orElse(null);
+                        if (task != null && !Boolean.TRUE.equals(task.getDeleted())) {
+                            log.info("Inbound: Tombstoning local task {} for cancelled Google event {}",
+                                    task.getId(), googleEventId);
+                            task.setDeleted(true);
+                            task.setDeletedAt(Instant.now());
+                            task.setLastSyncedAt(Instant.now());
+                            dailyTaskRepository.save(task);
+                        }
+                        mapping.setSyncState("CANCELLED");
+                        mapping.setLastSyncedAt(Instant.now());
+                        mappingRepository.save(mapping);
                     });
                     continue;
                 }
@@ -208,7 +221,11 @@ public class GoogleSyncService {
 
                     DailyTask task = dailyTaskRepository.findById(mapping.getTaskId()).orElse(null);
                     if (task != null) {
-                        log.info("Inbound: Updating local task {} for event {}", task.getId(), googleEventId);
+                        // LWW groundwork (enforcement lands in the conflict-resolution commit):
+                        // log both clocks on every inbound apply so google-vs-local skew is
+                        // debuggable. These are DIFFERENT clocks — do not compare for equality.
+                        log.info("Inbound: Updating local task {} for event {} [googleUpdated={} localUpdatedAt={}]",
+                                task.getId(), googleEventId, googleUpdated, task.getUpdatedAt());
                         mapGoogleEventToLocal(eventNode, task);
                         task.setLastSyncedAt(Instant.now());
                         dailyTaskRepository.save(task);

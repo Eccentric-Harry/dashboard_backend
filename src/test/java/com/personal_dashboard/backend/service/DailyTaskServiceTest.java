@@ -177,6 +177,49 @@ class DailyTaskServiceTest {
     }
 
     @Test
+    void testDeleteTask_SoftDeletesInsteadOfHardDelete() {
+        when(dailyTaskRepository.findByIdAndUserId("1", "test-user")).thenReturn(Optional.of(incompleteTask));
+        when(dailyTaskRepository.save(any(DailyTask.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        dailyTaskService.deleteTask("1");
+
+        // Never hard-removed…
+        verify(dailyTaskRepository, never()).delete(any());
+        verify(dailyTaskRepository, never()).deleteById(any());
+        // …instead tombstoned via save.
+        assertTrue(incompleteTask.getDeleted());
+        assertNotNull(incompleteTask.getDeletedAt());
+        verify(dailyTaskRepository, times(1)).save(incompleteTask);
+    }
+
+    @Test
+    void testDeleteTask_AlreadyTombstonedIsNoop() {
+        incompleteTask.setDeleted(true);
+        incompleteTask.setDeletedAt(java.time.Instant.now());
+        when(dailyTaskRepository.findByIdAndUserId("1", "test-user")).thenReturn(Optional.of(incompleteTask));
+
+        dailyTaskService.deleteTask("1");
+
+        verify(dailyTaskRepository, never()).save(any());
+        verify(dailyTaskRepository, never()).delete(any());
+    }
+
+    @Test
+    void testReads_ExcludeTombstonedTasks() {
+        DailyTask tombstoned = DailyTask.builder()
+                .id("9").title("Deleted").date(LocalDate.of(2026, 5, 30))
+                .deleted(true).deletedAt(java.time.Instant.now())
+                .build();
+        when(dailyTaskRepository.findActiveTasks(eq("test-user"), any(LocalDateTime.class)))
+                .thenReturn(List.of(incompleteTask, tombstoned, completedTask));
+
+        List<DailyTask> result = dailyTaskService.getActiveTasks();
+
+        assertEquals(2, result.size());
+        assertTrue(result.stream().noneMatch(t -> "9".equals(t.getId())));
+    }
+
+    @Test
     void testGetActiveTasks() {
         List<DailyTask> activeTasks = List.of(incompleteTask, completedTask);
         when(dailyTaskRepository.findActiveTasks(eq("test-user"), any(LocalDateTime.class))).thenReturn(activeTasks);
