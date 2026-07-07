@@ -35,6 +35,12 @@ public class DailyLogService {
         if (request.getMoodRating() != null) {
             log.setMoodRating(request.getMoodRating());
         }
+        if (request.getMoodScore() != null) {
+            log.setMoodScore(request.getMoodScore());
+        }
+        if (request.getMoodNote() != null) {
+            log.setMoodNote(request.getMoodNote());
+        }
 
         return dailyLogRepository.save(log);
     }
