@@ -302,36 +302,118 @@ public class GoogleCalendarClient {
         return responseNode.get("id").asText();
     }
 
+    /** Outcome of an update push: the (possibly re-inserted) event id, its new etag,
+     *  and whether our local change was actually applied (false = remote won LWW). */
+    public record UpdateResult(String googleEventId, String etag, boolean applied) {}
+
     /**
-     * Update an existing Google Calendar event by its googleEventId.
-     * storeId = userId:email — identifies which account's credentials to use.
-     * googleEventId is passed explicitly from the CalendarSyncMapping, not from task.
+     * Update an existing Google Calendar event, with concurrent-edit detection.
+     *
+     * Sends If-Match: <etag>. A 412 (Precondition Failed) means the remote copy
+     * changed under us since we last synced. We then resolve last-write-wins by
+     * comparing Google's current `updated` against our local `updatedAt`:
+     *   - local newer  → force-overwrite the remote (our push wins).
+     *   - remote newer → skip the push (applied=false); the next pull reconciles
+     *                    the remote change into the local task.
+     * Both clocks are logged on every conflict (they are DIFFERENT clocks).
      */
-    public String updateEvent(String storeId, String googleEventId, DailyTask task) throws Exception {
+    public UpdateResult updateEvent(String storeId, String googleEventId, DailyTask task, String etag) throws Exception {
         if (googleEventId == null || googleEventId.isBlank()) {
             throw new IllegalArgumentException("googleEventId must be provided for update");
         }
 
-        // No client id on update: the path already carries the event id, and a
-        // Google-origin event's id is NOT our taskId, so injecting one would be wrong.
         String eventJson = objectMapper.writeValueAsString(buildEventNode(storeId, task));
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + googleEventId))
                 .header("Content-Type", "application/json")
                 .PUT(HttpRequest.BodyPublishers.ofString(eventJson));
+        if (etag != null && !etag.isBlank()) {
+            requestBuilder.header("If-Match", etag);
+        }
 
         HttpResponse<String> response = executeRequestWithAuth(storeId, requestBuilder);
+
         if (response.statusCode() == 404) {
-            // Event was deleted in Google Calendar — re-insert it and return the new ID.
             log.warn("Google Event {} not found during update (404). Re-inserting.", googleEventId);
-            return insertEvent(storeId, task);
+            return new UpdateResult(insertEvent(storeId, task), null, true);
+        }
+
+        if (response.statusCode() == 412) {
+            return resolveConflict(storeId, googleEventId, task, eventJson);
         }
 
         if (response.statusCode() != 200) {
             log.error("Google Event update failed: status={}, body={}", response.statusCode(), response.body());
             throw new RuntimeException("Failed to update event in Google Calendar: " + response.body());
         }
-        return googleEventId; // unchanged
+        return new UpdateResult(googleEventId, readEtag(response.body()), true);
+    }
+
+    /** Last-write-wins resolution after a 412 on update. */
+    private UpdateResult resolveConflict(String storeId, String googleEventId, DailyTask task, String eventJson) throws Exception {
+        JsonNode remote = fetchEvent(storeId, googleEventId);
+        if (remote == null) {
+            // Vanished remotely between our PUT and the refetch — re-insert.
+            log.warn("Conflict refetch for event {} returned nothing — re-inserting.", googleEventId);
+            return new UpdateResult(insertEvent(storeId, task), null, true);
+        }
+
+        Instant remoteUpdated = remote.has("updated") ? Instant.parse(remote.get("updated").asText()) : Instant.EPOCH;
+        Instant localUpdated = task.getUpdatedAt();
+        boolean localWins = localUpdated != null && localUpdated.isAfter(remoteUpdated);
+        log.warn("Conflict on event {} [remoteUpdated={} localUpdatedAt={}] — last-write-wins: {}",
+                googleEventId, remoteUpdated, localUpdated, localWins ? "LOCAL" : "REMOTE");
+
+        if (!localWins) {
+            // Remote wins: don't overwrite. Return remote etag so the mapping tracks it;
+            // the next pull brings the remote content into the local task.
+            return new UpdateResult(googleEventId, readText(remote, "etag"), false);
+        }
+
+        // Local wins: force-overwrite unconditionally (no If-Match).
+        HttpRequest.Builder forced = HttpRequest.newBuilder()
+                .uri(URI.create("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + googleEventId))
+                .header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString(eventJson));
+        HttpResponse<String> resp = executeRequestWithAuth(storeId, forced);
+        if (resp.statusCode() == 404) {
+            return new UpdateResult(insertEvent(storeId, task), null, true);
+        }
+        if (resp.statusCode() != 200) {
+            log.error("Forced conflict overwrite failed for event {}: status={}, body={}",
+                    googleEventId, resp.statusCode(), resp.body());
+            throw new RuntimeException("Failed to resolve conflict for event " + googleEventId);
+        }
+        return new UpdateResult(googleEventId, readEtag(resp.body()), true);
+    }
+
+    /** GET a single event; returns null on 404/410 (gone). */
+    private JsonNode fetchEvent(String storeId, String googleEventId) throws Exception {
+        HttpRequest.Builder rb = HttpRequest.newBuilder()
+                .uri(URI.create("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + googleEventId))
+                .GET();
+        HttpResponse<String> resp = executeRequestWithAuth(storeId, rb);
+        if (resp.statusCode() == 404 || resp.statusCode() == 410) {
+            return null;
+        }
+        if (resp.statusCode() != 200) {
+            throw new RuntimeException("Failed to fetch event " + googleEventId + ": " + resp.body());
+        }
+        return objectMapper.readTree(resp.body());
+    }
+
+    private String readEtag(String body) {
+        try {
+            return readText(objectMapper.readTree(body), "etag");
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String readText(JsonNode node, String field) {
+        if (node == null || !node.has(field) || node.get(field).isNull()) return null;
+        String v = node.get(field).asText();
+        return (v == null || v.isBlank()) ? null : v;
     }
 
     /**

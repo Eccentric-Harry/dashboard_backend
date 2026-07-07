@@ -125,13 +125,15 @@ public class GoogleCalendarSyncEventListener extends AbstractMongoEventListener<
                         log.info("Outbound: Updating Google Event {} for task '{}' ({})",
                                 mapping.getGoogleEventId(), task.getTitle(), calendarEmail);
 
-                        String returnedId = googleCalendarClient.updateEvent(storeId, mapping.getGoogleEventId(), task);
+                        GoogleCalendarClient.UpdateResult result =
+                                googleCalendarClient.updateEvent(storeId, mapping.getGoogleEventId(), task, mapping.getEtag());
 
                         GoogleSyncContext.setBypass(true);
                         try {
-                            // updateEvent returns a new ID if the old event was re-inserted (404 case)
-                            if (!returnedId.equals(mapping.getGoogleEventId())) {
-                                mapping.setGoogleEventId(returnedId);
+                            // updateEvent may re-insert (404) and return a new id.
+                            mapping.setGoogleEventId(result.googleEventId());
+                            if (result.etag() != null) {
+                                mapping.setEtag(result.etag());
                             }
                             mapping.setLastSyncedAt(Instant.now());
                             mappingRepository.save(mapping);
@@ -140,7 +142,12 @@ public class GoogleCalendarSyncEventListener extends AbstractMongoEventListener<
                         } finally {
                             GoogleSyncContext.clear();
                         }
-                        log.info("Outbound: Updated Google Event successfully ({})", calendarEmail);
+                        if (result.applied()) {
+                            log.info("Outbound: Updated Google Event successfully ({})", calendarEmail);
+                        } else {
+                            log.info("Outbound: Remote won last-write-wins for Google Event {} ({}) — local change not pushed; will reconcile on next pull.",
+                                    mapping.getGoogleEventId(), calendarEmail);
+                        }
                     }
 
                 } catch (Exception e) {

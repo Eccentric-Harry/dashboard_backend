@@ -92,6 +92,54 @@ class GoogleCalendarClientTest {
         assertEquals(TASK_ID, client.insertEvent(STORE_ID, task()));
     }
 
+    // ── Conflict resolution: 412 → last-write-wins ────────────────────────────
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void update_conflict_localWins_forceOverwrites() throws Exception {
+        stubAuth();
+        HttpResponse<String> precondFail = mock(HttpResponse.class);
+        when(precondFail.statusCode()).thenReturn(412);
+        HttpResponse<String> remoteGet = mock(HttpResponse.class);
+        when(remoteGet.statusCode()).thenReturn(200);
+        when(remoteGet.body()).thenReturn("{\"id\":\"G1\",\"updated\":\"2026-07-01T09:00:00.000Z\",\"etag\":\"\\\"old\\\"\"}");
+        HttpResponse<String> forced = mock(HttpResponse.class);
+        when(forced.statusCode()).thenReturn(200);
+        when(forced.body()).thenReturn("{\"id\":\"G1\",\"etag\":\"\\\"new\\\"\"}");
+        // PUT(If-Match)=412, GET=200, PUT(force)=200
+        when(httpClient.<String>send(any(HttpRequest.class), any()))
+                .thenReturn(precondFail, remoteGet, forced);
+
+        DailyTask t = task();
+        t.setUpdatedAt(java.time.Instant.parse("2026-07-01T10:00:00.000Z")); // local NEWER than remote
+        GoogleCalendarClient.UpdateResult r = client.updateEvent(STORE_ID, "G1", t, "\"held\"");
+
+        assertTrue(r.applied());
+        assertEquals("G1", r.googleEventId());
+        verify(httpClient, times(3)).send(any(HttpRequest.class), any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void update_conflict_remoteWins_skipsPush() throws Exception {
+        stubAuth();
+        HttpResponse<String> precondFail = mock(HttpResponse.class);
+        when(precondFail.statusCode()).thenReturn(412);
+        HttpResponse<String> remoteGet = mock(HttpResponse.class);
+        when(remoteGet.statusCode()).thenReturn(200);
+        when(remoteGet.body()).thenReturn("{\"id\":\"G1\",\"updated\":\"2026-07-01T12:00:00.000Z\",\"etag\":\"\\\"remote\\\"\"}");
+        when(httpClient.<String>send(any(HttpRequest.class), any()))
+                .thenReturn(precondFail, remoteGet);
+
+        DailyTask t = task();
+        t.setUpdatedAt(java.time.Instant.parse("2026-07-01T10:00:00.000Z")); // local OLDER than remote
+        GoogleCalendarClient.UpdateResult r = client.updateEvent(STORE_ID, "G1", t, "\"held\"");
+
+        assertFalse(r.applied());              // remote won → not overwritten
+        assertEquals("\"remote\"", r.etag());  // mapping tracks remote etag
+        verify(httpClient, times(2)).send(any(HttpRequest.class), any()); // PUT + GET, no force
+    }
+
     private void stubAuth() {
         GoogleSyncStore store = GoogleSyncStore.builder()
                 .id(STORE_ID).userId("u").email("acct@gmail.com").accessToken("enc").build();
