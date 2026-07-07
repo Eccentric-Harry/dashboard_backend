@@ -37,7 +37,31 @@ public class GoogleCalendarClient {
     private final UserAccountRepository userAccountRepository;
     private final EncryptionUtils encryptionUtils;
     private final ObjectMapper objectMapper;
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    // Not final so tests can inject a mock client via setHttpClient(); Lombok's
+    // @RequiredArgsConstructor excludes initialized fields, so Spring wiring is unaffected.
+    private HttpClient httpClient = HttpClient.newHttpClient();
+
+    /** Test seam — replace the HTTP client. Not used in production wiring. */
+    void setHttpClient(HttpClient httpClient) {
+        this.httpClient = httpClient;
+    }
+
+    /**
+     * Deterministic Google event id derived from the local task id. Google event
+     * ids must be base32hex (chars 0-9a-v), length 5–1024. A lowercase Mongo
+     * ObjectId hex (0-9a-f, length 24) already satisfies this, so we use it verbatim.
+     * Supplying it on insert makes the write idempotent: a retry after a lost
+     * response gets 409 (already exists) instead of creating a second copy.
+     * The SAME id is reused across accounts on purpose — event ids are unique
+     * per-calendar, so one local event maps to the same id in every account.
+     * Returns null when the id is not a valid client id (caller falls back to a
+     * server-generated id, losing idempotency for that one write).
+     */
+    static String deterministicEventId(String taskId) {
+        if (taskId == null) return null;
+        String candidate = taskId.toLowerCase(java.util.Locale.ROOT);
+        return candidate.matches("[0-9a-v]{5,1024}") ? candidate : null;
+    }
 
     @Value("${google.calendar.client-id}")
     private String clientId;
@@ -239,13 +263,36 @@ public class GoogleCalendarClient {
      * storeId = userId:email — identifies which account's credentials to use.
      */
     public String insertEvent(String storeId, DailyTask task) throws Exception {
-        String eventJson = mapLocalToGoogleEventJson(storeId, task);
+        ObjectNode event = buildEventNode(storeId, task);
+
+        // Idempotency: supply a deterministic client id so a retried insert (after a
+        // lost response) returns 409 instead of creating a duplicate event.
+        String clientId = deterministicEventId(task.getId());
+        if (clientId != null) {
+            event.put("id", clientId);
+        }
+
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create("https://www.googleapis.com/calendar/v3/calendars/primary/events"))
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(eventJson));
+                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(event)));
 
         HttpResponse<String> response = executeRequestWithAuth(storeId, requestBuilder);
+
+        if (response.statusCode() == 409) {
+            // The event already exists — a previous insert with this same client id
+            // succeeded but we never saw the response. This is a SUCCESSFUL retry,
+            // not a duplicate. If the local task is already soft-deleted, the change
+            // is fully handled; either way we return the id we sent without looping.
+            if (clientId != null) {
+                log.info("Insert got 409 (already exists) for event id {}{} — treating as success (idempotent).",
+                        clientId, Boolean.TRUE.equals(task.getDeleted()) ? " [soft-deleted, already handled]" : "");
+                return clientId;
+            }
+            log.error("Google Event insert returned 409 but no client id was supplied: {}", response.body());
+            throw new RuntimeException("Failed to insert event to Google Calendar (409, no client id): " + response.body());
+        }
+
         if (response.statusCode() != 200 && response.statusCode() != 201) {
             log.error("Google Event insert failed: status={}, body={}", response.statusCode(), response.body());
             throw new RuntimeException("Failed to insert event to Google Calendar: " + response.body());
@@ -265,7 +312,9 @@ public class GoogleCalendarClient {
             throw new IllegalArgumentException("googleEventId must be provided for update");
         }
 
-        String eventJson = mapLocalToGoogleEventJson(storeId, task);
+        // No client id on update: the path already carries the event id, and a
+        // Google-origin event's id is NOT our taskId, so injecting one would be wrong.
+        String eventJson = objectMapper.writeValueAsString(buildEventNode(storeId, task));
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + googleEventId))
                 .header("Content-Type", "application/json")
@@ -399,10 +448,11 @@ public class GoogleCalendarClient {
     }
 
     /**
-     * Map a local DailyTask to a Google Event JSON payload.
+     * Build the Google Event JSON body for a local DailyTask (without an id).
      * storeId is used to resolve the user's timezone via their UserAccount.
+     * Callers add a client id only for inserts.
      */
-    private String mapLocalToGoogleEventJson(String storeId, DailyTask task) throws Exception {
+    private ObjectNode buildEventNode(String storeId, DailyTask task) throws Exception {
         // Resolve userId from the store so we can look up the user's timezone preference
         GoogleSyncStore store = syncStoreRepository.findById(storeId)
                 .orElseThrow(() -> new IllegalArgumentException("Sync store not found: " + storeId));
@@ -450,6 +500,6 @@ public class GoogleCalendarClient {
         event.set("start", start);
         event.set("end", end);
 
-        return objectMapper.writeValueAsString(event);
+        return event;
     }
 }
