@@ -50,6 +50,24 @@ public class GoogleSyncStore {
 
     private Instant lastSyncedAt;
 
+    /**
+     * Connection state: CONNECTED (default) or DISCONNECTED. Set to DISCONNECTED
+     * when the refresh token is revoked/invalid, instead of silently deleting the
+     * store — so the account surfaces a clean "reconnect needed" state to the user
+     * and sync aborts gracefully rather than crashing.
+     */
+    @Builder.Default
+    private String status = "CONNECTED";
+
+    /** Human-readable reason the account became DISCONNECTED (nullable). */
+    private String authError;
+
+    private Instant disconnectedAt;
+
+    public boolean isDisconnected() {
+        return "DISCONNECTED".equalsIgnoreCase(status);
+    }
+
     public static String storeId(String userId, String email) {
         return userId + ":" + email;
     }

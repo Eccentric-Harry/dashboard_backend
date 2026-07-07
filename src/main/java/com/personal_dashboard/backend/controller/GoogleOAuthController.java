@@ -84,6 +84,10 @@ public class GoogleOAuthController {
             }
             // Reset sync token so a full re-sync runs for this account
             store.setCurrentSyncToken(null);
+            // (Re)connecting clears any prior disconnected state.
+            store.setStatus("CONNECTED");
+            store.setAuthError(null);
+            store.setDisconnectedAt(null);
             syncStoreRepository.save(store);
 
             // Register webhook watch for this account
@@ -118,6 +122,8 @@ public class GoogleOAuthController {
             a.put("email", s.getEmail());
             a.put("lastSyncedAt", s.getLastSyncedAt() != null ? s.getLastSyncedAt().toString() : "");
             a.put("webhookExpiration", s.getWebhookExpiration() != null ? s.getWebhookExpiration().toString() : "");
+            a.put("status", s.getStatus() != null ? s.getStatus() : "CONNECTED");
+            a.put("authError", s.getAuthError() != null ? s.getAuthError() : "");
             return a;
         }).toList();
 

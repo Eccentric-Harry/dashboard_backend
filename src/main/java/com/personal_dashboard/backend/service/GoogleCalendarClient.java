@@ -174,8 +174,9 @@ public class GoogleCalendarClient {
             if (response.statusCode() != 200) {
                 log.error("Failed to refresh access token for store {}: {}", storeId, response.body());
                 if (response.statusCode() == 400 || response.statusCode() == 401) {
-                    // Token is revoked — remove this specific account's store
-                    syncStoreRepository.deleteById(storeId);
+                    // Refresh token revoked/invalid — mark the account DISCONNECTED instead of
+                    // deleting it, so the user sees a clean "reconnect needed" state.
+                    markDisconnected(storeId, "Refresh token revoked or invalid (HTTP " + response.statusCode() + ")");
                 }
                 throw new RuntimeException("Google token refresh failed: " + response.statusCode());
             }
@@ -198,6 +199,17 @@ public class GoogleCalendarClient {
             log.error("Error refreshing token for store {}", storeId, e);
             throw new RuntimeException("Failed to refresh token", e);
         }
+    }
+
+    /** Mark an account DISCONNECTED (revoked/invalid credentials) without deleting it. */
+    private void markDisconnected(String storeId, String reason) {
+        syncStoreRepository.findById(storeId).ifPresent(store -> {
+            store.setStatus("DISCONNECTED");
+            store.setAuthError(reason);
+            store.setDisconnectedAt(Instant.now());
+            syncStoreRepository.save(store);
+            log.warn("Google account {} marked DISCONNECTED: {}", storeId, reason);
+        });
     }
 
     /**

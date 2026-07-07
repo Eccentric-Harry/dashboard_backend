@@ -139,6 +139,10 @@ public class GoogleSyncService {
             log.warn("Sync aborting — no credentials found for storeId: {}", storeId);
             return;
         }
+        if (store.isDisconnected()) {
+            log.warn("Sync aborting — account {} is DISCONNECTED ({}). Reconnect required.", storeId, store.getAuthError());
+            return;
+        }
 
         try {
             GoogleSyncContext.setBypass(true);

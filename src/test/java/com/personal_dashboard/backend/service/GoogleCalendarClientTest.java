@@ -9,6 +9,7 @@ import com.personal_dashboard.backend.util.EncryptionUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -156,6 +157,32 @@ class GoogleCalendarClientTest {
 
         assertEquals(TASK_ID, client.insertEvent(STORE_ID, task()));
         verify(httpClient, times(2)).send(any(HttpRequest.class), any());
+    }
+
+    // ── OAuth revoked → clean disconnected state (not silent delete) ──────────
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void refresh_revoked_marksDisconnectedInsteadOfDeleting() throws Exception {
+        GoogleSyncStore store = GoogleSyncStore.builder()
+                .id(STORE_ID).userId("u").email("acct@gmail.com").status("CONNECTED").build();
+        when(encryptionUtils.decrypt("enc-rt")).thenReturn("plain-refresh");
+        when(syncStoreRepository.findById(STORE_ID)).thenReturn(Optional.of(store));
+        HttpResponse<String> revoked = mock(HttpResponse.class);
+        when(revoked.statusCode()).thenReturn(400);
+        when(revoked.body()).thenReturn("{\"error\":\"invalid_grant\"}");
+        when(httpClient.<String>send(any(HttpRequest.class), any())).thenReturn(revoked);
+
+        assertThrows(RuntimeException.class, () -> client.refreshAccessToken(STORE_ID, "enc-rt"));
+
+        // Not deleted…
+        verify(syncStoreRepository, never()).deleteById(any());
+        // …marked DISCONNECTED with a reason.
+        ArgumentCaptor<GoogleSyncStore> cap = ArgumentCaptor.forClass(GoogleSyncStore.class);
+        verify(syncStoreRepository).save(cap.capture());
+        assertTrue(cap.getValue().isDisconnected());
+        assertNotNull(cap.getValue().getAuthError());
+        assertNotNull(cap.getValue().getDisconnectedAt());
     }
 
     private void stubAuth() {
