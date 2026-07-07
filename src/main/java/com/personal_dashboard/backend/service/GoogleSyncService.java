@@ -49,6 +49,10 @@ public class GoogleSyncService {
 
         int pushed = 0;
         for (DailyTask task : allTasks) {
+            // Recurrence flag & defer: never push a recurring local task as a single event.
+            if (task.isRecurring()) {
+                continue;
+            }
             String mappingId = CalendarSyncMapping.compositeId(task.getId(), calendarEmail);
             if (mappingRepository.existsById(mappingId)) {
                 continue; // already synced to this account
@@ -178,6 +182,17 @@ public class GoogleSyncService {
             try {
                 String googleEventId = eventNode.get("id").asText();
                 String status = eventNode.has("status") ? eventNode.get("status").asText() : "confirmed";
+
+                // ── Recurrence: flag & defer ───────────────────────────────────────────
+                // A recurring master carries a "recurrence" (RRULE/EXDATE) array; a modified
+                // or cancelled instance carries "recurringEventId". Neither is supported yet,
+                // so skip cleanly rather than importing a broken single event or tombstoning
+                // based on an instance. Deliberately not half-built.
+                if (eventNode.has("recurrence") || eventNode.has("recurringEventId")) {
+                    log.info("Inbound: Skipping recurring event {} (recurrence not yet supported — flagged & deferred).",
+                            googleEventId);
+                    continue;
+                }
 
                 // Look up mapping by googleEventId + userId (account-agnostic — handles cross-account moves)
                 Optional<CalendarSyncMapping> mappingOpt = mappingRepository.findByGoogleEventIdAndUserId(googleEventId, userId);

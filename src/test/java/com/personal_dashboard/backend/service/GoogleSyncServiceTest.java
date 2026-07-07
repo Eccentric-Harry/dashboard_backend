@@ -138,6 +138,37 @@ class GoogleSyncServiceTest {
         assertEquals("SYNCED", cap.getValue().getSyncState());
     }
 
+    // ── Recurrence flag & defer: recurring events are skipped, not imported ────
+
+    @Test
+    void recurringMaster_isSkipped() throws Exception {
+        JsonNode master = mapper.readTree("{\"id\":\"R1\",\"status\":\"confirmed\","
+                + "\"updated\":\"2026-07-01T10:00:00.000Z\",\"iCalUID\":\"uid-r\","
+                + "\"recurrence\":[\"RRULE:FREQ=WEEKLY;BYDAY=MO\"],"
+                + "\"summary\":\"Weekly\",\"start\":{\"date\":\"2026-07-06\"},\"end\":{\"date\":\"2026-07-07\"}}");
+        stubSinglePull(master);
+
+        service.syncCalendar(USER, EMAIL, true);
+
+        verify(dailyTaskRepository, never()).save(any());
+        verify(mappingRepository, never()).save(any());
+        // Never even looked the event up — skipped before dedup.
+        verify(mappingRepository, never()).findByGoogleEventIdAndUserId(any(), any());
+    }
+
+    @Test
+    void recurringInstance_isSkipped() throws Exception {
+        JsonNode instance = mapper.readTree("{\"id\":\"R1_20260713\",\"status\":\"cancelled\","
+                + "\"updated\":\"2026-07-01T10:00:00.000Z\",\"recurringEventId\":\"R1\"}");
+        stubSinglePull(instance);
+
+        service.syncCalendar(USER, EMAIL, true);
+
+        verify(dailyTaskRepository, never()).save(any());
+        verify(dailyTaskRepository, never()).deleteById(any());
+        verify(mappingRepository, never()).save(any());
+    }
+
     // ── Baseline: genuinely new event still creates a task ─────────────────────
 
     @Test

@@ -51,6 +51,15 @@ public class GoogleCalendarSyncEventListener extends AbstractMongoEventListener<
         String userId = task.getUserId();
         if (userId == null || userId.isBlank()) return;
 
+        // Recurrence flag & defer: don't push a recurring task as a single Google event.
+        // A soft-deleted recurring task is still allowed through so any remote copy pushed
+        // before recurrence was deferred gets cancelled.
+        if (task.isRecurring() && !Boolean.TRUE.equals(task.getDeleted())) {
+            log.info("Outbound: Skipping recurring task {} (recurrence not yet supported — flagged & deferred).",
+                    task.getId());
+            return;
+        }
+
         List<GoogleSyncStore> stores = syncStoreRepository.findByUserId(userId);
         if (stores.isEmpty()) return;
 

@@ -109,4 +109,9 @@ public class DailyTask implements UserOwnedDocument {
 
     @LastModifiedDate
     private Instant updatedAt;
+
+    /** True when this task recurs (DAILY/WEEKLY/MONTHLY) rather than NONE. */
+    public boolean isRecurring() {
+        return recurrenceFrequency != null && !"NONE".equalsIgnoreCase(recurrenceFrequency);
+    }
 }

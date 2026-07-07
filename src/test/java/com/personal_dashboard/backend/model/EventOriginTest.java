@@ -1,5 +1,6 @@
 package com.personal_dashboard.backend.model;
 
+import com.personal_dashboard.backend.model.DailyTask;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -33,5 +34,13 @@ class EventOriginTest {
         EventOrigin origin = EventOrigin.builder().source("google").build();
         assertTrue(origin.isGoogle());
         assertFalse(origin.isLocal());
+    }
+
+    @Test
+    void dailyTask_isRecurring_reflectsFrequency() {
+        assertFalse(DailyTask.builder().recurrenceFrequency("NONE").build().isRecurring());
+        assertFalse(DailyTask.builder().recurrenceFrequency(null).build().isRecurring());
+        assertTrue(DailyTask.builder().recurrenceFrequency("WEEKLY").build().isRecurring());
+        assertTrue(DailyTask.builder().recurrenceFrequency("daily").build().isRecurring());
     }
 }
