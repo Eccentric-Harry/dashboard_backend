@@ -56,10 +56,7 @@ public class GoogleSyncService {
 
         int pushed = 0;
         for (DailyTask task : allTasks) {
-            // Recurrence flag & defer: never push a recurring local task as a single event.
-            if (task.isRecurring()) {
-                continue;
-            }
+            // Recurring tasks are pushed as native Google recurring events (RRULE).
             // Origin gate (guardrail #4 + cross-account #10).
             if (!SyncPushPolicy.shouldPush(task, store)) {
                 continue;

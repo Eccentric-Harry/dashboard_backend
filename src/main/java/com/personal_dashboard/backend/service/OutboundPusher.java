@@ -40,13 +40,9 @@ public class OutboundPusher {
         String userId = task.getUserId();
         if (userId == null || userId.isBlank()) return;
 
-        // Recurrence flag & defer: never push a recurring task as a single event.
-        // A soft-deleted recurring task still flows through so a remote copy pushed
-        // before recurrence was deferred gets cancelled.
-        if (task.isRecurring() && !Boolean.TRUE.equals(task.getDeleted())) {
-            log.info("Outbound: Skipping recurring task {} (recurrence deferred).", task.getId());
-            return;
-        }
+        // Recurring tasks ARE pushed outbound as native Google recurring events
+        // (RRULE emitted by GoogleCalendarClient.buildEventNode). Inbound recurrence
+        // (pulling Google recurring series/instances) is still deferred.
 
         List<GoogleSyncStore> stores = syncStoreRepository.findByUserId(userId);
         for (GoogleSyncStore store : stores) {

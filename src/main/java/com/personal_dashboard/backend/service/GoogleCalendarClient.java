@@ -639,6 +639,69 @@ public class GoogleCalendarClient {
         event.set("start", start);
         event.set("end", end);
 
+        // Recurring task → emit an RFC 5545 recurrence array (RRULE + optional EXDATE).
+        if (task.isRecurring()) {
+            com.fasterxml.jackson.databind.node.ArrayNode recurrence = objectMapper.createArrayNode();
+            recurrence.add(buildRrule(task, timeZoneStr));
+            String exdate = buildExdate(task, timeZoneStr);
+            if (exdate != null) {
+                recurrence.add(exdate);
+            }
+            event.set("recurrence", recurrence);
+        }
+
         return event;
+    }
+
+    private static final DateTimeFormatter BASIC_DATE = DateTimeFormatter.BASIC_ISO_DATE; // yyyyMMdd
+    private static final DateTimeFormatter RRULE_UNTIL_UTC = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'");
+    private static final DateTimeFormatter EXDATE_TIME = DateTimeFormatter.ofPattern("HHmmss");
+
+    /** Build an RRULE line (FREQ + optional UNTIL) from the task's recurrence. */
+    static String buildRrule(DailyTask task, String timeZoneStr) {
+        String freq = task.getRecurrenceFrequency().toUpperCase(java.util.Locale.ROOT); // DAILY|WEEKLY|MONTHLY
+        StringBuilder rule = new StringBuilder("RRULE:FREQ=").append(freq);
+        LocalDate until = task.getRecurrenceUntil();
+        if (until != null) {
+            if (Boolean.TRUE.equals(task.getAllDay())) {
+                // DATE value for all-day series.
+                rule.append(";UNTIL=").append(until.format(BASIC_DATE));
+            } else {
+                // Timed series: UNTIL must be a UTC datetime. Take end-of-day in the
+                // event's zone so the final day is inclusive.
+                ZonedDateTime utc = until.atTime(23, 59, 59)
+                        .atZone(ZoneId.of(timeZoneStr))
+                        .withZoneSameInstant(java.time.ZoneOffset.UTC);
+                rule.append(";UNTIL=").append(utc.format(RRULE_UNTIL_UTC));
+            }
+        }
+        return rule.toString();
+    }
+
+    /** Build an EXDATE line from the task's excludedDates (skipped occurrences), or null. */
+    static String buildExdate(DailyTask task, String timeZoneStr) {
+        List<LocalDate> excluded = task.getExcludedDates();
+        if (excluded == null || excluded.isEmpty()) {
+            return null;
+        }
+        if (Boolean.TRUE.equals(task.getAllDay())) {
+            StringBuilder sb = new StringBuilder("EXDATE;VALUE=DATE:");
+            for (int i = 0; i < excluded.size(); i++) {
+                if (i > 0) sb.append(",");
+                sb.append(excluded.get(i).format(BASIC_DATE));
+            }
+            return sb.toString();
+        }
+        // Timed: each excluded date at the event's start time in its zone.
+        java.time.LocalTime startTime = task.getStartTime() != null
+                ? java.time.LocalTime.parse(task.getStartTime())
+                : java.time.LocalTime.of(9, 0);
+        String time = startTime.format(EXDATE_TIME);
+        StringBuilder sb = new StringBuilder("EXDATE;TZID=").append(timeZoneStr).append(":");
+        for (int i = 0; i < excluded.size(); i++) {
+            if (i > 0) sb.append(",");
+            sb.append(excluded.get(i).format(BASIC_DATE)).append("T").append(time);
+        }
+        return sb.toString();
     }
 }
