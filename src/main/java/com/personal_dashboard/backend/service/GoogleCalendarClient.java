@@ -209,29 +209,70 @@ public class GoogleCalendarClient {
         return encryptionUtils.decrypt(store.getAccessToken());
     }
 
+    private static final int MAX_ATTEMPTS = 5;
+    // Base backoff; settable to 0 in tests so the retry loop doesn't actually sleep.
+    private long retryBaseDelayMs = 500L;
+
+    void setRetryBaseDelayMs(long ms) {
+        this.retryBaseDelayMs = ms;
+    }
+
     /**
-     * Execute an HTTP request with automatic token refresh on 401.
-     * storeId = userId:email — used to resolve credentials.
+     * Execute an HTTP request with automatic token refresh on 401 and bounded
+     * retries with exponential backoff + full jitter on transient failures
+     * (429, 5xx, and 403 rateLimitExceeded/userRateLimitExceeded).
      */
     private HttpResponse<String> executeRequestWithAuth(String storeId, HttpRequest.Builder requestBuilder) throws Exception {
         String accessToken = getValidAccessToken(storeId);
-        HttpRequest request = requestBuilder.copy()
-                .header("Authorization", "Bearer " + accessToken)
-                .build();
+        boolean refreshed = false;
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() == 401) {
-            log.warn("Access token expired for store {}. Refreshing and retrying.", storeId);
-            GoogleSyncStore store = syncStoreRepository.findById(storeId)
-                    .orElseThrow(() -> new IllegalArgumentException("Google sync store not found: " + storeId));
-            String newAccessToken = refreshAccessToken(storeId, store.getRefreshToken());
-            HttpRequest retryRequest = requestBuilder.copy()
-                    .header("Authorization", "Bearer " + newAccessToken)
+        for (int attempt = 1; ; attempt++) {
+            HttpRequest request = requestBuilder.copy()
+                    .header("Authorization", "Bearer " + accessToken)
                     .build();
-            return httpClient.send(retryRequest, HttpResponse.BodyHandlers.ofString());
-        }
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-        return response;
+            if (response.statusCode() == 401 && !refreshed) {
+                log.warn("Access token expired for store {}. Refreshing and retrying.", storeId);
+                GoogleSyncStore store = syncStoreRepository.findById(storeId)
+                        .orElseThrow(() -> new IllegalArgumentException("Google sync store not found: " + storeId));
+                accessToken = refreshAccessToken(storeId, store.getRefreshToken());
+                refreshed = true;
+                continue; // re-send with the fresh token
+            }
+
+            if (isRetryable(response) && attempt < MAX_ATTEMPTS) {
+                long backoff = backoffMillis(attempt);
+                log.warn("Retryable {} from Google for store {} (attempt {}/{}); backing off {}ms",
+                        response.statusCode(), storeId, attempt, MAX_ATTEMPTS, backoff);
+                if (backoff > 0) {
+                    Thread.sleep(backoff);
+                }
+                continue;
+            }
+
+            return response;
+        }
+    }
+
+    /** 429, any 5xx, or 403 that is specifically a rate-limit (not a hard forbidden). */
+    private boolean isRetryable(HttpResponse<String> response) {
+        int code = response.statusCode();
+        if (code == 429) return true;
+        if (code >= 500 && code < 600) return true;
+        if (code == 403) {
+            String body = response.body();
+            return body != null
+                    && (body.contains("rateLimitExceeded") || body.contains("userRateLimitExceeded"));
+        }
+        return false;
+    }
+
+    /** Exponential backoff with full jitter over [0, cappedBase], capped at 32s. */
+    private long backoffMillis(int attempt) {
+        long exp = retryBaseDelayMs << Math.min(attempt - 1, 6); // cap the shift
+        long capped = Math.min(exp, 32_000L);
+        return capped <= 0 ? 0 : java.util.concurrent.ThreadLocalRandom.current().nextLong(capped + 1);
     }
 
     /**

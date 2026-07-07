@@ -43,6 +43,7 @@ class GoogleCalendarClientTest {
         client = new GoogleCalendarClient(syncStoreRepository, userAccountRepository,
                 encryptionUtils, new ObjectMapper());
         client.setHttpClient(httpClient);
+        client.setRetryBaseDelayMs(0); // no real sleeping in tests
     }
 
     // ── deterministicEventId contract (guardrails #2, #3) ──────────────────────
@@ -138,6 +139,23 @@ class GoogleCalendarClientTest {
         assertFalse(r.applied());              // remote won → not overwritten
         assertEquals("\"remote\"", r.etag());  // mapping tracks remote etag
         verify(httpClient, times(2)).send(any(HttpRequest.class), any()); // PUT + GET, no force
+    }
+
+    // ── Backoff: transient 429 is retried, then succeeds ──────────────────────
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void insert_retriesOn429ThenSucceeds() throws Exception {
+        stubAuth();
+        HttpResponse<String> rateLimited = mock(HttpResponse.class);
+        when(rateLimited.statusCode()).thenReturn(429);
+        HttpResponse<String> ok = mock(HttpResponse.class);
+        when(ok.statusCode()).thenReturn(200);
+        when(ok.body()).thenReturn("{\"id\":\"" + TASK_ID + "\"}");
+        when(httpClient.<String>send(any(HttpRequest.class), any())).thenReturn(rateLimited, ok);
+
+        assertEquals(TASK_ID, client.insertEvent(STORE_ID, task()));
+        verify(httpClient, times(2)).send(any(HttpRequest.class), any());
     }
 
     private void stubAuth() {

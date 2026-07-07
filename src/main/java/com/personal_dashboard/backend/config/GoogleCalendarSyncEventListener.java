@@ -38,6 +38,7 @@ public class GoogleCalendarSyncEventListener extends AbstractMongoEventListener<
     private final GoogleSyncStoreRepository syncStoreRepository;
     private final DailyTaskRepository dailyTaskRepository;
     private final CalendarSyncMappingRepository mappingRepository;
+    private final com.personal_dashboard.backend.service.CalendarSyncLocks syncLocks;
     private final ExecutorService executor = Executors.newFixedThreadPool(8);
 
     @Override
@@ -69,6 +70,9 @@ public class GoogleCalendarSyncEventListener extends AbstractMongoEventListener<
             String mappingId = CalendarSyncMapping.compositeId(task.getId(), calendarEmail);
 
             executor.submit(() -> {
+                // Serialise against inbound pulls on the same calendar.
+                java.util.concurrent.locks.ReentrantLock lock = syncLocks.forStore(storeId);
+                lock.lock();
                 try {
                     Optional<CalendarSyncMapping> existingMapping = mappingRepository.findById(mappingId);
 
@@ -152,6 +156,8 @@ public class GoogleCalendarSyncEventListener extends AbstractMongoEventListener<
 
                 } catch (Exception e) {
                     log.error("Outbound sync failed for task {} to account {}: {}", task.getId(), calendarEmail, e.getMessage());
+                } finally {
+                    lock.unlock();
                 }
             });
         }
@@ -178,6 +184,8 @@ public class GoogleCalendarSyncEventListener extends AbstractMongoEventListener<
             if (!syncStoreRepository.existsById(storeId)) continue;
 
             executor.submit(() -> {
+                java.util.concurrent.locks.ReentrantLock lock = syncLocks.forStore(storeId);
+                lock.lock();
                 try {
                     log.info("Outbound: Deleting Google Event {} from account {}", googleEventId, mapping.getCalendarEmail());
                     googleCalendarClient.deleteEvent(storeId, googleEventId);
@@ -185,6 +193,8 @@ public class GoogleCalendarSyncEventListener extends AbstractMongoEventListener<
                     log.info("Outbound: Deleted Google Event successfully");
                 } catch (Exception e) {
                     log.error("Failed to delete Google Event {} from {}: {}", googleEventId, mapping.getCalendarEmail(), e.getMessage());
+                } finally {
+                    lock.unlock();
                 }
             });
         }

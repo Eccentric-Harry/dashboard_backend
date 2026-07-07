@@ -40,6 +40,7 @@ class GoogleSyncServiceTest {
     @Mock private GoogleSyncStoreRepository syncStoreRepository;
     @Mock private DailyTaskRepository dailyTaskRepository;
     @Mock private CalendarSyncMappingRepository mappingRepository;
+    @Mock private CalendarSyncLocks syncLocks;
 
     @InjectMocks private GoogleSyncService service;
 
@@ -50,6 +51,7 @@ class GoogleSyncServiceTest {
         GoogleSyncStore store = GoogleSyncStore.builder()
                 .id(STORE_ID).userId(USER).email(EMAIL).build();
         when(syncStoreRepository.findById(STORE_ID)).thenReturn(Optional.of(store));
+        when(syncLocks.forStore(STORE_ID)).thenReturn(new java.util.concurrent.locks.ReentrantLock());
     }
 
     private JsonNode event(String id, String status, String iCalUID) throws Exception {

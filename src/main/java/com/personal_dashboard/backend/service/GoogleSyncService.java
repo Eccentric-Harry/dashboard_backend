@@ -31,6 +31,7 @@ public class GoogleSyncService {
     private final GoogleSyncStoreRepository syncStoreRepository;
     private final DailyTaskRepository dailyTaskRepository;
     private final CalendarSyncMappingRepository mappingRepository;
+    private final CalendarSyncLocks syncLocks;
     private final ExecutorService syncExecutor = Executors.newFixedThreadPool(4);
 
     // ─── Outbound: push local-only tasks to a specific Google account ───────────
@@ -116,8 +117,21 @@ public class GoogleSyncService {
     /**
      * Synchronise events from one Google Calendar account (incremental or full).
      */
-    public synchronized void syncCalendar(String userId, String calendarEmail, boolean forceFullSync) throws Exception {
+    public void syncCalendar(String userId, String calendarEmail, boolean forceFullSync) throws Exception {
         String storeId = GoogleSyncStore.storeId(userId, calendarEmail);
+
+        // Per-(account,calendar) lock: serialise all sync work on this calendar so
+        // inbound and outbound cannot interleave. Reentrant for the 410 full-resync.
+        java.util.concurrent.locks.ReentrantLock lock = syncLocks.forStore(storeId);
+        lock.lock();
+        try {
+            syncCalendarLocked(userId, calendarEmail, forceFullSync, storeId);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private void syncCalendarLocked(String userId, String calendarEmail, boolean forceFullSync, String storeId) throws Exception {
         log.info("Starting Google Calendar sync: storeId={} forceFullSync={}", storeId, forceFullSync);
 
         GoogleSyncStore store = syncStoreRepository.findById(storeId).orElse(null);
