@@ -125,13 +125,13 @@ public class GoogleCalendarClient {
     }
 
     /**
-     * Force refresh the token for a user
+     * Force-refresh the access token for a specific store (identified by storeId = userId:email).
      */
-    public synchronized String refreshAccessToken(String userId, String encryptedRefreshToken) {
-        log.info("Refreshing access token for user: {}", userId);
+    public synchronized String refreshAccessToken(String storeId, String encryptedRefreshToken) {
+        log.info("Refreshing access token for store: {}", storeId);
         String decryptedRefreshToken = encryptionUtils.decrypt(encryptedRefreshToken);
         if (decryptedRefreshToken == null || decryptedRefreshToken.isBlank()) {
-            throw new IllegalStateException("Cannot refresh access token, refresh token is missing");
+            throw new IllegalStateException("Cannot refresh access token: refresh token is missing");
         }
 
         try {
@@ -148,68 +148,59 @@ public class GoogleCalendarClient {
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
-                log.error("Failed to refresh access token for user {}: {}", userId, response.body());
-                // If token is invalid or revoked, disconnect user
+                log.error("Failed to refresh access token for store {}: {}", storeId, response.body());
                 if (response.statusCode() == 400 || response.statusCode() == 401) {
-                    syncStoreRepository.deleteById(userId);
+                    // Token is revoked — remove this specific account's store
+                    syncStoreRepository.deleteById(storeId);
                 }
                 throw new RuntimeException("Google token refresh failed: " + response.statusCode());
             }
 
             JsonNode jsonNode = objectMapper.readTree(response.body());
             String newAccessToken = jsonNode.get("access_token").asText();
-            String encryptedAccessToken = encryptionUtils.encrypt(newAccessToken);
 
-            GoogleSyncStore store = syncStoreRepository.findById(userId)
-                    .orElseThrow(() -> new IllegalArgumentException("Sync store not found for user: " + userId));
-            store.setAccessToken(encryptedAccessToken);
-            
-            // Google occasionally issues a new refresh token
+            GoogleSyncStore store = syncStoreRepository.findById(storeId)
+                    .orElseThrow(() -> new IllegalArgumentException("Sync store not found: " + storeId));
+            store.setAccessToken(encryptionUtils.encrypt(newAccessToken));
             if (jsonNode.has("refresh_token")) {
                 store.setRefreshToken(encryptionUtils.encrypt(jsonNode.get("refresh_token").asText()));
             }
 
             syncStoreRepository.save(store);
-            log.info("Successfully refreshed access token for user: {}", userId);
+            log.info("Successfully refreshed access token for store: {}", storeId);
             return newAccessToken;
 
         } catch (Exception e) {
-            log.error("Error occurred while refreshing token for user {}", userId, e);
+            log.error("Error refreshing token for store {}", storeId, e);
             throw new RuntimeException("Failed to refresh token", e);
         }
     }
 
     /**
-     * Retrieve a valid access token, refreshing it if necessary
+     * Retrieve a valid access token for the given storeId (userId:email).
      */
-    public String getValidAccessToken(String userId) {
-        GoogleSyncStore store = syncStoreRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("Google synchronization credentials not found for user: " + userId));
-
-        // If the access token is near expiry or we want to guarantee validity, we can execute the API call first
-        // and catch 401 or proactively refresh. Proactive refresh is cleaner.
-        // For simplicity, we decrypt the current access token and let the HTTP helper retry on 401.
+    public String getValidAccessToken(String storeId) {
+        GoogleSyncStore store = syncStoreRepository.findById(storeId)
+                .orElseThrow(() -> new IllegalArgumentException("Google credentials not found for store: " + storeId));
         return encryptionUtils.decrypt(store.getAccessToken());
     }
 
     /**
-     * Helper to perform HTTP request with automatic token refresh
+     * Execute an HTTP request with automatic token refresh on 401.
+     * storeId = userId:email — used to resolve credentials.
      */
-    private HttpResponse<String> executeRequestWithAuth(String userId, HttpRequest.Builder requestBuilder) throws Exception {
-        String accessToken = getValidAccessToken(userId);
+    private HttpResponse<String> executeRequestWithAuth(String storeId, HttpRequest.Builder requestBuilder) throws Exception {
+        String accessToken = getValidAccessToken(storeId);
         HttpRequest request = requestBuilder.copy()
                 .header("Authorization", "Bearer " + accessToken)
                 .build();
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() == 401) {
-            log.warn("Access token expired for user {}. Refreshing and retrying request.", userId);
-            GoogleSyncStore store = syncStoreRepository.findById(userId)
-                    .orElseThrow(() -> new IllegalArgumentException("Google sync store not found"));
-            
-            String newAccessToken = refreshAccessToken(userId, store.getRefreshToken());
-            
-            // Retry request with new token
+            log.warn("Access token expired for store {}. Refreshing and retrying.", storeId);
+            GoogleSyncStore store = syncStoreRepository.findById(storeId)
+                    .orElseThrow(() -> new IllegalArgumentException("Google sync store not found: " + storeId));
+            String newAccessToken = refreshAccessToken(storeId, store.getRefreshToken());
             HttpRequest retryRequest = requestBuilder.copy()
                     .header("Authorization", "Bearer " + newAccessToken)
                     .build();
@@ -244,16 +235,17 @@ public class GoogleCalendarClient {
     }
 
     /**
-     * Insert Event into Google Calendar
+     * Insert a new event into Google Calendar.
+     * storeId = userId:email — identifies which account's credentials to use.
      */
-    public String insertEvent(String userId, DailyTask task) throws Exception {
-        String eventJson = mapLocalToGoogleEventJson(userId, task);
+    public String insertEvent(String storeId, DailyTask task) throws Exception {
+        String eventJson = mapLocalToGoogleEventJson(storeId, task);
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create("https://www.googleapis.com/calendar/v3/calendars/primary/events"))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(eventJson));
 
-        HttpResponse<String> response = executeRequestWithAuth(userId, requestBuilder);
+        HttpResponse<String> response = executeRequestWithAuth(storeId, requestBuilder);
         if (response.statusCode() != 200 && response.statusCode() != 201) {
             log.error("Google Event insert failed: status={}, body={}", response.statusCode(), response.body());
             throw new RuntimeException("Failed to insert event to Google Calendar: " + response.body());
@@ -264,39 +256,40 @@ public class GoogleCalendarClient {
     }
 
     /**
-     * Update Event in Google Calendar
+     * Update an existing Google Calendar event by its googleEventId.
+     * storeId = userId:email — identifies which account's credentials to use.
+     * googleEventId is passed explicitly from the CalendarSyncMapping, not from task.
      */
-    public void updateEvent(String userId, DailyTask task) throws Exception {
-        if (task.getGoogleEventId() == null || task.getGoogleEventId().isBlank()) {
-            throw new IllegalArgumentException("Task has no Google Event ID for update");
+    public String updateEvent(String storeId, String googleEventId, DailyTask task) throws Exception {
+        if (googleEventId == null || googleEventId.isBlank()) {
+            throw new IllegalArgumentException("googleEventId must be provided for update");
         }
 
-        String eventJson = mapLocalToGoogleEventJson(userId, task);
+        String eventJson = mapLocalToGoogleEventJson(storeId, task);
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-                .uri(URI.create("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + task.getGoogleEventId()))
+                .uri(URI.create("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + googleEventId))
                 .header("Content-Type", "application/json")
                 .PUT(HttpRequest.BodyPublishers.ofString(eventJson));
 
-        HttpResponse<String> response = executeRequestWithAuth(userId, requestBuilder);
+        HttpResponse<String> response = executeRequestWithAuth(storeId, requestBuilder);
         if (response.statusCode() == 404) {
-            // Google event might have been deleted directly in calendar. Re-insert it.
-            log.warn("Google Event not found during update (404). Re-inserting event.");
-            String newGoogleId = insertEvent(userId, task);
-            task.setGoogleEventId(newGoogleId);
-            task.setLastSyncedAt(Instant.now());
-            return;
+            // Event was deleted in Google Calendar — re-insert it and return the new ID.
+            log.warn("Google Event {} not found during update (404). Re-inserting.", googleEventId);
+            return insertEvent(storeId, task);
         }
 
         if (response.statusCode() != 200) {
             log.error("Google Event update failed: status={}, body={}", response.statusCode(), response.body());
             throw new RuntimeException("Failed to update event in Google Calendar: " + response.body());
         }
+        return googleEventId; // unchanged
     }
 
     /**
-     * Delete Event from Google Calendar
+     * Delete an event from Google Calendar.
+     * storeId = userId:email.
      */
-    public void deleteEvent(String userId, String googleEventId) throws Exception {
+    public void deleteEvent(String storeId, String googleEventId) throws Exception {
         if (googleEventId == null || googleEventId.isBlank()) {
             return;
         }
@@ -305,7 +298,7 @@ public class GoogleCalendarClient {
                 .uri(URI.create("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + googleEventId))
                 .DELETE();
 
-        HttpResponse<String> response = executeRequestWithAuth(userId, requestBuilder);
+        HttpResponse<String> response = executeRequestWithAuth(storeId, requestBuilder);
         if (response.statusCode() != 200 && response.statusCode() != 204 && response.statusCode() != 410 && response.statusCode() != 404) {
             log.error("Google Event deletion failed: status={}, body={}", response.statusCode(), response.body());
             throw new RuntimeException("Failed to delete event from Google Calendar: " + response.body());
@@ -313,26 +306,22 @@ public class GoogleCalendarClient {
     }
 
     /**
-     * Watch events changes (Webhook setup)
+     * Register a push-notification watch channel for the given storeId.
      */
-    public WatchResponse watchCalendar(String userId, String channelId) throws Exception {
+    public WatchResponse watchCalendar(String storeId, String channelId) throws Exception {
         ObjectNode payload = objectMapper.createObjectNode();
         payload.put("id", channelId);
         payload.put("type", "web_hook");
         payload.put("address", webhookUrl);
-
-        // Optional expiration (up to 30 days, we let Google assign maximum or request a large value)
-        // Instant exp = Instant.now().plus(29, java.time.temporal.ChronoUnit.DAYS);
-        // payload.put("expiration", exp.toEpochMilli());
 
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create("https://www.googleapis.com/calendar/v3/calendars/primary/events/watch"))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(payload.toString()));
 
-        HttpResponse<String> response = executeRequestWithAuth(userId, requestBuilder);
+        HttpResponse<String> response = executeRequestWithAuth(storeId, requestBuilder);
         if (response.statusCode() != 200) {
-            log.error("Failed to watch calendar for user {}: {}", userId, response.body());
+            log.error("Failed to watch calendar for store {}: {}", storeId, response.body());
             throw new RuntimeException("Google Calendar watch failed: " + response.body());
         }
 
@@ -344,9 +333,9 @@ public class GoogleCalendarClient {
     }
 
     /**
-     * Stop a Webhook watch channel
+     * Stop a webhook watch channel.
      */
-    public void stopChannel(String userId, String channelId, String resourceId) {
+    public void stopChannel(String storeId, String channelId, String resourceId) {
         try {
             ObjectNode payload = objectMapper.createObjectNode();
             payload.put("id", channelId);
@@ -357,19 +346,20 @@ public class GoogleCalendarClient {
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(payload.toString()));
 
-            HttpResponse<String> response = executeRequestWithAuth(userId, requestBuilder);
+            HttpResponse<String> response = executeRequestWithAuth(storeId, requestBuilder);
             if (response.statusCode() != 200 && response.statusCode() != 204 && response.statusCode() != 404) {
-                log.warn("Failed to stop watch channel {} for user {}: {}", channelId, userId, response.body());
+                log.warn("Failed to stop watch channel {} for store {}: {}", channelId, storeId, response.body());
             }
         } catch (Exception e) {
-            log.warn("Exception stopped watch channel {} for user {}: {}", channelId, userId, e.getMessage());
+            log.warn("Exception stopping watch channel {} for store {}: {}", channelId, storeId, e.getMessage());
         }
     }
 
     /**
-     * List events (supports incremental sync and pagination)
+     * List calendar events with incremental-sync / pagination support.
+     * storeId = userId:email.
      */
-    public SyncEventsResponse listEvents(String userId, String syncToken, String pageToken) throws Exception {
+    public SyncEventsResponse listEvents(String storeId, String syncToken, String pageToken) throws Exception {
         StringBuilder urlBuilder = new StringBuilder("https://www.googleapis.com/calendar/v3/calendars/primary/events?maxResults=100");
         if (syncToken != null && !syncToken.isBlank() && pageToken == null) {
             urlBuilder.append("&syncToken=").append(syncToken);
@@ -382,15 +372,15 @@ public class GoogleCalendarClient {
                 .uri(URI.create(urlBuilder.toString()))
                 .GET();
 
-        HttpResponse<String> response = executeRequestWithAuth(userId, requestBuilder);
-        
+        HttpResponse<String> response = executeRequestWithAuth(storeId, requestBuilder);
+
         if (response.statusCode() == 410) {
-            log.warn("Sync token expired (410 Gone) for user: {}", userId);
+            log.warn("Sync token expired (410 Gone) for store: {}", storeId);
             return new SyncEventsResponse(Collections.emptyList(), null, null, true);
         }
 
         if (response.statusCode() != 200) {
-            log.error("Google Calendar list events failed: status={}, body={}", response.statusCode(), response.body());
+            log.error("Google Calendar listEvents failed: status={}, body={}", response.statusCode(), response.body());
             throw new RuntimeException("Google listEvents failed: " + response.body());
         }
 
@@ -409,9 +399,15 @@ public class GoogleCalendarClient {
     }
 
     /**
-     * Helper to map our local Task model into a Google Event Resource JSON representation
+     * Map a local DailyTask to a Google Event JSON payload.
+     * storeId is used to resolve the user's timezone via their UserAccount.
      */
-    private String mapLocalToGoogleEventJson(String userId, DailyTask task) throws Exception {
+    private String mapLocalToGoogleEventJson(String storeId, DailyTask task) throws Exception {
+        // Resolve userId from the store so we can look up the user's timezone preference
+        GoogleSyncStore store = syncStoreRepository.findById(storeId)
+                .orElseThrow(() -> new IllegalArgumentException("Sync store not found: " + storeId));
+        String userId = store.getUserId();
+
         ObjectNode event = objectMapper.createObjectNode();
         event.put("summary", task.getTitle());
         event.put("description", task.getNotes() != null ? task.getNotes() : "");

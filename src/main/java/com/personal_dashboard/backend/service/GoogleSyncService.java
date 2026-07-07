@@ -1,8 +1,10 @@
 package com.personal_dashboard.backend.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.personal_dashboard.backend.model.CalendarSyncMapping;
 import com.personal_dashboard.backend.model.DailyTask;
 import com.personal_dashboard.backend.model.GoogleSyncStore;
+import com.personal_dashboard.backend.repository.CalendarSyncMappingRepository;
 import com.personal_dashboard.backend.repository.DailyTaskRepository;
 import com.personal_dashboard.backend.repository.GoogleSyncStoreRepository;
 import lombok.RequiredArgsConstructor;
@@ -11,8 +13,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -29,66 +29,99 @@ public class GoogleSyncService {
     private final GoogleCalendarClient googleCalendarClient;
     private final GoogleSyncStoreRepository syncStoreRepository;
     private final DailyTaskRepository dailyTaskRepository;
+    private final CalendarSyncMappingRepository mappingRepository;
     private final ExecutorService syncExecutor = Executors.newFixedThreadPool(4);
 
+    // ─── Outbound: push local-only tasks to a specific Google account ───────────
+
     /**
-     * Pushes all local-only tasks (no googleEventId) for a user to Google Calendar.
+     * Push all tasks that have no CalendarSyncMapping for the given calendar email.
+     * Safe to call repeatedly — already-synced tasks are skipped.
      * Returns the number of tasks successfully pushed.
      */
-    public int pushLocalEventsToGoogle(String userId) {
-        log.info("Starting outbound push of local-only events for user: {}", userId);
-        List<DailyTask> unpushed = dailyTaskRepository.findByUserIdAndGoogleEventIdMissing(userId);
-        log.info("Found {} local task(s) without a Google Event ID", unpushed.size());
+    public int pushLocalEventsToGoogle(String userId, String calendarEmail) {
+        String storeId = GoogleSyncStore.storeId(userId, calendarEmail);
+        log.info("Outbound push starting: userId={} calendarEmail={}", userId, calendarEmail);
+
+        List<DailyTask> allTasks = dailyTaskRepository.findByUserId(userId);
+        log.info("Found {} total task(s) for user", allTasks.size());
 
         int pushed = 0;
-        for (DailyTask task : unpushed) {
+        for (DailyTask task : allTasks) {
+            String mappingId = CalendarSyncMapping.compositeId(task.getId(), calendarEmail);
+            if (mappingRepository.existsById(mappingId)) {
+                continue; // already synced to this account
+            }
             try {
-                String googleEventId = googleCalendarClient.insertEvent(userId, task);
+                String googleEventId = googleCalendarClient.insertEvent(storeId, task);
+                CalendarSyncMapping mapping = CalendarSyncMapping.builder()
+                        .id(mappingId)
+                        .taskId(task.getId())
+                        .userId(userId)
+                        .calendarEmail(calendarEmail)
+                        .googleEventId(googleEventId)
+                        .lastSyncedAt(Instant.now())
+                        .build();
+
                 GoogleSyncContext.setBypass(true);
                 try {
-                    task.setGoogleEventId(googleEventId);
-                    task.setLastSyncedAt(java.time.Instant.now());
+                    mappingRepository.save(mapping);
+                    task.setLastSyncedAt(Instant.now());
                     dailyTaskRepository.save(task);
                 } finally {
                     GoogleSyncContext.clear();
                 }
-                log.info("Pushed task '{}' → Google Event ID: {}", task.getTitle(), googleEventId);
+
+                log.info("Pushed task '{}' → Google Event ID: {} (account: {})", task.getTitle(), googleEventId, calendarEmail);
                 pushed++;
             } catch (Exception e) {
-                log.error("Failed to push task '{}' ({}) to Google Calendar: {}", task.getTitle(), task.getId(), e.getMessage());
+                log.error("Failed to push task '{}' ({}) to {}: {}", task.getTitle(), task.getId(), calendarEmail, e.getMessage());
             }
         }
-        log.info("Outbound push complete: {}/{} tasks pushed successfully", pushed, unpushed.size());
+        log.info("Outbound push complete: {}/{} tasks pushed to {}", pushed, allTasks.size(), calendarEmail);
         return pushed;
     }
 
+    // ─── Inbound: pull from Google Calendar ─────────────────────────────────────
+
     /**
-     * Submit an asynchronous sync request for a user
+     * Schedule an asynchronous sync for a specific Google account.
      */
-    public void triggerSyncAsync(String userId, boolean forceFullSync) {
+    public void triggerSyncAsync(String userId, String calendarEmail, boolean forceFullSync) {
         syncExecutor.submit(() -> {
             try {
-                syncCalendar(userId, forceFullSync);
+                syncCalendar(userId, calendarEmail, forceFullSync);
             } catch (Exception e) {
-                log.error("Asynchronous sync execution failed for user: {}", userId, e);
+                log.error("Async sync failed for userId={} calendarEmail={}", userId, calendarEmail, e);
             }
         });
     }
 
     /**
-     * Synchronize calendar events (supports incremental and full synchronization)
+     * Backward-compat overload: look up all accounts for the userId and sync them all.
+     * Used by the webhook controller which only knows userId (via the store).
      */
-    public synchronized void syncCalendar(String userId, boolean forceFullSync) throws Exception {
-        log.info("Starting Google Calendar sync for user: {} (forceFullSync={})", userId, forceFullSync);
-        
-        GoogleSyncStore store = syncStoreRepository.findById(userId).orElse(null);
+    public void triggerSyncAsync(String userId, boolean forceFullSync) {
+        List<GoogleSyncStore> stores = syncStoreRepository.findByUserId(userId);
+        for (GoogleSyncStore store : stores) {
+            triggerSyncAsync(userId, store.getEmail(), forceFullSync);
+        }
+    }
+
+    /**
+     * Synchronise events from one Google Calendar account (incremental or full).
+     */
+    public synchronized void syncCalendar(String userId, String calendarEmail, boolean forceFullSync) throws Exception {
+        String storeId = GoogleSyncStore.storeId(userId, calendarEmail);
+        log.info("Starting Google Calendar sync: storeId={} forceFullSync={}", storeId, forceFullSync);
+
+        GoogleSyncStore store = syncStoreRepository.findById(storeId).orElse(null);
         if (store == null) {
-            log.warn("Sync aborting. Google sync store credentials not found for user: {}", userId);
+            log.warn("Sync aborting — no credentials found for storeId: {}", storeId);
             return;
         }
 
         try {
-            // Establish ThreadLocal bypass context to prevent database writes from triggering outbound loops
             GoogleSyncContext.setBypass(true);
 
             String syncToken = forceFullSync ? null : store.getCurrentSyncToken();
@@ -98,8 +131,9 @@ public class GoogleSyncService {
             boolean syncTokenExpired = false;
 
             do {
-                GoogleCalendarClient.SyncEventsResponse response = googleCalendarClient.listEvents(userId, syncToken, pageToken);
-                
+                GoogleCalendarClient.SyncEventsResponse response =
+                        googleCalendarClient.listEvents(storeId, syncToken, pageToken);
+
                 if (response.isGone()) {
                     syncTokenExpired = true;
                     break;
@@ -113,107 +147,105 @@ public class GoogleSyncService {
             } while (pageToken != null);
 
             if (syncTokenExpired) {
-                log.warn("Sync token is invalid/expired (410 Gone) for user: {}. Rebuilding state via full sync.", userId);
-                // Clear the expired token and execute full history rebuild
+                log.warn("Sync token invalid (410 Gone) for storeId: {}. Rebuilding via full sync.", storeId);
                 store.setCurrentSyncToken(null);
                 syncStoreRepository.save(store);
-                syncCalendar(userId, true);
+                syncCalendar(userId, calendarEmail, true);
                 return;
             }
 
-            // Process Google changes
-            processGoogleEvents(userId, allGoogleEvents);
+            processGoogleEvents(userId, calendarEmail, allGoogleEvents);
 
-            // Save new sync token for future incremental syncs
             if (nextSyncToken != null) {
                 store.setCurrentSyncToken(nextSyncToken);
             }
             store.setLastSyncedAt(Instant.now());
             syncStoreRepository.save(store);
-            log.info("Successfully completed Google Calendar sync for user: {}", userId);
+            log.info("Google Calendar sync complete for storeId: {}", storeId);
 
         } finally {
             GoogleSyncContext.clear();
         }
     }
 
-    /**
-     * Process list of changed events from Google Calendar
-     */
-    private void processGoogleEvents(String userId, List<JsonNode> googleEvents) {
-        log.info("Processing {} changed event(s) from Google Calendar", googleEvents.size());
+    // ─── Internal ────────────────────────────────────────────────────────────────
+
+    private void processGoogleEvents(String userId, String calendarEmail, List<JsonNode> googleEvents) {
+        log.info("Processing {} changed event(s) from Google Calendar (account: {})", googleEvents.size(), calendarEmail);
 
         for (JsonNode eventNode : googleEvents) {
             try {
                 String googleEventId = eventNode.get("id").asText();
                 String status = eventNode.has("status") ? eventNode.get("status").asText() : "confirmed";
 
-                Optional<DailyTask> localTaskOpt = findLocalTaskByGoogleId(googleEventId, userId);
+                // Look up mapping by googleEventId + userId (account-agnostic — handles cross-account moves)
+                Optional<CalendarSyncMapping> mappingOpt = mappingRepository.findByGoogleEventIdAndUserId(googleEventId, userId);
 
-                // Handle Deleted / Cancelled events
                 if ("cancelled".equalsIgnoreCase(status)) {
-                    if (localTaskOpt.isPresent()) {
-                        log.info("Inbound sync: Deleting local task associated with cancelled Google Event: {}", googleEventId);
-                        dailyTaskRepository.delete(localTaskOpt.get());
-                    }
+                    mappingOpt.ifPresent(mapping -> {
+                        log.info("Inbound: Deleting local task for cancelled Google event: {}", googleEventId);
+                        dailyTaskRepository.deleteById(mapping.getTaskId());
+                        mappingRepository.deleteByTaskId(mapping.getTaskId());
+                    });
                     continue;
                 }
 
-                // Parse Google updated timestamp (RFC3339 format)
                 String updatedStr = eventNode.get("updated").asText();
                 Instant googleUpdated = Instant.parse(updatedStr);
 
-                // Dedup Loop Defense: Check if local modification occurred within a tight buffer window
-                if (localTaskOpt.isPresent()) {
-                    DailyTask localTask = localTaskOpt.get();
-                    Instant lastSynced = localTask.getLastSyncedAt();
-                    
-                    if (lastSynced != null) {
-                        long diffMs = Math.abs(googleUpdated.toEpochMilli() - lastSynced.toEpochMilli());
+                if (mappingOpt.isPresent()) {
+                    CalendarSyncMapping mapping = mappingOpt.get();
+
+                    // Dedup: skip if the update is our own echo
+                    if (mapping.getLastSyncedAt() != null) {
+                        long diffMs = Math.abs(googleUpdated.toEpochMilli() - mapping.getLastSyncedAt().toEpochMilli());
                         if (diffMs < 5000) {
-                            // If the change occurred within 5 seconds, it is highly likely our own outbound write echoed back.
-                            log.info("Inbound sync: Discarding duplicate update for event {} (Time difference: {} ms)", googleEventId, diffMs);
+                            log.info("Inbound: Skipping duplicate echo for event {} (diff {}ms)", googleEventId, diffMs);
                             continue;
                         }
                     }
-                    
-                    // Update existing task
-                    log.info("Inbound sync: Updating local task for event: {}", googleEventId);
-                    mapGoogleEventToLocal(eventNode, localTask);
-                    localTask.setLastSyncedAt(Instant.now());
-                    dailyTaskRepository.save(localTask);
+
+                    DailyTask task = dailyTaskRepository.findById(mapping.getTaskId()).orElse(null);
+                    if (task != null) {
+                        log.info("Inbound: Updating local task {} for event {}", task.getId(), googleEventId);
+                        mapGoogleEventToLocal(eventNode, task);
+                        task.setLastSyncedAt(Instant.now());
+                        dailyTaskRepository.save(task);
+                        mapping.setLastSyncedAt(Instant.now());
+                        mappingRepository.save(mapping);
+                    }
                 } else {
-                    // Create new task
-                    log.info("Inbound sync: Creating new local task for event: {}", googleEventId);
+                    // No mapping — create a new local task and mapping
+                    log.info("Inbound: Creating new local task for event: {}", googleEventId);
                     DailyTask newTask = new DailyTask();
                     newTask.setUserId(userId);
-                    newTask.setGoogleEventId(googleEventId);
                     newTask.setItemType("TASK");
                     newTask.setCategory("Personal");
                     newTask.setColor("#c9bff6");
-                    
                     mapGoogleEventToLocal(eventNode, newTask);
                     newTask.setLastSyncedAt(Instant.now());
                     dailyTaskRepository.save(newTask);
+
+                    CalendarSyncMapping newMapping = CalendarSyncMapping.builder()
+                            .id(CalendarSyncMapping.compositeId(newTask.getId(), calendarEmail))
+                            .taskId(newTask.getId())
+                            .userId(userId)
+                            .calendarEmail(calendarEmail)
+                            .googleEventId(googleEventId)
+                            .lastSyncedAt(Instant.now())
+                            .build();
+                    mappingRepository.save(newMapping);
                 }
 
             } catch (Exception e) {
-                log.error("Failed to process Google event item: {}", eventNode, e);
+                log.error("Failed to process Google event: {}", eventNode, e);
             }
         }
     }
 
-    private Optional<DailyTask> findLocalTaskByGoogleId(String googleEventId, String userId) {
-        return dailyTaskRepository.findByGoogleEventIdAndUserId(googleEventId, userId);
-    }
-
-    /**
-     * Map Google Event Resource values to local DailyTask entity
-     */
     private void mapGoogleEventToLocal(JsonNode eventNode, DailyTask task) {
         String summary = eventNode.has("summary") ? eventNode.get("summary").asText() : "Google Calendar Event";
         String description = eventNode.has("description") ? eventNode.get("description").asText() : "";
-
         task.setTitle(summary);
         task.setNotes(description);
 
@@ -224,41 +256,30 @@ public class GoogleSyncService {
                 task.setColor(hexColor);
                 task.setCategory(getCategoryFromGoogleColor(colorId));
             }
-        } else {
-            if (task.getColor() == null) {
-                task.setColor("#6d28d9"); // Default personal brand color
-                task.setCategory("Personal");
-            }
+        } else if (task.getColor() == null) {
+            task.setColor("#6d28d9");
+            task.setCategory("Personal");
         }
 
         JsonNode startNode = eventNode.get("start");
         JsonNode endNode = eventNode.get("end");
 
         if (startNode.has("date")) {
-            // All-day event
-            LocalDate startDate = LocalDate.parse(startNode.get("date").asText());
-            task.setDate(startDate);
+            task.setDate(LocalDate.parse(startNode.get("date").asText()));
             task.setAllDay(true);
             task.setStartTime(null);
             task.setEndTime(null);
             task.setScheduledTime(null);
         } else if (startNode.has("dateTime")) {
-            // Timed event
-            String startDateTimeStr = startNode.get("dateTime").asText();
-            ZonedDateTime zdt = ZonedDateTime.parse(startDateTimeStr);
-            
+            ZonedDateTime zdt = ZonedDateTime.parse(startNode.get("dateTime").asText());
             task.setDate(zdt.toLocalDate());
             task.setAllDay(false);
-
-            // Format start time as HH:mm
             String startTime = zdt.format(DateTimeFormatter.ofPattern("HH:mm"));
             task.setStartTime(startTime);
             task.setScheduledTime(startTime);
-
             if (endNode != null && endNode.has("dateTime")) {
-                ZonedDateTime endZdt = ZonedDateTime.parse(endNode.get("dateTime").asText());
-                String endTime = endZdt.format(DateTimeFormatter.ofPattern("HH:mm"));
-                task.setEndTime(endTime);
+                task.setEndTime(ZonedDateTime.parse(endNode.get("dateTime").asText())
+                        .format(DateTimeFormatter.ofPattern("HH:mm")));
             }
         }
     }
@@ -266,30 +287,30 @@ public class GoogleSyncService {
     private String getGoogleColorHex(String colorId) {
         if (colorId == null) return null;
         return switch (colorId) {
-            case "1" -> "#a4bdfc"; // Lavender
-            case "2" -> "#7ae7bf"; // Sage
-            case "3" -> "#dbadff"; // Grape
-            case "4" -> "#ff887c"; // Flamingo
-            case "5" -> "#fbd75b"; // Banana / Yellow
-            case "6" -> "#ffb878"; // Tangerine
-            case "7" -> "#46d6db"; // Peacock
-            case "8" -> "#e1e1e1"; // Graphite
-            case "9" -> "#5484ed"; // Blueberry
-            case "10" -> "#51b749"; // Basil
-            case "11" -> "#dc2127"; // Tomato
-            default -> null;
+            case "1"  -> "#a4bdfc";
+            case "2"  -> "#7ae7bf";
+            case "3"  -> "#dbadff";
+            case "4"  -> "#ff887c";
+            case "5"  -> "#fbd75b";
+            case "6"  -> "#ffb878";
+            case "7"  -> "#46d6db";
+            case "8"  -> "#e1e1e1";
+            case "9"  -> "#5484ed";
+            case "10" -> "#51b749";
+            case "11" -> "#dc2127";
+            default   -> null;
         };
     }
 
     private String getCategoryFromGoogleColor(String colorId) {
         if (colorId == null) return "Personal";
         return switch (colorId) {
-            case "1", "4" -> "Social";
+            case "1", "4"       -> "Social";
             case "2", "7", "10" -> "Health";
-            case "3" -> "Learning";
-            case "5", "6" -> "Finance";
+            case "3"            -> "Learning";
+            case "5", "6"       -> "Finance";
             case "8", "9", "11" -> "Work";
-            default -> "Personal";
+            default             -> "Personal";
         };
     }
 }

@@ -2,7 +2,9 @@ package com.personal_dashboard.backend.controller;
 
 import com.personal_dashboard.backend.dto.ApiMeta;
 import com.personal_dashboard.backend.dto.ApiResponse;
+import com.personal_dashboard.backend.model.CalendarSyncMapping;
 import com.personal_dashboard.backend.model.GoogleSyncStore;
+import com.personal_dashboard.backend.repository.CalendarSyncMappingRepository;
 import com.personal_dashboard.backend.repository.GoogleSyncStoreRepository;
 import com.personal_dashboard.backend.security.UserContext;
 import com.personal_dashboard.backend.service.GoogleCalendarClient;
@@ -16,27 +18,25 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/google-calendar")
 @RequiredArgsConstructor
-@Tag(name = "Google Calendar Sync Auth", description = "OAuth authentication and channel management for Google Calendar")
+@Tag(name = "Google Calendar Sync", description = "Multi-account OAuth and sync management for Google Calendar")
 @Slf4j
 public class GoogleOAuthController {
 
     private final GoogleCalendarClient googleCalendarClient;
     private final GoogleSyncService googleSyncService;
     private final GoogleSyncStoreRepository syncStoreRepository;
+    private final CalendarSyncMappingRepository mappingRepository;
     private final EncryptionUtils encryptionUtils;
 
     @Value("${google.calendar.client-id}")
@@ -45,243 +45,241 @@ public class GoogleOAuthController {
     @Value("${google.calendar.redirect-uri}")
     private String redirectUri;
 
+    // ─── OAuth flow ──────────────────────────────────────────────────────────────
+
     @GetMapping("/auth/url")
-    @Operation(summary = "Get OAuth Redirect URL", description = "Generates the Google OAuth authorization consent redirect URL")
+    @Operation(summary = "Get OAuth URL", description = "Returns the Google OAuth consent-screen URL to connect a new account")
     public ResponseEntity<ApiResponse<Map<String, String>>> getAuthUrl() {
         String userId = UserContext.getRequiredUserId();
-        
+
         String authUrl = String.format(
-                "https://accounts.google.com/o/oauth2/v2/auth?client_id=%s&redirect_uri=%s&response_type=code" +
-                        "&scope=https://www.googleapis.com/auth/calendar&access_type=offline&prompt=consent&state=%s",
+                "https://accounts.google.com/o/oauth2/v2/auth?client_id=%s&redirect_uri=%s&response_type=code"
+                        + "&scope=https://www.googleapis.com/auth/calendar"
+                        + "&access_type=offline&prompt=consent&state=%s",
                 clientId, redirectUri, userId
         );
 
-        ApiMeta meta = ApiMeta.builder()
-                .requestId(UUID.randomUUID().toString())
-                .timestamp(Instant.now().toString())
-                .source("google-calendar-auth-url")
-                .build();
-
-        return ResponseEntity.ok(ApiResponse.<Map<String, String>>builder()
-                .data(Map.of("url", authUrl))
-                .meta(meta)
-                .build());
+        return ok("google-calendar-auth-url", Map.of("url", authUrl));
     }
 
     @GetMapping(value = "/auth/callback", produces = MediaType.TEXT_HTML_VALUE)
-    @Operation(summary = "OAuth Callback Endpoint", description = "Callback landing page redirected from Google")
+    @Operation(summary = "OAuth Callback", description = "Google redirects here after the user grants consent")
     public ResponseEntity<String> oAuthCallback(
             @RequestParam("code") String code,
             @RequestParam("state") String userId) {
-        
-        log.info("Google OAuth callback received code for user: {}", userId);
+
+        log.info("Google OAuth callback received for user: {}", userId);
         try {
-            // Exchange code for Access and Refresh tokens
             GoogleCalendarClient.OAuthTokens tokens = googleCalendarClient.exchangeCode(code);
             String email = googleCalendarClient.getUserEmail(tokens.getAccessToken());
+            String storeId = GoogleSyncStore.storeId(userId, email);
 
-            // Build/Update GoogleSyncStore
-            GoogleSyncStore store = syncStoreRepository.findById(userId)
-                    .orElse(new GoogleSyncStore());
-            
+            GoogleSyncStore store = syncStoreRepository.findById(storeId).orElse(new GoogleSyncStore());
+            store.setId(storeId);
             store.setUserId(userId);
             store.setEmail(email);
             store.setAccessToken(encryptionUtils.encrypt(tokens.getAccessToken()));
             if (tokens.getRefreshToken() != null) {
                 store.setRefreshToken(encryptionUtils.encrypt(tokens.getRefreshToken()));
             }
-
-            // Save credentials first to make them available for watchCalendar call
+            // Reset sync token so a full re-sync runs for this account
+            store.setCurrentSyncToken(null);
             syncStoreRepository.save(store);
 
-            // Immediately register Google Calendar web hook watcher
+            // Register webhook watch for this account
             String channelId = UUID.randomUUID().toString();
-            GoogleCalendarClient.WatchResponse watchResponse = googleCalendarClient.watchCalendar(userId, channelId);
-
+            GoogleCalendarClient.WatchResponse watchResponse = googleCalendarClient.watchCalendar(storeId, channelId);
             store.setWebhookChannelId(watchResponse.getChannelId());
             store.setWebhookResourceId(watchResponse.getResourceId());
             store.setWebhookExpiration(watchResponse.getExpiration());
-
             syncStoreRepository.save(store);
 
-            // Trigger initial history synchronization asynchronously
-            googleSyncService.triggerSyncAsync(userId, true);
+            // Trigger full pull-sync asynchronously
+            googleSyncService.triggerSyncAsync(userId, email, true);
 
-            String htmlSuccess = "<html>" +
-                    "<head>" +
-                    "<title>Authentication Successful</title>" +
-                    "<style>" +
-                    "  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; text-align: center; padding: 50px; background-color: #1e1e1e; color: #fff; }" +
-                    "  .card { background: rgba(255, 255, 255, 0.05); padding: 40px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5); backdrop-filter: blur(10px); }" +
-                    "  h1 { color: #4CAF50; margin-bottom: 10px; }" +
-                    "  p { color: #ccc; margin-bottom: 30px; }" +
-                    "  .btn { background: #4CAF50; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 16px; cursor: pointer; text-decoration: none; }" +
-                    "  .btn:hover { background: #45a049; }" +
-                    "</style>" +
-                    "</head>" +
-                    "<body>" +
-                    "<div class='card'>" +
-                    "  <h1>Connection Successful!</h1>" +
-                    "  <p>Your Google Calendar has been securely synced with your dashboard. You can close this window now.</p>" +
-                    "  <button class='btn' onclick='window.close()'>Close Window</button>" +
-                    "</div>" +
-                    "<script>" +
-                    "  if (window.opener) {" +
-                    "    window.opener.postMessage({ type: 'GOOGLE_CALENDAR_CONNECTED', status: 'success' }, '*');" +
-                    "  }" +
-                    "  setTimeout(function() { window.close(); }, 3000);" +
-                    "</script>" +
-                    "</body>" +
-                    "</html>";
-
-            return ResponseEntity.ok(htmlSuccess);
+            return ResponseEntity.ok(successHtml(email));
 
         } catch (Exception e) {
-            log.error("Google OAuth callback exchange failed for user {}", userId, e);
-            String htmlFailure = "<html>" +
-                    "<head>" +
-                    "<title>Authentication Failed</title>" +
-                    "<style>" +
-                    "  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; text-align: center; padding: 50px; background-color: #1e1e1e; color: #fff; }" +
-                    "  .card { background: rgba(255, 255, 255, 0.05); padding: 40px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5); backdrop-filter: blur(10px); }" +
-                    "  h1 { color: #f44336; margin-bottom: 10px; }" +
-                    "  p { color: #ccc; margin-bottom: 30px; }" +
-                    "  .btn { background: #f44336; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 16px; cursor: pointer; text-decoration: none; }" +
-                    "</style>" +
-                    "</head>" +
-                    "<body>" +
-                    "<div class='card'>" +
-                    "  <h1>Connection Failed</h1>" +
-                    "  <p>An error occurred while linking your Google account. Please try again.</p>" +
-                    "  <button class='btn' onclick='window.close()'>Close Window</button>" +
-                    "</div>" +
-                    "</body>" +
-                    "</html>";
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(htmlFailure);
+            log.error("Google OAuth callback failed for user {}", userId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorHtml());
         }
     }
+
+    // ─── Status ──────────────────────────────────────────────────────────────────
 
     @GetMapping("/auth/status")
-    @Operation(summary = "Get Connection Status", description = "Checks whether the user's account is connected to Google Calendar")
+    @Operation(summary = "Get Connected Accounts", description = "Returns all Google Calendar accounts connected by this user")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getStatus() {
         String userId = UserContext.getRequiredUserId();
-        Optional<GoogleSyncStore> storeOpt = syncStoreRepository.findById(userId);
+        List<GoogleSyncStore> stores = syncStoreRepository.findByUserId(userId);
 
-        ApiMeta meta = ApiMeta.builder()
-                .requestId(UUID.randomUUID().toString())
-                .timestamp(Instant.now().toString())
-                .source("google-calendar-auth-status")
-                .build();
+        List<Map<String, Object>> accounts = stores.stream().map(s -> {
+            Map<String, Object> a = new HashMap<>();
+            a.put("email", s.getEmail());
+            a.put("lastSyncedAt", s.getLastSyncedAt() != null ? s.getLastSyncedAt().toString() : "");
+            a.put("webhookExpiration", s.getWebhookExpiration() != null ? s.getWebhookExpiration().toString() : "");
+            return a;
+        }).toList();
 
-        if (storeOpt.isEmpty()) {
-            return ResponseEntity.ok(ApiResponse.<Map<String, Object>>builder()
-                    .data(Map.of("connected", false))
-                    .meta(meta)
-                    .build());
-        }
+        Map<String, Object> data = new HashMap<>();
+        data.put("connected", !accounts.isEmpty());
+        data.put("accounts", accounts);
+        // Convenience for legacy callers that expected a single "email" field
+        data.put("email", accounts.isEmpty() ? "" : accounts.get(0).get("email"));
 
-        GoogleSyncStore store = storeOpt.get();
-        Map<String, Object> data = Map.of(
-                "connected", true,
-                "email", store.getEmail() != null ? store.getEmail() : "Google Calendar Account",
-                "lastSyncedAt", store.getLastSyncedAt() != null ? store.getLastSyncedAt().toString() : "",
-                "webhookExpiration", store.getWebhookExpiration() != null ? store.getWebhookExpiration().toString() : ""
-        );
-
-        return ResponseEntity.ok(ApiResponse.<Map<String, Object>>builder()
-                .data(data)
-                .meta(meta)
-                .build());
+        return ok("google-calendar-auth-status", data);
     }
+
+    // ─── Disconnect ───────────────────────────────────────────────────────────────
 
     @PostMapping("/auth/disconnect")
-    @Operation(summary = "Disconnect Google Calendar", description = "Removes Google Calendar credentials and stops webhook watcher")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> disconnect() {
-        String userId = UserContext.getRequiredUserId();
-        GoogleSyncStore store = syncStoreRepository.findById(userId).orElse(null);
+    @Operation(summary = "Disconnect a Google Account",
+               description = "Pass ?email=... to disconnect a specific account; omit to disconnect all")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> disconnect(
+            @RequestParam(value = "email", required = false) String email) {
 
+        String userId = UserContext.getRequiredUserId();
+
+        if (email != null && !email.isBlank()) {
+            disconnectOne(userId, email.trim());
+            return ok("google-calendar-disconnect", Map.of("status", "disconnected", "email", email.trim()));
+        } else {
+            List<GoogleSyncStore> stores = syncStoreRepository.findByUserId(userId);
+            for (GoogleSyncStore store : stores) {
+                disconnectOne(userId, store.getEmail());
+            }
+            return ok("google-calendar-disconnect", Map.of("status", "disconnected_all"));
+        }
+    }
+
+    private void disconnectOne(String userId, String email) {
+        String storeId = GoogleSyncStore.storeId(userId, email);
+        GoogleSyncStore store = syncStoreRepository.findById(storeId).orElse(null);
         if (store != null) {
             if (store.getWebhookChannelId() != null && store.getWebhookResourceId() != null) {
-                // Stop watching channel asynchronously
-                final String channelId = store.getWebhookChannelId();
-                final String resourceId = store.getWebhookResourceId();
-                new Thread(() -> googleCalendarClient.stopChannel(userId, channelId, resourceId)).start();
+                new Thread(() -> googleCalendarClient.stopChannel(storeId, store.getWebhookChannelId(), store.getWebhookResourceId())).start();
             }
-            syncStoreRepository.deleteById(userId);
-            log.info("Disconnected Google Calendar for user: {}", userId);
+            syncStoreRepository.deleteById(storeId);
+            // Mappings are intentionally kept: if user reconnects this same account,
+            // events are matched without creating duplicates.
+            log.info("Disconnected Google Calendar account {} for user {}", email, userId);
         }
-
-        ApiMeta meta = ApiMeta.builder()
-                .requestId(UUID.randomUUID().toString())
-                .timestamp(Instant.now().toString())
-                .source("google-calendar-disconnect")
-                .build();
-
-        return ResponseEntity.ok(ApiResponse.<Map<String, Object>>builder()
-                .data(Map.of("status", "disconnected"))
-                .meta(meta)
-                .build());
     }
+
+    // ─── Pull sync ────────────────────────────────────────────────────────────────
 
     @PostMapping("/sync")
-    @Operation(summary = "Manually Trigger Sync", description = "Manually request an incremental sync sequence")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> triggerManualSync() {
+    @Operation(summary = "Trigger Pull Sync",
+               description = "Pull latest events from Google Calendar. Pass ?email=... for a specific account, omit for all.")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> triggerManualSync(
+            @RequestParam(value = "email", required = false) String email) {
+
         String userId = UserContext.getRequiredUserId();
-        googleSyncService.triggerSyncAsync(userId, false);
 
-        ApiMeta meta = ApiMeta.builder()
-                .requestId(UUID.randomUUID().toString())
-                .timestamp(Instant.now().toString())
-                .source("google-calendar-sync")
-                .build();
+        if (email != null && !email.isBlank()) {
+            googleSyncService.triggerSyncAsync(userId, email.trim(), false);
+            return ok("google-calendar-sync", Map.of("status", "sync_scheduled", "email", email.trim()));
+        } else {
+            googleSyncService.triggerSyncAsync(userId, false);
+            return ok("google-calendar-sync", Map.of("status", "sync_scheduled_all"));
+        }
+    }
 
-        return ResponseEntity.ok(ApiResponse.<Map<String, Object>>builder()
-                .data(Map.of("status", "sync_scheduled"))
-                .meta(meta)
+    // ─── Push local ───────────────────────────────────────────────────────────────
+
+    @PostMapping("/push-local")
+    @Operation(summary = "Push Local Events to Google Calendar",
+               description = "Pushes tasks without a mapping for the given account. "
+                           + "Pass ?email=... for a specific account, omit to push to all connected accounts.")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> pushLocalEvents(
+            @RequestParam(value = "email", required = false) String email) {
+
+        String userId = UserContext.getRequiredUserId();
+        List<GoogleSyncStore> stores = syncStoreRepository.findByUserId(userId);
+
+        if (stores.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.PRECONDITION_FAILED)
+                    .body(errorResponse("push-local", "No Google Calendar accounts connected"));
+        }
+
+        List<GoogleSyncStore> targets = (email != null && !email.isBlank())
+                ? stores.stream().filter(s -> s.getEmail().equalsIgnoreCase(email.trim())).toList()
+                : stores;
+
+        if (targets.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(errorResponse("push-local", "Account not found: " + email));
+        }
+
+        Map<String, Object> results = new HashMap<>();
+        int totalPushed = 0;
+        for (GoogleSyncStore store : targets) {
+            try {
+                int pushed = googleSyncService.pushLocalEventsToGoogle(userId, store.getEmail());
+                results.put(store.getEmail(), pushed);
+                totalPushed += pushed;
+            } catch (Exception e) {
+                log.error("Push-local failed for account {}: {}", store.getEmail(), e.getMessage(), e);
+                results.put(store.getEmail(), "error: " + e.getMessage());
+            }
+        }
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("status", "ok");
+        data.put("totalPushed", totalPushed);
+        data.put("byAccount", results);
+        return ok("google-calendar-push-local", data);
+    }
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+    private <T> ResponseEntity<ApiResponse<T>> ok(String source, T data) {
+        return ResponseEntity.ok(ApiResponse.<T>builder()
+                .data(data)
+                .meta(ApiMeta.builder()
+                        .requestId(UUID.randomUUID().toString())
+                        .timestamp(Instant.now().toString())
+                        .source(source)
+                        .build())
                 .build());
     }
 
-    @PostMapping("/push-local")
-    @Operation(summary = "Push Local Events to Google Calendar", description = "Finds all local tasks without a Google Event ID and pushes them to Google Calendar")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> pushLocalEvents() {
-        String userId = UserContext.getRequiredUserId();
+    private ApiResponse<Map<String, Object>> errorResponse(String source, String message) {
+        return ApiResponse.<Map<String, Object>>builder()
+                .data(Map.of("error", message))
+                .meta(ApiMeta.builder()
+                        .requestId(UUID.randomUUID().toString())
+                        .timestamp(Instant.now().toString())
+                        .source(source)
+                        .build())
+                .build();
+    }
 
-        if (!syncStoreRepository.existsById(userId)) {
-            return ResponseEntity.status(HttpStatus.PRECONDITION_FAILED)
-                    .body(ApiResponse.<Map<String, Object>>builder()
-                            .data(Map.of("error", "Google Calendar not connected"))
-                            .meta(ApiMeta.builder()
-                                    .requestId(UUID.randomUUID().toString())
-                                    .timestamp(Instant.now().toString())
-                                    .source("google-calendar-push-local")
-                                    .build())
-                            .build());
-        }
+    private String successHtml(String email) {
+        return "<html><head><title>Connected</title><style>"
+                + "body{font-family:-apple-system,sans-serif;text-align:center;padding:50px;background:#1e1e1e;color:#fff}"
+                + ".card{background:rgba(255,255,255,.05);padding:40px;border-radius:12px;display:inline-block}"
+                + "h1{color:#4CAF50}p{color:#ccc;margin-bottom:30px}"
+                + ".btn{background:#4CAF50;color:#fff;border:none;padding:12px 24px;border-radius:6px;font-size:16px;cursor:pointer}"
+                + "</style></head><body><div class='card'>"
+                + "<h1>Connected!</h1>"
+                + "<p>" + email + " is now synced with your dashboard.</p>"
+                + "<button class='btn' onclick='window.close()'>Close Window</button>"
+                + "</div><script>"
+                + "if(window.opener){window.opener.postMessage({type:'GOOGLE_CALENDAR_CONNECTED',status:'success',email:'" + email + "'},'*');}"
+                + "setTimeout(function(){window.close();},3000);"
+                + "</script></body></html>";
+    }
 
-        try {
-            int pushed = googleSyncService.pushLocalEventsToGoogle(userId);
-
-            ApiMeta meta = ApiMeta.builder()
-                    .requestId(UUID.randomUUID().toString())
-                    .timestamp(Instant.now().toString())
-                    .source("google-calendar-push-local")
-                    .build();
-
-            return ResponseEntity.ok(ApiResponse.<Map<String, Object>>builder()
-                    .data(Map.of("status", "ok", "pushed", pushed))
-                    .meta(meta)
-                    .build());
-        } catch (Exception e) {
-            log.error("Failed to push local events to Google Calendar for user {}: {}", userId, e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.<Map<String, Object>>builder()
-                            .data(Map.of("error", "Push failed: " + e.getMessage()))
-                            .meta(ApiMeta.builder()
-                                    .requestId(UUID.randomUUID().toString())
-                                    .timestamp(Instant.now().toString())
-                                    .source("google-calendar-push-local")
-                                    .build())
-                            .build());
-        }
+    private String errorHtml() {
+        return "<html><head><title>Failed</title><style>"
+                + "body{font-family:-apple-system,sans-serif;text-align:center;padding:50px;background:#1e1e1e;color:#fff}"
+                + ".card{background:rgba(255,255,255,.05);padding:40px;border-radius:12px;display:inline-block}"
+                + "h1{color:#f44336}p{color:#ccc;margin-bottom:30px}"
+                + ".btn{background:#f44336;color:#fff;border:none;padding:12px 24px;border-radius:6px;cursor:pointer}"
+                + "</style></head><body><div class='card'>"
+                + "<h1>Connection Failed</h1><p>An error occurred. Please try again.</p>"
+                + "<button class='btn' onclick='window.close()'>Close</button>"
+                + "</div></body></html>";
     }
 }

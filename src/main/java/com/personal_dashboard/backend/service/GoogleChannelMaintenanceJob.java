@@ -40,16 +40,16 @@ public class GoogleChannelMaintenanceJob {
                         store.getUserId(), expiration);
 
                 try {
-                    String userId = store.getUserId();
-                    
+                    String storeId = store.getId();
+
                     // Stop current channel if active
                     if (store.getWebhookChannelId() != null && store.getWebhookResourceId() != null) {
-                        googleCalendarClient.stopChannel(userId, store.getWebhookChannelId(), store.getWebhookResourceId());
+                        googleCalendarClient.stopChannel(storeId, store.getWebhookChannelId(), store.getWebhookResourceId());
                     }
 
                     // Register new watch channel
                     String newChannelId = UUID.randomUUID().toString();
-                    GoogleCalendarClient.WatchResponse watchResponse = googleCalendarClient.watchCalendar(userId, newChannelId);
+                    GoogleCalendarClient.WatchResponse watchResponse = googleCalendarClient.watchCalendar(storeId, newChannelId);
 
                     // Update store with new subscription
                     store.setWebhookChannelId(watchResponse.getChannelId());
