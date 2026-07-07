@@ -12,4 +12,8 @@ import lombok.NoArgsConstructor;
 public class DailyLogRequest {
 
     private String moodRating;
+
+    private Integer moodScore;
+
+    private String moodNote;
 }

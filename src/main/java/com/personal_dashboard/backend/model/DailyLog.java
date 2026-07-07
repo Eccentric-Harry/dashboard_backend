@@ -35,6 +35,11 @@ public class DailyLog implements UserOwnedDocument {
 
     private String moodRating;
 
+    // Mind tab check-in: a 1–5 mood score and an optional note.
+    private Integer moodScore;
+
+    private String moodNote;
+
     @CreatedDate
     private Instant createdAt;
 
