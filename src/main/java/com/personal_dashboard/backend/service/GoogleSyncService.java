@@ -206,11 +206,38 @@ public class GoogleSyncService {
 
                 String updatedStr = eventNode.get("updated").asText();
                 Instant googleUpdated = Instant.parse(updatedStr);
+                String iCalUID = readText(eventNode, "iCalUID");
 
-                if (mappingOpt.isPresent()) {
-                    CalendarSyncMapping mapping = mappingOpt.get();
+                // ── Dedup precedence: googleEventId → iCalUID → create ──────────────────
+                // Matching on googleEventId alone duplicates shared invites, so fall back
+                // to the RFC 5545 iCalUID (which is stable across calendars/accounts)
+                // before ever creating a new local task. Both lookups include tombstones.
+                CalendarSyncMapping mapping = mappingOpt.orElse(null);
+                DailyTask existingTask = null;
+                if (mapping != null) {
+                    existingTask = dailyTaskRepository.findById(mapping.getTaskId()).orElse(null);
+                } else if (iCalUID != null) {
+                    existingTask = dailyTaskRepository.findByUserAndICalUID(userId, iCalUID)
+                            .stream().findFirst().orElse(null);
+                }
 
-                    // Dedup: skip if the update is our own echo
+                // ── Resurrection guard ─────────────────────────────────────────────────
+                // A match that is tombstoned is NEVER revived or duplicated, even on a full
+                // 410 resync. Ensure a CANCELLED mapping links this googleEventId so the
+                // next pull short-circuits on it, then skip.
+                if (existingTask != null && Boolean.TRUE.equals(existingTask.getDeleted())) {
+                    log.info("Inbound: Event {} resolves to tombstoned task {} (matched by {}). Leaving deleted — no resurrection.",
+                            googleEventId, existingTask.getId(), mapping != null ? "googleEventId" : "iCalUID");
+                    if (mapping == null) {
+                        mappingRepository.save(newMapping(existingTask.getId(), userId, calendarEmail,
+                                googleEventId, readText(eventNode, "etag"), "CANCELLED"));
+                    }
+                    continue;
+                }
+
+                if (mapping != null && existingTask != null) {
+                    // ── Update existing copy (matched by googleEventId) ─────────────────
+                    // Skip our own echo (a write we just pushed coming back).
                     if (mapping.getLastSyncedAt() != null) {
                         long diffMs = Math.abs(googleUpdated.toEpochMilli() - mapping.getLastSyncedAt().toEpochMilli());
                         if (diffMs < 5000) {
@@ -218,23 +245,31 @@ public class GoogleSyncService {
                             continue;
                         }
                     }
+                    // LWW groundwork (enforcement lands in the conflict-resolution commit):
+                    // log both clocks on every inbound apply so google-vs-local skew is
+                    // debuggable. These are DIFFERENT clocks — do not compare for equality.
+                    log.info("Inbound: Updating local task {} for event {} [googleUpdated={} localUpdatedAt={}]",
+                            existingTask.getId(), googleEventId, googleUpdated, existingTask.getUpdatedAt());
+                    mapGoogleEventToLocal(eventNode, existingTask);
+                    existingTask.setLastSyncedAt(Instant.now());
+                    dailyTaskRepository.save(existingTask);
+                    mapping.setEtag(readText(eventNode, "etag"));
+                    mapping.setLastSyncedAt(Instant.now());
+                    mappingRepository.save(mapping);
 
-                    DailyTask task = dailyTaskRepository.findById(mapping.getTaskId()).orElse(null);
-                    if (task != null) {
-                        // LWW groundwork (enforcement lands in the conflict-resolution commit):
-                        // log both clocks on every inbound apply so google-vs-local skew is
-                        // debuggable. These are DIFFERENT clocks — do not compare for equality.
-                        log.info("Inbound: Updating local task {} for event {} [googleUpdated={} localUpdatedAt={}]",
-                                task.getId(), googleEventId, googleUpdated, task.getUpdatedAt());
-                        mapGoogleEventToLocal(eventNode, task);
-                        task.setLastSyncedAt(Instant.now());
-                        dailyTaskRepository.save(task);
-                        mapping.setEtag(readText(eventNode, "etag"));
-                        mapping.setLastSyncedAt(Instant.now());
-                        mappingRepository.save(mapping);
-                    }
+                } else if (existingTask != null) {
+                    // ── Link only (matched by iCalUID, no mapping for this account) ─────
+                    // A shared invite already known locally under another account. Link this
+                    // account's copy to the existing task instead of creating a duplicate;
+                    // do NOT overwrite task content here (cross-account merge belongs to the
+                    // conflict-resolution commit).
+                    log.info("Inbound: Linking event {} to existing task {} by iCalUID (shared invite — no duplicate).",
+                            googleEventId, existingTask.getId());
+                    mappingRepository.save(newMapping(existingTask.getId(), userId, calendarEmail,
+                            googleEventId, readText(eventNode, "etag"), "SYNCED"));
+
                 } else {
-                    // No mapping — create a new local task and mapping
+                    // ── Create a new local task + mapping ───────────────────────────────
                     log.info("Inbound: Creating new local task for event: {}", googleEventId);
                     DailyTask newTask = new DailyTask();
                     newTask.setUserId(userId);
@@ -247,16 +282,8 @@ public class GoogleSyncService {
                     newTask.setLastSyncedAt(Instant.now());
                     dailyTaskRepository.save(newTask);
 
-                    CalendarSyncMapping newMapping = CalendarSyncMapping.builder()
-                            .id(CalendarSyncMapping.compositeId(newTask.getId(), calendarEmail))
-                            .taskId(newTask.getId())
-                            .userId(userId)
-                            .calendarEmail(calendarEmail)
-                            .googleEventId(googleEventId)
-                            .etag(readText(eventNode, "etag"))
-                            .lastSyncedAt(Instant.now())
-                            .build();
-                    mappingRepository.save(newMapping);
+                    mappingRepository.save(newMapping(newTask.getId(), userId, calendarEmail,
+                            googleEventId, readText(eventNode, "etag"), "SYNCED"));
                 }
 
             } catch (Exception e) {
@@ -311,6 +338,21 @@ public class GoogleSyncService {
                         .format(DateTimeFormatter.ofPattern("HH:mm")));
             }
         }
+    }
+
+    /** Builds a CalendarSyncMapping linking a local task to a remote copy. */
+    private CalendarSyncMapping newMapping(String taskId, String userId, String calendarEmail,
+                                           String googleEventId, String etag, String syncState) {
+        return CalendarSyncMapping.builder()
+                .id(CalendarSyncMapping.compositeId(taskId, calendarEmail))
+                .taskId(taskId)
+                .userId(userId)
+                .calendarEmail(calendarEmail)
+                .googleEventId(googleEventId)
+                .etag(etag)
+                .syncState(syncState)
+                .lastSyncedAt(Instant.now())
+                .build();
     }
 
     /** Null-safe text extraction: returns null for missing, null, or blank nodes. */

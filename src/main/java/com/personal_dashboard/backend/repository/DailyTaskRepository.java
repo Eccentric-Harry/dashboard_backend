@@ -62,4 +62,13 @@ public interface DailyTaskRepository extends MongoRepository<DailyTask, String> 
     /** Finds all tasks for a user that have not yet been pushed to Google Calendar. */
     @Query("{ 'userId': ?0, $or: [ { 'googleEventId': null }, { 'googleEventId': '' }, { 'googleEventId': { $exists: false } } ] }")
     List<DailyTask> findByUserIdAndGoogleEventIdMissing(String userId);
+
+    /**
+     * Second-tier dedup lookup: all tasks (INCLUDING tombstones) for a user with a
+     * given RFC 5545 iCalUID. Explicit @Query avoids Spring Data's ambiguous derived
+     * naming for the iCalUID property. Returns a list defensively — a well-formed
+     * store has at most one live match per account.
+     */
+    @Query("{ 'userId': ?0, 'iCalUID': ?1 }")
+    List<DailyTask> findByUserAndICalUID(String userId, String iCalUID);
 }
