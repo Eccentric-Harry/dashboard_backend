@@ -194,4 +194,28 @@ class GoogleSyncServiceTest {
         assertTrue(taskCap.getValue().getOrigin().isGoogle());
         verify(mappingRepository).save(any(CalendarSyncMapping.class));
     }
+
+    @Test
+    void timedEvent_preservesIanaTimeZone() throws Exception {
+        when(mappingRepository.findByGoogleEventIdAndUserId("G4", USER)).thenReturn(Optional.empty());
+        when(dailyTaskRepository.findByUserAndICalUID(USER, "uid-tz")).thenReturn(List.of());
+        when(dailyTaskRepository.save(any(DailyTask.class))).thenAnswer(inv -> {
+            DailyTask t = inv.getArgument(0);
+            if (t.getId() == null) t.setId("NEW2");
+            return t;
+        });
+        JsonNode ev = mapper.readTree("{\"id\":\"G4\",\"status\":\"confirmed\","
+                + "\"updated\":\"2026-07-01T10:00:00.000Z\",\"iCalUID\":\"uid-tz\",\"summary\":\"Call\","
+                + "\"start\":{\"dateTime\":\"2026-07-02T14:30:00+05:30\",\"timeZone\":\"Asia/Kolkata\"},"
+                + "\"end\":{\"dateTime\":\"2026-07-02T15:30:00+05:30\",\"timeZone\":\"Asia/Kolkata\"}}");
+        stubSinglePull(ev);
+
+        service.syncCalendar(USER, EMAIL, true);
+
+        ArgumentCaptor<DailyTask> cap = ArgumentCaptor.forClass(DailyTask.class);
+        verify(dailyTaskRepository).save(cap.capture());
+        assertEquals("Asia/Kolkata", cap.getValue().getTimeZone());
+        assertEquals("14:30", cap.getValue().getStartTime());
+        assertFalse(cap.getValue().getAllDay());
+    }
 }

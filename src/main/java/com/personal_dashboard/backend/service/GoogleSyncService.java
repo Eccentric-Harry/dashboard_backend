@@ -341,10 +341,16 @@ public class GoogleSyncService {
             task.setStartTime(null);
             task.setEndTime(null);
             task.setScheduledTime(null);
+            task.setTimeZone(null); // all-day events carry no timezone
         } else if (startNode.has("dateTime")) {
             ZonedDateTime zdt = ZonedDateTime.parse(startNode.get("dateTime").asText());
             task.setDate(zdt.toLocalDate());
             task.setAllDay(false);
+            // Preserve the original IANA zone id (not a raw offset) so wall-clock
+            // time survives DST. Prefer Google's start.timeZone; fall back to the
+            // zone parsed from the dateTime offset.
+            String tz = readText(startNode, "timeZone");
+            task.setTimeZone(tz != null ? tz : zdt.getZone().getId());
             String startTime = zdt.format(DateTimeFormatter.ofPattern("HH:mm"));
             task.setStartTime(startTime);
             task.setScheduledTime(startTime);

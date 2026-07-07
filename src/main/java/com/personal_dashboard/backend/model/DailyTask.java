@@ -32,6 +32,13 @@ public class DailyTask implements UserOwnedDocument {
     private String startTime;
     private String endTime;
 
+    /**
+     * IANA time-zone id (e.g. "Asia/Kolkata") for timed events, captured from the
+     * source so the wall-clock time survives DST changes. Never a numeric offset.
+     * Null for all-day events and legacy rows (fall back to the user's timezone).
+     */
+    private String timeZone;
+
     @Builder.Default
     private Boolean allDay = true;
 

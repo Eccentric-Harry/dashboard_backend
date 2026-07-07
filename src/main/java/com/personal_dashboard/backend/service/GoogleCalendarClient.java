@@ -544,10 +544,14 @@ public class GoogleCalendarClient {
         event.put("summary", task.getTitle());
         event.put("description", task.getNotes() != null ? task.getNotes() : "");
 
-        // Fetch user timezone
-        String rawTimeZoneStr = userAccountRepository.findById(userId)
-                .map(UserAccount::getTimezone)
-                .orElse(ZoneId.systemDefault().getId());
+        // Prefer the event's own captured IANA zone; otherwise fall back to the
+        // user's configured timezone, then the system default.
+        String rawTimeZoneStr = task.getTimeZone();
+        if (rawTimeZoneStr == null || rawTimeZoneStr.isBlank()) {
+            rawTimeZoneStr = userAccountRepository.findById(userId)
+                    .map(UserAccount::getTimezone)
+                    .orElse(ZoneId.systemDefault().getId());
+        }
         String timeZoneStr = TimeZoneUtils.normalizeTimeZone(rawTimeZoneStr);
 
         ObjectNode start = objectMapper.createObjectNode();
