@@ -251,6 +251,7 @@ public class MindService {
      */
     private long computeStreak(String userId, LocalDate today) {
         java.util.Set<LocalDate> activeDays = mindEntryRepository.findByUserId(userId).stream()
+                .filter(e -> "BREATH".equalsIgnoreCase(e.getType()))
                 .map(MindEntry::getDate)
                 .filter(java.util.Objects::nonNull)
                 .collect(java.util.stream.Collectors.toSet());
