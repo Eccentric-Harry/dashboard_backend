@@ -3,6 +3,7 @@ package com.personal_dashboard.backend.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.personal_dashboard.backend.model.CalendarSyncMapping;
 import com.personal_dashboard.backend.model.DailyTask;
+import com.personal_dashboard.backend.model.EventOrigin;
 import com.personal_dashboard.backend.model.GoogleSyncStore;
 import com.personal_dashboard.backend.repository.CalendarSyncMappingRepository;
 import com.personal_dashboard.backend.repository.DailyTaskRepository;
@@ -211,6 +212,7 @@ public class GoogleSyncService {
                         mapGoogleEventToLocal(eventNode, task);
                         task.setLastSyncedAt(Instant.now());
                         dailyTaskRepository.save(task);
+                        mapping.setEtag(readText(eventNode, "etag"));
                         mapping.setLastSyncedAt(Instant.now());
                         mappingRepository.save(mapping);
                     }
@@ -222,6 +224,8 @@ public class GoogleSyncService {
                     newTask.setItemType("TASK");
                     newTask.setCategory("Personal");
                     newTask.setColor("#c9bff6");
+                    // Immutable source-of-truth marker: this event was born in Google.
+                    newTask.setOrigin(EventOrigin.google(calendarEmail, "primary"));
                     mapGoogleEventToLocal(eventNode, newTask);
                     newTask.setLastSyncedAt(Instant.now());
                     dailyTaskRepository.save(newTask);
@@ -232,6 +236,7 @@ public class GoogleSyncService {
                             .userId(userId)
                             .calendarEmail(calendarEmail)
                             .googleEventId(googleEventId)
+                            .etag(readText(eventNode, "etag"))
                             .lastSyncedAt(Instant.now())
                             .build();
                     mappingRepository.save(newMapping);
@@ -248,6 +253,13 @@ public class GoogleSyncService {
         String description = eventNode.has("description") ? eventNode.get("description").asText() : "";
         task.setTitle(summary);
         task.setNotes(description);
+
+        // RFC 5545 UID — stable across calendars/accounts. Persisted now for the
+        // second-tier dedup key; matching still runs on googleEventId in commit 1.
+        String iCalUID = readText(eventNode, "iCalUID");
+        if (iCalUID != null) {
+            task.setICalUID(iCalUID);
+        }
 
         if (eventNode.has("colorId")) {
             String colorId = eventNode.get("colorId").asText();
@@ -282,6 +294,15 @@ public class GoogleSyncService {
                         .format(DateTimeFormatter.ofPattern("HH:mm")));
             }
         }
+    }
+
+    /** Null-safe text extraction: returns null for missing, null, or blank nodes. */
+    private String readText(JsonNode node, String field) {
+        if (node == null || !node.has(field) || node.get(field).isNull()) {
+            return null;
+        }
+        String value = node.get(field).asText();
+        return (value == null || value.isBlank()) ? null : value;
     }
 
     private String getGoogleColorHex(String colorId) {

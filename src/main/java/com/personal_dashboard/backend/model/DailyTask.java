@@ -75,6 +75,31 @@ public class DailyTask implements UserOwnedDocument {
     @org.springframework.data.mongodb.core.index.Indexed(sparse = true)
     private String googleEventId;
 
+    /**
+     * RFC 5545 iCalendar UID — stable for the same logical event across
+     * calendars and accounts (e.g. a shared invite). Used as the second-tier
+     * dedup key on pull (after googleEventId). Sparse-indexed because
+     * local-only events created before this field may not have one yet.
+     */
+    @org.springframework.data.mongodb.core.index.Indexed(sparse = true)
+    private String iCalUID;
+
+    /**
+     * Immutable source-of-truth marker. Null on legacy rows created before the
+     * identity model — treat null as "unknown/legacy".
+     */
+    private EventOrigin origin;
+
+    /**
+     * Tombstone flag. Deleted events are never hard-removed from Mongo; they are
+     * flagged here so a later full resync cannot resurrect them. Retention is
+     * indefinite (no purge job). Wired into delete/pull flows in commit 2.
+     */
+    @Builder.Default
+    private Boolean deleted = false;
+
+    private Instant deletedAt;
+
     private Instant lastSyncedAt;
 
     private Long versionToken;

@@ -96,6 +96,7 @@ public class DailyTaskService {
                 .recurrenceFrequency("NONE")
                 .subtasks(request.getSubtasks())
                 .tags(request.getTags())
+                .origin(com.personal_dashboard.backend.model.EventOrigin.local())
                 .build();
         return dailyTaskRepository.save(task);
     }

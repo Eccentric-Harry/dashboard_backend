@@ -42,6 +42,20 @@ public class CalendarSyncMapping {
 
     private String googleEventId;
 
+    /**
+     * Google's opaque etag for this remote copy, captured on the last pull/push.
+     * Used for concurrent-edit detection (If-Match) — populated here in commit 1,
+     * enforced in the conflict-resolution work.
+     */
+    private String etag;
+
+    /**
+     * Lifecycle of this remote link: SYNCED (default), PENDING, ERROR.
+     * Free-form for now; state-machine transitions land with the outbox worker.
+     */
+    @Builder.Default
+    private String syncState = "SYNCED";
+
     private Instant lastSyncedAt;
 
     public static String compositeId(String taskId, String calendarEmail) {

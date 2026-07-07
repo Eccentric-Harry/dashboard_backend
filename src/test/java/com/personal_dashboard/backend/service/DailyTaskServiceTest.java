@@ -80,6 +80,26 @@ class DailyTaskServiceTest {
     }
 
     @Test
+    void testCreateTask_TagsLocalOrigin() {
+        DailyTaskRequest request = DailyTaskRequest.builder()
+                .title("New Task")
+                .date("2026-05-30")
+                .completed(false)
+                .build();
+
+        when(dailyTaskRepository.findByUserIdAndDateRange(eq("test-user"), any(), any())).thenReturn(new ArrayList<>());
+        when(dailyTaskRepository.save(any(DailyTask.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        DailyTask result = dailyTaskService.createTask(request);
+
+        assertNotNull(result.getOrigin());
+        assertTrue(result.getOrigin().isLocal());
+        assertNull(result.getOrigin().getAccountId());
+        // Tombstone flag defaults to not-deleted.
+        assertEquals(Boolean.FALSE, result.getDeleted());
+    }
+
+    @Test
     void testCreateTask_Completed() {
         DailyTaskRequest request = DailyTaskRequest.builder()
                 .title("Completed Task")

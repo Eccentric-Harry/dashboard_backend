@@ -105,6 +105,7 @@ public class CalendarItemService {
                 .sortOrder(request.getSortOrder() != null ? request.getSortOrder() : nextOrder)
                 .recurrenceFrequency(recurrence)
                 .recurrenceUntil(parseOptionalDate(request.getRecurrenceUntil()))
+                .origin(com.personal_dashboard.backend.model.EventOrigin.local())
                 .build();
         return dailyTaskRepository.save(item);
     }
