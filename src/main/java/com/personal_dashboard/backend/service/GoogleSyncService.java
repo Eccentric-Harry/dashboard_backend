@@ -45,6 +45,12 @@ public class GoogleSyncService {
         String storeId = GoogleSyncStore.storeId(userId, calendarEmail);
         log.info("Outbound push starting: userId={} calendarEmail={}", userId, calendarEmail);
 
+        GoogleSyncStore store = syncStoreRepository.findById(storeId).orElse(null);
+        if (store == null) {
+            log.warn("Outbound push aborting — no store for {}", storeId);
+            return 0;
+        }
+
         List<DailyTask> allTasks = dailyTaskRepository.findByUserId(userId);
         log.info("Found {} total task(s) for user", allTasks.size());
 
@@ -52,6 +58,14 @@ public class GoogleSyncService {
         for (DailyTask task : allTasks) {
             // Recurrence flag & defer: never push a recurring local task as a single event.
             if (task.isRecurring()) {
+                continue;
+            }
+            // Origin gate (guardrail #4 + cross-account #10).
+            if (!SyncPushPolicy.shouldPush(task, store)) {
+                continue;
+            }
+            // Skip anything already soft-deleted — nothing to push.
+            if (Boolean.TRUE.equals(task.getDeleted())) {
                 continue;
             }
             String mappingId = CalendarSyncMapping.compositeId(task.getId(), calendarEmail);

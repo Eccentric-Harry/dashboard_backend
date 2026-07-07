@@ -64,6 +64,14 @@ public class GoogleSyncStore {
 
     private Instant disconnectedAt;
 
+    /**
+     * Per-account opt-in for cross-account fan-out: when true, events that were
+     * PULLED from another Google account may be pushed into THIS account. Default
+     * false so shared invites don't silently fan out across every connected calendar.
+     */
+    @Builder.Default
+    private Boolean crossAccountPush = false;
+
     public boolean isDisconnected() {
         return "DISCONNECTED".equalsIgnoreCase(status);
     }

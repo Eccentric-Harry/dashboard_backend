@@ -172,6 +172,29 @@ public class GoogleOAuthController {
         }
     }
 
+    // ─── Cross-account push intent (#10) ────────────────────────────────────────────
+
+    @PostMapping("/cross-account-push")
+    @Operation(summary = "Set cross-account push intent",
+               description = "Enable/disable pushing events pulled from OTHER accounts into this one. "
+                           + "Pass ?email=...&enabled=true|false. Default is disabled (no silent fan-out).")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> setCrossAccountPush(
+            @RequestParam("email") String email,
+            @RequestParam("enabled") boolean enabled) {
+
+        String userId = UserContext.getRequiredUserId();
+        String storeId = GoogleSyncStore.storeId(userId, email.trim());
+        GoogleSyncStore store = syncStoreRepository.findById(storeId).orElse(null);
+        if (store == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(errorResponse("cross-account-push", "Account not found: " + email));
+        }
+        store.setCrossAccountPush(enabled);
+        syncStoreRepository.save(store);
+        return ok("google-calendar-cross-account-push",
+                Map.of("email", email.trim(), "crossAccountPush", enabled));
+    }
+
     // ─── Pull sync ────────────────────────────────────────────────────────────────
 
     @PostMapping("/sync")

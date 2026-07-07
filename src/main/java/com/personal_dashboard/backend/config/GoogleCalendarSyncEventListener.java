@@ -76,6 +76,16 @@ public class GoogleCalendarSyncEventListener extends AbstractMongoEventListener<
                 try {
                     Optional<CalendarSyncMapping> existingMapping = mappingRepository.findById(mappingId);
 
+                    // Origin gate (guardrail #4 + cross-account #10): never push a
+                    // GOOGLE-origin event back to its source account, and only fan out to
+                    // other accounts that opted in. Soft-deletes are exempt — they only act
+                    // on an existing mapping (cancel), never create a new remote.
+                    if (!Boolean.TRUE.equals(task.getDeleted())
+                            && !com.personal_dashboard.backend.service.SyncPushPolicy.shouldPush(task, store)) {
+                        log.debug("Outbound: Skipping push of task {} to {} (origin gate).", task.getId(), calendarEmail);
+                        return;
+                    }
+
                     if (Boolean.TRUE.equals(task.getDeleted())) {
                         // ── Soft-delete propagation ────────────────────────────────────────────
                         // The task was soft-deleted locally. Cancel the remote copy but KEEP the
