@@ -58,4 +58,8 @@ public interface DailyTaskRepository extends MongoRepository<DailyTask, String> 
 
     @Query("{ 'userId': ?0, $or: [ { 'completed': { $ne: true } }, { 'completed': true, 'completedAt': { $gte: ?1 } } ] }")
     List<DailyTask> findActiveTasks(String userId, LocalDateTime completedAtThreshold);
+
+    /** Finds all tasks for a user that have not yet been pushed to Google Calendar. */
+    @Query("{ 'userId': ?0, $or: [ { 'googleEventId': null }, { 'googleEventId': '' }, { 'googleEventId': { $exists: false } } ] }")
+    List<DailyTask> findByUserIdAndGoogleEventIdMissing(String userId);
 }

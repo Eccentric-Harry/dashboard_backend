@@ -240,4 +240,48 @@ public class GoogleOAuthController {
                 .meta(meta)
                 .build());
     }
+
+    @PostMapping("/push-local")
+    @Operation(summary = "Push Local Events to Google Calendar", description = "Finds all local tasks without a Google Event ID and pushes them to Google Calendar")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> pushLocalEvents() {
+        String userId = UserContext.getRequiredUserId();
+
+        if (!syncStoreRepository.existsById(userId)) {
+            return ResponseEntity.status(HttpStatus.PRECONDITION_FAILED)
+                    .body(ApiResponse.<Map<String, Object>>builder()
+                            .data(Map.of("error", "Google Calendar not connected"))
+                            .meta(ApiMeta.builder()
+                                    .requestId(UUID.randomUUID().toString())
+                                    .timestamp(Instant.now().toString())
+                                    .source("google-calendar-push-local")
+                                    .build())
+                            .build());
+        }
+
+        try {
+            int pushed = googleSyncService.pushLocalEventsToGoogle(userId);
+
+            ApiMeta meta = ApiMeta.builder()
+                    .requestId(UUID.randomUUID().toString())
+                    .timestamp(Instant.now().toString())
+                    .source("google-calendar-push-local")
+                    .build();
+
+            return ResponseEntity.ok(ApiResponse.<Map<String, Object>>builder()
+                    .data(Map.of("status", "ok", "pushed", pushed))
+                    .meta(meta)
+                    .build());
+        } catch (Exception e) {
+            log.error("Failed to push local events to Google Calendar for user {}: {}", userId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.<Map<String, Object>>builder()
+                            .data(Map.of("error", "Push failed: " + e.getMessage()))
+                            .meta(ApiMeta.builder()
+                                    .requestId(UUID.randomUUID().toString())
+                                    .timestamp(Instant.now().toString())
+                                    .source("google-calendar-push-local")
+                                    .build())
+                            .build());
+        }
+    }
 }

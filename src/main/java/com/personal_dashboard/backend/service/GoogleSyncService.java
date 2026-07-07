@@ -32,6 +32,37 @@ public class GoogleSyncService {
     private final ExecutorService syncExecutor = Executors.newFixedThreadPool(4);
 
     /**
+     * Pushes all local-only tasks (no googleEventId) for a user to Google Calendar.
+     * Returns the number of tasks successfully pushed.
+     */
+    public int pushLocalEventsToGoogle(String userId) {
+        log.info("Starting outbound push of local-only events for user: {}", userId);
+        List<DailyTask> unpushed = dailyTaskRepository.findByUserIdAndGoogleEventIdMissing(userId);
+        log.info("Found {} local task(s) without a Google Event ID", unpushed.size());
+
+        int pushed = 0;
+        for (DailyTask task : unpushed) {
+            try {
+                String googleEventId = googleCalendarClient.insertEvent(userId, task);
+                GoogleSyncContext.setBypass(true);
+                try {
+                    task.setGoogleEventId(googleEventId);
+                    task.setLastSyncedAt(java.time.Instant.now());
+                    dailyTaskRepository.save(task);
+                } finally {
+                    GoogleSyncContext.clear();
+                }
+                log.info("Pushed task '{}' → Google Event ID: {}", task.getTitle(), googleEventId);
+                pushed++;
+            } catch (Exception e) {
+                log.error("Failed to push task '{}' ({}) to Google Calendar: {}", task.getTitle(), task.getId(), e.getMessage());
+            }
+        }
+        log.info("Outbound push complete: {}/{} tasks pushed successfully", pushed, unpushed.size());
+        return pushed;
+    }
+
+    /**
      * Submit an asynchronous sync request for a user
      */
     public void triggerSyncAsync(String userId, boolean forceFullSync) {
