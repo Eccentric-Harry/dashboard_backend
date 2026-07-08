@@ -13,11 +13,15 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.Optional;
+import java.util.concurrent.Flow;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -157,6 +161,62 @@ class GoogleCalendarClientTest {
 
         assertEquals(TASK_ID, client.insertEvent(STORE_ID, task()));
         verify(httpClient, times(2)).send(any(HttpRequest.class), any());
+    }
+
+    // ── Outbound extendedProperties: category + color embedded in request body ──
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void insert_embedsCategoryAndColorInExtendedProperties() throws Exception {
+        stubAuth();
+        HttpResponse<String> ok = mock(HttpResponse.class);
+        when(ok.statusCode()).thenReturn(200);
+        when(ok.body()).thenReturn("{\"id\":\"" + TASK_ID + "\"}");
+        ArgumentCaptor<HttpRequest> reqCap = ArgumentCaptor.forClass(HttpRequest.class);
+        when(httpClient.<String>send(reqCap.capture(), any())).thenReturn(ok);
+
+        DailyTask colored = task();
+        colored.setCategory("Health");
+        colored.setColor("#10b981");
+        client.insertEvent(STORE_ID, colored);
+
+        String body = extractBody(reqCap.getValue());
+        JsonNode bodyNode = new com.fasterxml.jackson.databind.ObjectMapper().readTree(body);
+        JsonNode priv = bodyNode.path("extendedProperties").path("private");
+        assertEquals("Health",   priv.path("lifeos_category").asText());
+        assertEquals("#10b981",  priv.path("lifeos_color").asText());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void insert_categoryOnlyTask_embedsCategoryButNotColor() throws Exception {
+        stubAuth();
+        HttpResponse<String> ok = mock(HttpResponse.class);
+        when(ok.statusCode()).thenReturn(200);
+        when(ok.body()).thenReturn("{\"id\":\"" + TASK_ID + "\"}");
+        ArgumentCaptor<HttpRequest> reqCap = ArgumentCaptor.forClass(HttpRequest.class);
+        when(httpClient.<String>send(reqCap.capture(), any())).thenReturn(ok);
+
+        // task() has @Builder.Default category="Personal" but no color
+        client.insertEvent(STORE_ID, task());
+
+        String body = extractBody(reqCap.getValue());
+        JsonNode bodyNode = new com.fasterxml.jackson.databind.ObjectMapper().readTree(body);
+        JsonNode priv = bodyNode.path("extendedProperties").path("private");
+        assertEquals("Personal", priv.path("lifeos_category").asText());
+        assertTrue(priv.path("lifeos_color").isMissingNode(), "lifeos_color absent when task has no color");
+    }
+
+    /** Read a synchronous HttpRequest body publisher into a String. */
+    private static String extractBody(HttpRequest req) {
+        StringBuilder sb = new StringBuilder();
+        req.bodyPublisher().ifPresent(pub -> pub.subscribe(new Flow.Subscriber<>() {
+            @Override public void onSubscribe(Flow.Subscription s) { s.request(Long.MAX_VALUE); }
+            @Override public void onNext(ByteBuffer item) { sb.append(StandardCharsets.UTF_8.decode(item)); }
+            @Override public void onError(Throwable t) {}
+            @Override public void onComplete() {}
+        }));
+        return sb.toString();
     }
 
     // ── OAuth revoked → clean disconnected state (not silent delete) ──────────

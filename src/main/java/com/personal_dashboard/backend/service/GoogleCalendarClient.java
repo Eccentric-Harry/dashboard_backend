@@ -660,6 +660,22 @@ public class GoogleCalendarClient {
             event.put("colorId", colorId);
         }
 
+        // Store category and exact hex in private extended properties. On inbound sync these
+        // are read first, giving exact round-trip fidelity without relying on the lossy
+        // colorId→category approximation. Invisible in the Google Calendar UI.
+        ObjectNode privateProps = objectMapper.createObjectNode();
+        if (task.getCategory() != null && !task.getCategory().isBlank()) {
+            privateProps.put("lifeos_category", task.getCategory());
+        }
+        if (localColor != null && !localColor.isBlank()) {
+            privateProps.put("lifeos_color", localColor);
+        }
+        if (!privateProps.isEmpty()) {
+            ObjectNode extProps = objectMapper.createObjectNode();
+            extProps.set("private", privateProps);
+            event.set("extendedProperties", extProps);
+        }
+
         return event;
     }
 

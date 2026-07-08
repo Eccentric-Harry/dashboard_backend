@@ -349,7 +349,18 @@ public class GoogleSyncService {
             task.setICalUID(iCalUID);
         }
 
-        if (eventNode.has("colorId")) {
+        // First priority: our own private extended properties — exact round-trip, no approximation.
+        // Falls back to colorId inference only for events created outside the app.
+        JsonNode privateProps = eventNode.path("extendedProperties").path("private");
+        String lifeosCategory = privateProps.isMissingNode() ? null : readText(privateProps, "lifeos_category");
+        String lifeosColor    = privateProps.isMissingNode() ? null : readText(privateProps, "lifeos_color");
+
+        if (lifeosCategory != null) {
+            task.setCategory(lifeosCategory);
+            // Restore exact local hex; fall back to colorId-derived hex if color wasn't stored.
+            String colorId = readText(eventNode, "colorId");
+            task.setColor(lifeosColor != null ? lifeosColor : getGoogleColorHex(colorId));
+        } else if (eventNode.has("colorId")) {
             String colorId = eventNode.get("colorId").asText();
             String hexColor = getGoogleColorHex(colorId);
             if (hexColor != null) {

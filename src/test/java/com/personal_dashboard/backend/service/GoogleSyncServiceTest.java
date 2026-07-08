@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -169,6 +170,60 @@ class GoogleSyncServiceTest {
         verify(dailyTaskRepository, never()).save(any());
         verify(dailyTaskRepository, never()).deleteById(any());
         verify(mappingRepository, never()).save(any());
+    }
+
+    // ── extendedProperties: lifeos_category/color round-trip ─────────────────
+
+    /** Event created by our app carries lifeos_category → category is restored exactly. */
+    @Test
+    void inbound_extendedProperties_categoryTakesPriorityOverColorId() throws Exception {
+        when(mappingRepository.findByGoogleEventIdAndUserId("G5", USER)).thenReturn(Optional.empty());
+        when(dailyTaskRepository.findByUserAndICalUID(USER, "uid-ep")).thenReturn(List.of());
+        when(dailyTaskRepository.save(any(DailyTask.class))).thenAnswer(inv -> {
+            DailyTask t = inv.getArgument(0); if (t.getId() == null) t.setId("NEW3"); return t;
+        });
+        // colorId=9 (Blueberry) would infer "Work" — but lifeos_category overrides to "Health"
+        JsonNode ev = mapper.readTree("{\"id\":\"G5\",\"status\":\"confirmed\","
+                + "\"updated\":\"2026-07-01T10:00:00.000Z\",\"iCalUID\":\"uid-ep\","
+                + "\"colorId\":\"9\","
+                + "\"extendedProperties\":{\"private\":{"
+                +   "\"lifeos_category\":\"Health\","
+                +   "\"lifeos_color\":\"#10b981\""
+                + "}},"
+                + "\"summary\":\"Morning run\","
+                + "\"start\":{\"date\":\"2026-07-08\"},\"end\":{\"date\":\"2026-07-09\"}}");
+        stubSinglePull(ev);
+
+        service.syncCalendar(USER, EMAIL, true);
+
+        ArgumentCaptor<DailyTask> cap = ArgumentCaptor.forClass(DailyTask.class);
+        verify(dailyTaskRepository).save(cap.capture());
+        assertEquals("Health", cap.getValue().getCategory()); // lifeos_category wins over colorId-derived "Work"
+        assertEquals("#10b981", cap.getValue().getColor());    // exact local hex preserved
+    }
+
+    /** Event with only colorId (not created by our app) still infers category. */
+    @Test
+    void inbound_noExtendedProperties_fallsBackToColorIdInference() throws Exception {
+        when(mappingRepository.findByGoogleEventIdAndUserId("G6", USER)).thenReturn(Optional.empty());
+        when(dailyTaskRepository.findByUserAndICalUID(USER, "uid-nep")).thenReturn(List.of());
+        when(dailyTaskRepository.save(any(DailyTask.class))).thenAnswer(inv -> {
+            DailyTask t = inv.getArgument(0); if (t.getId() == null) t.setId("NEW4"); return t;
+        });
+        // colorId=2 (Sage) → "Health" via getCategoryFromGoogleColor
+        JsonNode ev = mapper.readTree("{\"id\":\"G6\",\"status\":\"confirmed\","
+                + "\"updated\":\"2026-07-01T10:00:00.000Z\",\"iCalUID\":\"uid-nep\","
+                + "\"colorId\":\"2\","
+                + "\"summary\":\"Walk\","
+                + "\"start\":{\"date\":\"2026-07-08\"},\"end\":{\"date\":\"2026-07-09\"}}");
+        stubSinglePull(ev);
+
+        service.syncCalendar(USER, EMAIL, true);
+
+        ArgumentCaptor<DailyTask> cap = ArgumentCaptor.forClass(DailyTask.class);
+        verify(dailyTaskRepository).save(cap.capture());
+        assertEquals("Health", cap.getValue().getCategory()); // colorId=2 → Sage → Health
+        assertEquals("#33b679", cap.getValue().getColor());    // modern Sage hex
     }
 
     // ── Baseline: genuinely new event still creates a task ─────────────────────
