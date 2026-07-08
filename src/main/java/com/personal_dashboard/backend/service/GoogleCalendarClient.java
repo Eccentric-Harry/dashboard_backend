@@ -650,12 +650,87 @@ public class GoogleCalendarClient {
             event.set("recurrence", recurrence);
         }
 
+        // Carry the local color to Google as the nearest matching colorId.
+        // Priority: per-event hex color > category default > omit (Google uses calendar color).
+        String localColor = task.getColor();
+        String colorId = (localColor != null && !localColor.isBlank())
+                ? hexToGoogleColorId(localColor)
+                : categoryToGoogleColorId(task.getCategory());
+        if (colorId != null) {
+            event.put("colorId", colorId);
+        }
+
         return event;
     }
 
     private static final DateTimeFormatter BASIC_DATE = DateTimeFormatter.BASIC_ISO_DATE; // yyyyMMdd
     private static final DateTimeFormatter RRULE_UNTIL_UTC = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'");
     private static final DateTimeFormatter EXDATE_TIME = DateTimeFormatter.ofPattern("HHmmss");
+
+    // Google Calendar event colorIds mapped to their modern (darker) RGB values — the palette
+    // displayed in the Google Calendar UI. Stored as {R, G, B} int arrays for distance math.
+    private static final Map<String, int[]> GOOGLE_EVENT_COLORS = Map.ofEntries(
+        Map.entry("1",  new int[]{121, 134, 203}), // Lavender
+        Map.entry("2",  new int[]{ 51, 182, 121}), // Sage
+        Map.entry("3",  new int[]{142,  36, 170}), // Grape
+        Map.entry("4",  new int[]{230, 124, 115}), // Flamingo
+        Map.entry("5",  new int[]{246, 191,  38}), // Banana
+        Map.entry("6",  new int[]{244,  81,  30}), // Tangerine
+        Map.entry("7",  new int[]{  3, 155, 229}), // Peacock
+        Map.entry("8",  new int[]{ 97,  97,  97}), // Graphite
+        Map.entry("9",  new int[]{ 63,  81, 181}), // Blueberry
+        Map.entry("10", new int[]{ 11, 128,  67}), // Basil
+        Map.entry("11", new int[]{213,   0,   0})  // Tomato
+    );
+
+    /**
+     * Maps a hex color string to the nearest Google Calendar event colorId (1–11)
+     * using RGB Euclidean distance against the modern (darker) Google palette.
+     * Returns null if the hex cannot be parsed.
+     */
+    static String hexToGoogleColorId(String hex) {
+        if (hex == null || hex.isBlank()) return null;
+        String h = hex.startsWith("#") ? hex.substring(1) : hex;
+        if (h.length() != 6) return null;
+        try {
+            int r = Integer.parseInt(h.substring(0, 2), 16);
+            int g = Integer.parseInt(h.substring(2, 4), 16);
+            int b = Integer.parseInt(h.substring(4, 6), 16);
+            String best = null;
+            double bestDist = Double.MAX_VALUE;
+            for (Map.Entry<String, int[]> entry : GOOGLE_EVENT_COLORS.entrySet()) {
+                int[] rgb = entry.getValue();
+                double dist = Math.pow(r - rgb[0], 2)
+                        + Math.pow(g - rgb[1], 2)
+                        + Math.pow(b - rgb[2], 2);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    best = entry.getKey();
+                }
+            }
+            return best;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Category-name → Google colorId fallback used when a task has no explicit hex color.
+     * Aligned with the local UI palette (personal=violet, health=green, work=blue, etc.).
+     */
+    static String categoryToGoogleColorId(String category) {
+        if (category == null) return null;
+        return switch (category.toLowerCase(java.util.Locale.ROOT).trim()) {
+            case "health", "fitness"     -> "2";  // Sage (green)
+            case "work", "job"           -> "9";  // Blueberry (blue)
+            case "finance", "money"      -> "6";  // Tangerine (amber-orange)
+            case "learning", "education" -> "10"; // Basil (teal-green)
+            case "social"                -> "4";  // Flamingo (pink)
+            case "movies"                -> "11"; // Tomato (red)
+            case "personal"              -> "3";  // Grape (violet)
+            default                      -> null; // let Google use the calendar's default
+        };
+    }
 
     /** Build an RRULE line (FREQ + optional UNTIL) from the task's recurrence. */
     static String buildRrule(DailyTask task, String timeZoneStr) {

@@ -414,20 +414,23 @@ public class GoogleSyncService {
         return (value == null || value.isBlank()) ? null : value;
     }
 
+    // Returns the modern (darker) Google event color hex so that outbound round-trips
+    // are lossless: inbound colorId→hex stored on task, outbound hex→nearest colorId
+    // via GoogleCalendarClient.hexToGoogleColorId picks the same colorId back.
     private String getGoogleColorHex(String colorId) {
         if (colorId == null) return null;
         return switch (colorId) {
-            case "1"  -> "#a4bdfc";
-            case "2"  -> "#7ae7bf";
-            case "3"  -> "#dbadff";
-            case "4"  -> "#ff887c";
-            case "5"  -> "#fbd75b";
-            case "6"  -> "#ffb878";
-            case "7"  -> "#46d6db";
-            case "8"  -> "#e1e1e1";
-            case "9"  -> "#5484ed";
-            case "10" -> "#51b749";
-            case "11" -> "#dc2127";
+            case "1"  -> "#7986cb"; // Lavender
+            case "2"  -> "#33b679"; // Sage
+            case "3"  -> "#8e24aa"; // Grape
+            case "4"  -> "#e67c73"; // Flamingo
+            case "5"  -> "#f6bf26"; // Banana
+            case "6"  -> "#f4511e"; // Tangerine
+            case "7"  -> "#039be5"; // Peacock
+            case "8"  -> "#616161"; // Graphite
+            case "9"  -> "#3f51b5"; // Blueberry
+            case "10" -> "#0b8043"; // Basil
+            case "11" -> "#d50000"; // Tomato
             default   -> null;
         };
     }
