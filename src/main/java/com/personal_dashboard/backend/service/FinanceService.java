@@ -1,11 +1,14 @@
 package com.personal_dashboard.backend.service;
 
+import com.personal_dashboard.backend.dto.FinanceAccountDTO;
 import com.personal_dashboard.backend.dto.TransactionDTO;
 import com.personal_dashboard.backend.dto.request.TransactionRequest;
 import com.personal_dashboard.backend.model.DailyFinancialLog;
+import com.personal_dashboard.backend.model.FinanceAccount;
 import com.personal_dashboard.backend.model.FinancialTotals;
 import com.personal_dashboard.backend.model.FinancialTransaction;
 import com.personal_dashboard.backend.repository.DailyFinancialLogRepository;
+import com.personal_dashboard.backend.repository.FinanceAccountRepository;
 import com.personal_dashboard.backend.security.UserContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -38,6 +41,7 @@ import java.util.UUID;
 public class FinanceService {
 
     private final DailyFinancialLogRepository dailyFinancialLogRepository;
+    private final FinanceAccountRepository financeAccountRepository;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final String INCOME = "Income";
@@ -66,6 +70,20 @@ public class FinanceService {
         }
         out.sort(Comparator.comparing(TransactionDTO::getDate).reversed());
         return out;
+    }
+
+    // ─── Account / Total Balance ──────────────────────────────────────────
+
+    /** Current running balance for the user (creates a zero account on first access). */
+    public FinanceAccountDTO getAccount() {
+        return toDto(getOrCreateAccount());
+    }
+
+    /** Sets the Total Balance to an absolute value ("I have ₹X right now"). */
+    public FinanceAccountDTO setBalance(BigDecimal balance) {
+        FinanceAccount account = getOrCreateAccount();
+        account.setBalance(balance);
+        return toDto(financeAccountRepository.save(account));
     }
 
     // ─── Writes (CRUD) ────────────────────────────────────────────────────
@@ -141,6 +159,9 @@ public class FinanceService {
         log.getTransactions().computeIfAbsent(category, k -> new ArrayList<>()).add(tx);
         applyToTotals(log, tx.getType(), tx.getAmount());
         dailyFinancialLogRepository.save(log);
+
+        // Money in/out also moves the running Total Balance.
+        applyToBalance(tx.getType(), tx.getAmount());
     }
 
     /** Removes the transaction with {@code id} from {@code log}, adjusts totals, and persists. */
@@ -152,6 +173,8 @@ public class FinanceService {
                 FinancialTransaction tx = match.get();
                 entry.getValue().remove(tx);
                 applyToTotals(log, tx.getType(), tx.getAmount().negate());
+                // Reverse the transaction's effect on the running Total Balance.
+                applyToBalance(tx.getType(), tx.getAmount().negate());
                 break;
             }
         }
@@ -167,6 +190,33 @@ public class FinanceService {
         } else {
             totals.setTotalExpense(totals.getTotalExpense().add(delta));
         }
+    }
+
+    /**
+     * Moves the running Total Balance by a transaction of the given {@code amount}:
+     * income increases the balance, expense decreases it. Pass a negated amount to
+     * reverse a transaction's effect (edit/delete).
+     */
+    private void applyToBalance(String type, BigDecimal amount) {
+        FinanceAccount account = getOrCreateAccount();
+        BigDecimal signed = INCOME.equalsIgnoreCase(type) ? amount : amount.negate();
+        account.setBalance(account.getBalance().add(signed));
+        financeAccountRepository.save(account);
+    }
+
+    private FinanceAccount getOrCreateAccount() {
+        String userId = UserContext.getRequiredUserId();
+        return financeAccountRepository.findByUserId(userId)
+                .orElseGet(() -> FinanceAccount.builder()
+                        .userId(userId)
+                        .balance(BigDecimal.ZERO)
+                        .build());
+    }
+
+    private FinanceAccountDTO toDto(FinanceAccount account) {
+        return FinanceAccountDTO.builder()
+                .balance(account.getBalance().doubleValue())
+                .build();
     }
 
     /** Locates the current user's log that contains a given transaction id (one doc per day). */

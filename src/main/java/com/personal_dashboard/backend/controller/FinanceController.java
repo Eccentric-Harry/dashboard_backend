@@ -2,7 +2,9 @@ package com.personal_dashboard.backend.controller;
 
 import com.personal_dashboard.backend.dto.ApiMeta;
 import com.personal_dashboard.backend.dto.ApiResponse;
+import com.personal_dashboard.backend.dto.FinanceAccountDTO;
 import com.personal_dashboard.backend.dto.TransactionDTO;
+import com.personal_dashboard.backend.dto.request.BalanceUpdateRequest;
 import com.personal_dashboard.backend.dto.request.TransactionRequest;
 import com.personal_dashboard.backend.model.DailyFinancialLog;
 import com.personal_dashboard.backend.model.SliceRepayment;
@@ -37,6 +39,17 @@ public class FinanceController {
         public ResponseEntity<ApiResponse<List<DailyFinancialLog>>> getDailyLogs(
                         @RequestParam(value = "days", defaultValue = "30") int days) {
                 return ResponseEntity.ok(wrap(financeService.getDailyLogs(days)));
+        }
+
+        @GetMapping("/account")
+        public ResponseEntity<ApiResponse<FinanceAccountDTO>> getAccount() {
+                return ResponseEntity.ok(wrap(financeService.getAccount()));
+        }
+
+        @PutMapping("/account/balance")
+        public ResponseEntity<ApiResponse<FinanceAccountDTO>> updateBalance(
+                        @Valid @RequestBody BalanceUpdateRequest request) {
+                return ResponseEntity.ok(wrap(financeService.setBalance(request.getBalance())));
         }
 
         @PostMapping("/transactions")

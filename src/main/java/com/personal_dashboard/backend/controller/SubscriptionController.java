@@ -92,4 +92,26 @@ public class SubscriptionController {
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteSubscription(@PathVariable String id) {
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        Subscription subscription = subscriptionRepository.findById(id)
+                .filter(sub -> userId.equals(sub.getUserId()))
+                .orElseThrow(() -> new IllegalArgumentException("Subscription not found: " + id));
+        subscriptionRepository.delete(subscription);
+
+        ApiMeta meta = ApiMeta.builder()
+                .requestId(UUID.randomUUID().toString())
+                .timestamp(Instant.now().toString())
+                .source("api")
+                .build();
+
+        ApiResponse<Void> response = ApiResponse.<Void>builder()
+                .data(null)
+                .meta(meta)
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
 }
