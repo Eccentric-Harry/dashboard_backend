@@ -5,341 +5,72 @@ import com.personal_dashboard.backend.dto.ApiResponse;
 import com.personal_dashboard.backend.dto.TransactionDTO;
 import com.personal_dashboard.backend.dto.request.TransactionRequest;
 import com.personal_dashboard.backend.model.DailyFinancialLog;
-import com.personal_dashboard.backend.repository.DailyFinancialLogRepository;
-import com.personal_dashboard.backend.model.Transaction;
-import com.personal_dashboard.backend.repository.TransactionRepository;
-import com.personal_dashboard.backend.model.FinancialTransaction;
-import com.personal_dashboard.backend.model.FinancialTotals;
 import com.personal_dashboard.backend.model.SliceRepayment;
 import com.personal_dashboard.backend.repository.SliceRepaymentRepository;
+import com.personal_dashboard.backend.security.UserContext;
+import com.personal_dashboard.backend.service.FinanceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 
+/**
+ * Thin controller for the finance route. Request/response mapping only —
+ * all business logic lives in {@link FinanceService}. Money is stored as one
+ * {@link DailyFinancialLog} per user per day (grouped by category); there is no
+ * separate flat transactions collection.
+ */
 @RestController
 @RequestMapping("/api/v1/finance")
 @RequiredArgsConstructor
 public class FinanceController {
 
-        private final TransactionRepository transactionRepository;
-        private final DailyFinancialLogRepository dailyFinancialLogRepository;
+        private final FinanceService financeService;
         private final SliceRepaymentRepository sliceRepaymentRepository;
-
-        private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
-
-        @PostMapping("/transactions")
-        public ResponseEntity<ApiResponse<TransactionDTO>> createTransaction(
-                        @Valid @RequestBody TransactionRequest request) {
-
-                // Parse the date string to LocalDate, then convert to Instant
-                LocalDate localDate = LocalDate.parse(request.getDate(), DATE_FORMATTER);
-                Instant dateInstant = localDate.atStartOfDay()
-                                .atZone(java.time.ZoneId.systemDefault())
-                                .toInstant();
-
-                // Create and save the transaction
-                Transaction transaction = Transaction.builder()
-                                .description(request.getDescription())
-                                .amount(request.getAmount())
-                                .category(request.getCategory())
-                                .type(request.getType())
-                                .date(dateInstant)
-                                .build();
-
-                Transaction savedTransaction = transactionRepository.save(transaction);
-
-                // Update DailyFinancialLog
-                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
-                String logId = request.getDate();
-                DailyFinancialLog dailyLog = dailyFinancialLogRepository.findByUserIdAndDateString(userId, logId)
-                                .orElse(DailyFinancialLog.builder()
-                                                .userId(userId)
-                                                .dateString(logId)
-                                                .date(dateInstant)
-                                                .dailyTotals(new FinancialTotals())
-                                                .transactions(new LinkedHashMap<>())
-                                                .build());
-
-                // Add transaction to the appropriate category list
-                dailyLog.getTransactions()
-                                .computeIfAbsent(request.getCategory(), k -> new ArrayList<>())
-                                .add(FinancialTransaction.builder()
-                                                .id(savedTransaction.getId())
-                                                .description(savedTransaction.getDescription())
-                                                .amount(savedTransaction.getAmount())
-                                                .timestamp(savedTransaction.getDate())
-                                                .build());
-
-                // Update totals
-                if ("Income".equalsIgnoreCase(request.getType())) {
-                        dailyLog.getDailyTotals().setTotalIncome(
-                                        dailyLog.getDailyTotals().getTotalIncome().add(request.getAmount()));
-                } else {
-                        dailyLog.getDailyTotals().setTotalExpense(
-                                        dailyLog.getDailyTotals().getTotalExpense().add(request.getAmount()));
-                }
-
-                dailyFinancialLogRepository.save(dailyLog);
-
-                // Map to DTO
-                TransactionDTO responseDto = TransactionDTO.builder()
-                                .id(savedTransaction.getId())
-                                .description(savedTransaction.getDescription())
-                                .amount(savedTransaction.getAmount().doubleValue())
-                                .category(savedTransaction.getCategory())
-                                .type(savedTransaction.getType())
-                                .date(savedTransaction.getDate().toString())
-                                .build();
-
-                ApiMeta meta = ApiMeta.builder()
-                                .requestId(UUID.randomUUID().toString())
-                                .timestamp(Instant.now().toString())
-                                .source("api")
-                                .build();
-
-                ApiResponse<TransactionDTO> response = ApiResponse.<TransactionDTO>builder()
-                                .data(responseDto)
-                                .meta(meta)
-                                .build();
-
-                return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        }
-
-        @GetMapping("/transactions")
-        public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactions(
-                        @RequestParam(value = "days", defaultValue = "30") int days,
-                        @RequestParam(value = "category", required = false) String category,
-                        @RequestParam(value = "type", required = false) String type) {
-
-                Instant endDate = Instant.now();
-                Instant startDate = endDate.minus(Duration.ofDays(days));
-
-                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
-                List<Transaction> transactions;
-
-                if (type != null && !type.isEmpty() && category != null && !category.isEmpty()) {
-                        transactions = transactionRepository.findByUserIdAndTypeAndDateBetween(userId, type, startDate, endDate);
-                        transactions = transactions.stream()
-                                        .filter(t -> t.getCategory().equalsIgnoreCase(category))
-                                        .toList();
-                } else if (category != null && !category.isEmpty()) {
-                        transactions = transactionRepository.findByUserIdAndCategoryAndDateBetween(userId, category, startDate, endDate);
-                } else if (type != null && !type.isEmpty()) {
-                        transactions = transactionRepository.findByUserIdAndTypeAndDateBetween(userId, type, startDate, endDate);
-                } else {
-                        transactions = transactionRepository.findByUserIdAndDateBetween(userId, startDate, endDate);
-                }
-
-                List<TransactionDTO> dtos = transactions.stream()
-                                .map(t -> TransactionDTO.builder()
-                                                .id(t.getId())
-                                                .description(t.getDescription())
-                                                .amount(t.getAmount().doubleValue())
-                                                .category(t.getCategory())
-                                                .type(t.getType())
-                                                .date(t.getDate().toString())
-                                                .build())
-                                .toList();
-
-                ApiMeta meta = ApiMeta.builder()
-                                .requestId(UUID.randomUUID().toString())
-                                .timestamp(Instant.now().toString())
-                                .source("api")
-                                .build();
-
-                ApiResponse<List<TransactionDTO>> response = ApiResponse.<List<TransactionDTO>>builder()
-                                .data(dtos)
-                                .meta(meta)
-                                .build();
-
-                return ResponseEntity.ok(response);
-        }
 
         @GetMapping("/daily-logs")
         public ResponseEntity<ApiResponse<List<DailyFinancialLog>>> getDailyLogs(
                         @RequestParam(value = "days", defaultValue = "30") int days) {
-
-                Instant endDate = Instant.now();
-                Instant startDate = endDate.minus(Duration.ofDays(days));
-
-                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
-                List<DailyFinancialLog> logs = dailyFinancialLogRepository.findByUserIdAndDateBetween(userId, startDate, endDate);
-
-                ApiMeta meta = ApiMeta.builder()
-                                .requestId(UUID.randomUUID().toString())
-                                .timestamp(Instant.now().toString())
-                                .source("api")
-                                .build();
-
-                ApiResponse<List<DailyFinancialLog>> response = ApiResponse.<List<DailyFinancialLog>>builder()
-                                .data(logs)
-                                .meta(meta)
-                                .build();
-
-                return ResponseEntity.ok(response);
+                return ResponseEntity.ok(wrap(financeService.getDailyLogs(days)));
         }
 
-        @GetMapping("/slice-repayments")
-        public ResponseEntity<ApiResponse<List<SliceRepayment>>> getSliceRepayments() {
-                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
-                List<SliceRepayment> repayments = sliceRepaymentRepository.findByUserId(userId);
-
-                ApiMeta meta = ApiMeta.builder()
-                                .requestId(UUID.randomUUID().toString())
-                                .timestamp(Instant.now().toString())
-                                .source("api")
-                                .build();
-
-                ApiResponse<List<SliceRepayment>> response = ApiResponse.<List<SliceRepayment>>builder()
-                                .data(repayments)
-                                .meta(meta)
-                                .build();
-
-                return ResponseEntity.ok(response);
-        }
-
-        @DeleteMapping("/transactions/{id}")
-        public ResponseEntity<ApiResponse<Void>> deleteTransaction(@PathVariable String id) {
-                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
-                Transaction transaction = transactionRepository.findByIdAndUserId(id, userId)
-                                .orElseThrow(() -> new RuntimeException("Transaction not found: " + id));
-
-                removeTransactionFromLog(transaction);
-                transactionRepository.delete(transaction);
-
-                ApiMeta meta = ApiMeta.builder()
-                                .requestId(UUID.randomUUID().toString())
-                                .timestamp(Instant.now().toString())
-                                .source("api")
-                                .build();
-
-                ApiResponse<Void> response = ApiResponse.<Void>builder()
-                                .data(null)
-                                .meta(meta)
-                                .build();
-
-                return ResponseEntity.ok(response);
+        @PostMapping("/transactions")
+        public ResponseEntity<ApiResponse<TransactionDTO>> createTransaction(
+                        @Valid @RequestBody TransactionRequest request) {
+                return ResponseEntity.status(HttpStatus.CREATED)
+                                .body(wrap(financeService.createTransaction(request)));
         }
 
         @PutMapping("/transactions/{id}")
         public ResponseEntity<ApiResponse<TransactionDTO>> updateTransaction(
                         @PathVariable String id,
                         @Valid @RequestBody TransactionRequest request) {
+                return ResponseEntity.ok(wrap(financeService.updateTransaction(id, request)));
+        }
 
-                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
-                Transaction existingTransaction = transactionRepository.findByIdAndUserId(id, userId)
-                                .orElseThrow(() -> new RuntimeException("Transaction not found"));
+        @DeleteMapping("/transactions/{id}")
+        public ResponseEntity<ApiResponse<Void>> deleteTransaction(@PathVariable String id) {
+                financeService.deleteTransaction(id);
+                return ResponseEntity.ok(wrap((Void) null));
+        }
 
-                // 1. Remove from old log (using current state)
-                removeTransactionFromLog(existingTransaction);
+        @GetMapping("/slice-repayments")
+        public ResponseEntity<ApiResponse<List<SliceRepayment>>> getSliceRepayments() {
+                String userId = UserContext.getRequiredUserId();
+                return ResponseEntity.ok(wrap(sliceRepaymentRepository.findByUserId(userId)));
+        }
 
-                // 2. Parse new date
-                LocalDate newLocalDate = LocalDate.parse(request.getDate(), DATE_FORMATTER);
-                Instant newDateInstant = newLocalDate.atStartOfDay()
-                                .atZone(ZoneId.systemDefault())
-                                .toInstant();
-
-                // 3. Update the transaction object
-                existingTransaction.setDescription(request.getDescription());
-                existingTransaction.setAmount(request.getAmount());
-                existingTransaction.setCategory(request.getCategory());
-                existingTransaction.setType(request.getType());
-                existingTransaction.setDate(newDateInstant);
-
-                Transaction savedTransaction = transactionRepository.save(existingTransaction);
-
-                // 4. Add to new log
-                addTransactionToLog(savedTransaction);
-
-                // 5. Map to DTO
-                TransactionDTO responseDto = TransactionDTO.builder()
-                                .id(savedTransaction.getId())
-                                .description(savedTransaction.getDescription())
-                                .amount(savedTransaction.getAmount().doubleValue())
-                                .category(savedTransaction.getCategory())
-                                .type(savedTransaction.getType())
-                                .date(savedTransaction.getDate().toString())
-                                .build();
-
+        private static <T> ApiResponse<T> wrap(T data) {
                 ApiMeta meta = ApiMeta.builder()
                                 .requestId(UUID.randomUUID().toString())
                                 .timestamp(Instant.now().toString())
                                 .source("api")
                                 .build();
-
-                ApiResponse<TransactionDTO> response = ApiResponse.<TransactionDTO>builder()
-                                .data(responseDto)
-                                .meta(meta)
-                                .build();
-
-                return ResponseEntity.ok(response);
-        }
-
-        private void removeTransactionFromLog(Transaction transaction) {
-                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
-                String dateStr = transaction.getDate().atZone(ZoneId.systemDefault()).toLocalDate().toString();
-                dailyFinancialLogRepository.findByUserIdAndDateString(userId, dateStr).ifPresent(log -> {
-                        boolean removed = false;
-                        for (List<FinancialTransaction> list : log.getTransactions().values()) {
-                                if (list.removeIf(t -> t.getId().equals(transaction.getId()))) {
-                                        removed = true;
-                                        break;
-                                }
-                        }
-                        if (removed) {
-                                if ("Income".equalsIgnoreCase(transaction.getType())) {
-                                        log.getDailyTotals().setTotalIncome(log.getDailyTotals().getTotalIncome()
-                                                        .subtract(transaction.getAmount()));
-                                } else {
-                                        log.getDailyTotals().setTotalExpense(log.getDailyTotals().getTotalExpense()
-                                                        .subtract(transaction.getAmount()));
-                                }
-                                dailyFinancialLogRepository.save(log);
-                        }
-                });
-        }
-
-        private void addTransactionToLog(Transaction transaction) {
-                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
-                String dateStr = transaction.getDate().atZone(ZoneId.systemDefault()).toLocalDate().toString();
-                DailyFinancialLog dailyLog = dailyFinancialLogRepository.findByUserIdAndDateString(userId, dateStr)
-                                .orElse(DailyFinancialLog.builder()
-                                                .userId(userId)
-                                                .dateString(dateStr)
-                                                .date(transaction.getDate())
-                                                .dailyTotals(new FinancialTotals())
-                                                .transactions(new LinkedHashMap<>())
-                                                .build());
-
-                dailyLog.getTransactions()
-                                .computeIfAbsent(transaction.getCategory(), k -> new ArrayList<>())
-                                .add(FinancialTransaction.builder()
-                                                .id(transaction.getId())
-                                                .description(transaction.getDescription())
-                                                .amount(transaction.getAmount())
-                                                .timestamp(transaction.getDate())
-                                                .build());
-
-                if ("Income".equalsIgnoreCase(transaction.getType())) {
-                        dailyLog.getDailyTotals().setTotalIncome(
-                                        dailyLog.getDailyTotals().getTotalIncome().add(transaction.getAmount()));
-                } else {
-                        dailyLog.getDailyTotals().setTotalExpense(
-                                        dailyLog.getDailyTotals().getTotalExpense().add(transaction.getAmount()));
-                }
-
-                dailyFinancialLogRepository.save(dailyLog);
+                return ApiResponse.<T>builder().data(data).meta(meta).build();
         }
 }

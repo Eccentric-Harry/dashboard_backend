@@ -4,8 +4,6 @@ import com.opencsv.CSVParserBuilder;
 import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;
 import com.personal_dashboard.backend.model.MealEntry;
-import com.personal_dashboard.backend.model.Transaction;
-import com.personal_dashboard.backend.repository.TransactionRepository;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,7 +23,7 @@ import java.util.*;
 public class CsvImportService {
 
     private final DailyFoodLogService dailyFoodLogService;
-    private final TransactionRepository transactionRepository;
+    private final FinanceService financeService;
 
     private static final String IST_TIMEZONE = "Asia/Kolkata";
     private static final ZoneId IST = ZoneId.of(IST_TIMEZONE);
@@ -43,10 +41,11 @@ public class CsvImportService {
         }
 
         if (spendingCsv != null && !spendingCsv.isEmpty()) {
-            List<Transaction> transactions = parseSpendingCsv(spendingCsv);
-            transactionRepository.saveAll(transactions);
-            result.put("transactionsImported", transactions.size());
-            log.info("Imported {} transactions", transactions.size());
+            List<SpendingRow> rows = parseSpendingCsv(spendingCsv);
+            rows.forEach(r -> financeService.addImportedExpense(
+                    r.description(), r.amount(), r.category(), r.timestamp()));
+            result.put("transactionsImported", rows.size());
+            log.info("Imported {} transactions", rows.size());
         }
 
         return result;
@@ -156,8 +155,12 @@ public class CsvImportService {
         }
     }
 
-    private List<Transaction> parseSpendingCsv(MultipartFile file) throws Exception {
-        List<Transaction> entries = new ArrayList<>();
+    /** A parsed spending CSV row, before it is folded into a daily financial log. */
+    private record SpendingRow(String description, BigDecimal amount, String category, Instant timestamp) {
+    }
+
+    private List<SpendingRow> parseSpendingCsv(MultipartFile file) throws Exception {
+        List<SpendingRow> entries = new ArrayList<>();
         Random random = new Random(42); // Seed for reproducibility
 
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()));
@@ -169,9 +172,9 @@ public class CsvImportService {
             String[] line;
             while ((line = csvReader.readNext()) != null) {
                 try {
-                    Transaction transaction = parseSpendingLine(line, random);
-                    if (transaction != null) {
-                        entries.add(transaction);
+                    SpendingRow row = parseSpendingLine(line, random);
+                    if (row != null) {
+                        entries.add(row);
                     }
                 } catch (Exception e) {
                     log.warn("Skipping invalid spending entry: {}", Arrays.toString(line), e);
@@ -183,7 +186,7 @@ public class CsvImportService {
         return entries;
     }
 
-    private Transaction parseSpendingLine(String[] line, Random random) {
+    private SpendingRow parseSpendingLine(String[] line, Random random) {
         if (line.length < 4) {
             return null;
         }
@@ -207,13 +210,7 @@ public class CsvImportService {
             LocalDateTime dateTime = date.atTime(hour, minute);
             Instant instant = dateTime.atZone(IST).toInstant();
 
-            return Transaction.builder()
-                    .description(description)
-                    .amount(amount)
-                    .category(category)
-                    .type("Expense") // Default to Expense
-                    .date(instant)
-                    .build();
+            return new SpendingRow(description, amount, category, instant);
         } catch (Exception e) {
             log.debug("Failed to parse spending line: {}", Arrays.toString(line), e);
             return null;

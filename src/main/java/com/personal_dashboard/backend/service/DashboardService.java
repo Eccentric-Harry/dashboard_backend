@@ -22,7 +22,7 @@ public class DashboardService {
 
         private final DailyFoodLogService dailyFoodLogService;
         private final DailyHealthRecordRepository dailyHealthRecordRepository;
-        private final TransactionRepository transactionRepository;
+        private final FinanceService financeService;
         private final DailyLogRepository dailyLogRepository;
         private final LearningRepository learningRepository;
         private final DailyTaskRepository dailyTaskRepository;
@@ -122,22 +122,20 @@ public class DashboardService {
                 LocalDate monthStart = currentMonth.atDay(1);
                 LocalDate monthEnd = currentMonth.atEndOfMonth();
 
-                // Fetch all transactions for the month
-                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
-                List<Transaction> transactions = transactionRepository.findByUserIdAndDateBetween(
-                                userId,
+                // Fetch all transactions for the month (flattened from the daily logs)
+                List<TransactionDTO> transactions = financeService.getTransactionsBetween(
                                 monthStart.atStartOfDay(ZoneId.systemDefault()).toInstant(),
                                 monthEnd.atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant());
 
                 // Separate expenses and income
                 BigDecimal totalExpenses = transactions.stream()
                                 .filter(t -> "Expense".equals(t.getType()))
-                                .map(Transaction::getAmount)
+                                .map(t -> BigDecimal.valueOf(t.getAmount()))
                                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
                 BigDecimal totalIncome = transactions.stream()
                                 .filter(t -> "Income".equals(t.getType()))
-                                .map(Transaction::getAmount)
+                                .map(t -> BigDecimal.valueOf(t.getAmount()))
                                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
                 // Mock budget
@@ -153,25 +151,13 @@ public class DashboardService {
                 // Build budget items (grouped by category)
                 List<BudgetItem> budgetItems = buildBudgetItems(transactions);
 
-                // Map transactions to DTOs
-                List<TransactionDTO> transactionDTOs = transactions.stream()
-                                .map(t -> TransactionDTO.builder()
-                                                .id(t.getId())
-                                                .description(t.getDescription())
-                                                .amount(t.getAmount().doubleValue())
-                                                .category(t.getCategory())
-                                                .type(t.getType())
-                                                .date(t.getDate().toString())
-                                                .build())
-                                .collect(Collectors.toList());
-
                 return FinanceMetrics.builder()
                                 .month(currentMonth.format(DateTimeFormatter.ofPattern("yyyy-MM")))
                                 .totalBudget(totalBudget.doubleValue())
                                 .totalSpent(totalExpenses.doubleValue())
                                 .savingsRatePercent(savingsRate)
                                 .budgetItems(budgetItems)
-                                .transactions(transactionDTOs)
+                                .transactions(transactions)
                                 .build();
         }
 
@@ -260,12 +246,13 @@ public class DashboardService {
         /**
          * Helper: Build budget items grouped by category
          */
-        private List<BudgetItem> buildBudgetItems(List<Transaction> transactions) {
+        private List<BudgetItem> buildBudgetItems(List<TransactionDTO> transactions) {
                 Map<String, BigDecimal> categorySpend = new HashMap<>();
 
                 transactions.stream()
                                 .filter(t -> "Expense".equals(t.getType()))
-                                .forEach(t -> categorySpend.merge(t.getCategory(), t.getAmount(), BigDecimal::add));
+                                .forEach(t -> categorySpend.merge(t.getCategory(),
+                                                BigDecimal.valueOf(t.getAmount()), BigDecimal::add));
 
                 // Mock per-category budgets
                 Map<String, BigDecimal> categoryBudgets = Map.of(
@@ -410,24 +397,23 @@ public class DashboardService {
                 LocalDate monthStart = month.atDay(1);
                 LocalDate monthEnd = month.atEndOfMonth();
 
-                String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
-                List<Transaction> transactions = transactionRepository.findByUserIdAndDateBetween(
-                                userId,
+                List<TransactionDTO> transactions = financeService.getTransactionsBetween(
                                 monthStart.atStartOfDay(ZoneId.systemDefault()).toInstant(),
                                 monthEnd.atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant());
 
                 // Calculate total spent
                 BigDecimal totalExpenses = transactions.stream()
                                 .filter(t -> "Expense".equals(t.getType()))
-                                .map(Transaction::getAmount)
+                                .map(t -> BigDecimal.valueOf(t.getAmount()))
                                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
                 // Group by category
                 Map<String, BigDecimal> categorySpend = transactions.stream()
                                 .filter(t -> "Expense".equals(t.getType()))
                                 .collect(Collectors.groupingBy(
-                                                Transaction::getCategory,
-                                                Collectors.reducing(BigDecimal.ZERO, Transaction::getAmount,
+                                                TransactionDTO::getCategory,
+                                                Collectors.reducing(BigDecimal.ZERO,
+                                                                t -> BigDecimal.valueOf(t.getAmount()),
                                                                 BigDecimal::add)));
 
                 // Build response

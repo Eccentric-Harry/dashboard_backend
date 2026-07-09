@@ -10,9 +10,10 @@ import java.util.Optional;
 
 @Repository
 public interface DailyFinancialLogRepository extends MongoRepository<DailyFinancialLog, String> {
-    List<DailyFinancialLog> findByDateBetween(Instant startDate, Instant endDate);
 
     Optional<DailyFinancialLog> findByUserIdAndDateString(String userId, String dateString);
 
     List<DailyFinancialLog> findByUserIdAndDateBetween(String userId, Instant startDate, Instant endDate);
+
+    List<DailyFinancialLog> findByUserId(String userId);
 }
