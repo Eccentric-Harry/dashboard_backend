@@ -416,13 +416,18 @@ public class DashboardService {
                                                                 t -> BigDecimal.valueOf(t.getAmount()),
                                                                 BigDecimal::add)));
 
+                // Use the user's persisted monthly budget (falls back to 20 000 if never set)
+                BigDecimal monthlyBudget = financeService.getMonthlyBudget();
+
                 // Build response
                 Map<String, Object> response = new LinkedHashMap<>();
                 response.put("month", month.format(DateTimeFormatter.ofPattern("yyyy-MM")));
                 response.put("totalSpent", totalExpenses.doubleValue());
-                response.put("monthlyBudget", 20000.0);
-                response.put("budgetRemaining", 20000.0 - totalExpenses.doubleValue());
-                response.put("budgetUtilization", totalExpenses.doubleValue() / 20000.0 * 100);
+                response.put("monthlyBudget", monthlyBudget.doubleValue());
+                response.put("budgetRemaining", monthlyBudget.subtract(totalExpenses).doubleValue());
+                response.put("budgetUtilization", monthlyBudget.compareTo(BigDecimal.ZERO) > 0
+                                ? totalExpenses.divide(monthlyBudget, 4, java.math.RoundingMode.HALF_UP).doubleValue() * 100
+                                : 0.0);
                 response.put("categoryBreakdown", categorySpend.entrySet().stream()
                                 .collect(Collectors.toMap(
                                                 Map.Entry::getKey,

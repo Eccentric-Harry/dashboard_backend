@@ -5,6 +5,7 @@ import com.personal_dashboard.backend.dto.ApiResponse;
 import com.personal_dashboard.backend.dto.FinanceAccountDTO;
 import com.personal_dashboard.backend.dto.TransactionDTO;
 import com.personal_dashboard.backend.dto.request.BalanceUpdateRequest;
+import com.personal_dashboard.backend.dto.request.BudgetUpdateRequest;
 import com.personal_dashboard.backend.dto.request.TransactionRequest;
 import com.personal_dashboard.backend.model.DailyFinancialLog;
 import com.personal_dashboard.backend.model.SliceRepayment;
@@ -50,6 +51,17 @@ public class FinanceController {
         public ResponseEntity<ApiResponse<FinanceAccountDTO>> updateBalance(
                         @Valid @RequestBody BalanceUpdateRequest request) {
                 return ResponseEntity.ok(wrap(financeService.setBalance(request.getBalance())));
+        }
+
+        @GetMapping("/budget")
+        public ResponseEntity<ApiResponse<FinanceAccountDTO>> getBudget() {
+                return ResponseEntity.ok(wrap(financeService.getAccount()));
+        }
+
+        @PutMapping("/budget")
+        public ResponseEntity<ApiResponse<FinanceAccountDTO>> updateBudget(
+                        @Valid @RequestBody BudgetUpdateRequest request) {
+                return ResponseEntity.ok(wrap(financeService.setMonthlyBudget(request.getMonthlyBudget())));
         }
 
         @PostMapping("/transactions")

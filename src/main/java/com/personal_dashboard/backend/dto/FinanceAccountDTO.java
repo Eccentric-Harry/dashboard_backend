@@ -5,7 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** Client-facing view of a user's running cash balance. */
+/** Client-facing view of a user's running cash balance and monthly budget. */
 @Data
 @Builder
 @NoArgsConstructor
@@ -13,4 +13,6 @@ import lombok.NoArgsConstructor;
 public class FinanceAccountDTO {
 
     private Double balance;
+
+    private Double monthlyBudget;
 }

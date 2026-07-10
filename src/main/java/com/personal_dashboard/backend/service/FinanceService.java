@@ -86,6 +86,21 @@ public class FinanceService {
         return toDto(financeAccountRepository.save(account));
     }
 
+    /** Returns the current user's monthly spending budget (default 20 000 if not set). */
+    public BigDecimal getMonthlyBudget() {
+        FinanceAccount account = getOrCreateAccount();
+        return account.getMonthlyBudget() != null
+                ? account.getMonthlyBudget()
+                : BigDecimal.valueOf(20_000);
+    }
+
+    /** Sets the user's monthly spending budget. */
+    public FinanceAccountDTO setMonthlyBudget(BigDecimal budget) {
+        FinanceAccount account = getOrCreateAccount();
+        account.setMonthlyBudget(budget);
+        return toDto(financeAccountRepository.save(account));
+    }
+
     // ─── Writes (CRUD) ────────────────────────────────────────────────────
 
     public TransactionDTO createTransaction(TransactionRequest request) {
@@ -214,8 +229,12 @@ public class FinanceService {
     }
 
     private FinanceAccountDTO toDto(FinanceAccount account) {
+        BigDecimal budget = account.getMonthlyBudget() != null
+                ? account.getMonthlyBudget()
+                : BigDecimal.valueOf(20_000);
         return FinanceAccountDTO.builder()
                 .balance(account.getBalance().doubleValue())
+                .monthlyBudget(budget.doubleValue())
                 .build();
     }
 

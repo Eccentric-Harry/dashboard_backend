@@ -37,6 +37,10 @@ public class FinanceAccount implements UserOwnedDocument {
     @Builder.Default
     private BigDecimal balance = BigDecimal.ZERO;
 
+    /** User-configurable monthly spending budget. Defaults to 20 000 if not set. */
+    @Builder.Default
+    private BigDecimal monthlyBudget = BigDecimal.valueOf(20_000);
+
     @CreatedDate
     private Instant createdAt;
 
