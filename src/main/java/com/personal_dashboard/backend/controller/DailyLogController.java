@@ -38,6 +38,19 @@ public class DailyLogController {
                 .build());
     }
 
+    @GetMapping("/range")
+    @Operation(summary = "Get daily logs in range", description = "Returns existing daily logs (mood check-ins) with date in [startDate, endDate]")
+    public ResponseEntity<ApiResponse<java.util.List<DailyLog>>> getDailyLogRange(
+            @RequestParam(name = "startDate") String startDateStr,
+            @RequestParam(name = "endDate") String endDateStr) {
+        LocalDate startDate = LocalDate.parse(startDateStr, DATE_FORMATTER);
+        LocalDate endDate = LocalDate.parse(endDateStr, DATE_FORMATTER);
+        return ResponseEntity.ok(ApiResponse.<java.util.List<DailyLog>>builder()
+                .data(dailyLogService.getRange(startDate, endDate))
+                .meta(buildMeta("range"))
+                .build());
+    }
+
     @PutMapping
     @Operation(summary = "Upsert daily log", description = "Update daily focus and optional coding counters")
     public ResponseEntity<ApiResponse<DailyLog>> upsertDailyLog(

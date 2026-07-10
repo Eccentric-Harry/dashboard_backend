@@ -38,6 +38,20 @@ public class FocusSessionController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/history")
+    @Operation(summary = "Get focus history", description = "Completed focus minutes per day for dates in [startDate, endDate]")
+    public ResponseEntity<ApiResponse<java.util.List<com.personal_dashboard.backend.dto.FocusDaySummary>>> getHistory(
+            @RequestParam(name = "startDate") String startDate,
+            @RequestParam(name = "endDate") String endDate) {
+        String activeUserId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        var history = service.getDailyHistory(
+                activeUserId, java.time.LocalDate.parse(startDate), java.time.LocalDate.parse(endDate));
+        return ResponseEntity.ok(ApiResponse.<java.util.List<com.personal_dashboard.backend.dto.FocusDaySummary>>builder()
+                .data(history)
+                .meta(buildMeta("history"))
+                .build());
+    }
+
     @PostMapping("/start")
     @Operation(summary = "Start a focus session", description = "Start a new focus session with pursuit and duration")
     public ResponseEntity<ApiResponse<FocusSession>> startSession(
