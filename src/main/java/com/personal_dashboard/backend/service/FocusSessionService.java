@@ -8,12 +8,19 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class FocusSessionService {
+
+    private static final ZoneId ZONE = ZoneId.of("Asia/Kolkata");
 
     private final FocusSessionRepository repository;
 
@@ -22,6 +29,27 @@ public class FocusSessionService {
             return repository.findTopByUserIdAndStatusNotOrderByStartTimeDesc(userId, FocusSessionStatus.COMPLETED);
         }
         return repository.findTopByStatusNotOrderByStartTimeDesc(FocusSessionStatus.COMPLETED);
+    }
+
+    public List<com.personal_dashboard.backend.dto.FocusDaySummary> getDailyHistory(
+            String userId, LocalDate startDate, LocalDate endDate) {
+        Instant windowStart = startDate.atStartOfDay(ZONE).toInstant();
+        Instant windowEnd = endDate.plusDays(1).atStartOfDay(ZONE).toInstant();
+
+        Map<LocalDate, List<FocusSession>> byDay = repository
+                .findByUserIdAndStatusAndStartTimeBetween(userId, FocusSessionStatus.COMPLETED, windowStart, windowEnd)
+                .stream()
+                .filter(s -> s.getStartTime() != null)
+                .collect(Collectors.groupingBy(s -> LocalDate.ofInstant(s.getStartTime(), ZONE)));
+
+        return byDay.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -> com.personal_dashboard.backend.dto.FocusDaySummary.builder()
+                        .date(e.getKey().toString())
+                        .totalMinutes(e.getValue().stream().mapToLong(s -> Math.max(0, s.getDurationMinutes())).sum())
+                        .sessions(e.getValue().size())
+                        .build())
+                .toList();
     }
 
     public FocusSession startSession(String activePursuit, int durationMinutes, String userId) {

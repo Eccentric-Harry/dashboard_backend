@@ -8,6 +8,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -47,6 +49,13 @@ public class DailyLogService {
 
     public Optional<DailyLog> findByDate(LocalDate date) {
         return firstLogForDate(date);
+    }
+
+    public List<DailyLog> getRange(LocalDate startDate, LocalDate endDate) {
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        return dailyLogRepository.findByUserIdAndDateRange(userId, startDate, endDate).stream()
+                .sorted(Comparator.comparing(DailyLog::getDate))
+                .toList();
     }
 
     private Optional<DailyLog> firstLogForDate(LocalDate date) {
