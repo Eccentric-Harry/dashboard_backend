@@ -79,8 +79,10 @@ public class FinanceService {
                 .findByUserIdAndDateStringGreaterThanEqualAndDateStringLessThanEqual(userId, startDateString, endDateString);
         List<TransactionDTO> out = new ArrayList<>();
         for (DailyFinancialLog log : logs) {
-            log.getTransactions().forEach((category, txs) ->
-                    txs.forEach(tx -> out.add(toDto(tx, category))));
+            if (log.getTransactions() == null) continue;
+            log.getTransactions().forEach((category, txs) -> {
+                if (txs != null) txs.forEach(tx -> out.add(toDto(tx, category)));
+            });
         }
         return out;
     }
@@ -271,10 +273,10 @@ public class FinanceService {
         return TransactionDTO.builder()
                 .id(tx.getId())
                 .description(tx.getDescription())
-                .amount(tx.getAmount().doubleValue())
+                .amount(tx.getAmount() != null ? tx.getAmount().doubleValue() : 0.0)
                 .category(category)
                 .type(tx.getType())
-                .date(tx.getTimestamp().toString())
+                .date(tx.getTimestamp() != null ? tx.getTimestamp().toString() : Instant.EPOCH.toString())
                 .build();
     }
 }
