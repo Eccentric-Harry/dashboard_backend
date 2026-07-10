@@ -72,6 +72,19 @@ public class FinanceService {
         return out;
     }
 
+    /** Flattens logs in a dateString range (e.g. "2026-07-01" to "2026-07-31"). Reliable alternative to Instant-based range which can miss documents with null/mismatched date fields. */
+    public List<TransactionDTO> getTransactionsByDateStringRange(String startDateString, String endDateString) {
+        String userId = UserContext.getRequiredUserId();
+        List<DailyFinancialLog> logs = dailyFinancialLogRepository
+                .findByUserIdAndDateStringGreaterThanEqualAndDateStringLessThanEqual(userId, startDateString, endDateString);
+        List<TransactionDTO> out = new ArrayList<>();
+        for (DailyFinancialLog log : logs) {
+            log.getTransactions().forEach((category, txs) ->
+                    txs.forEach(tx -> out.add(toDto(tx, category))));
+        }
+        return out;
+    }
+
     // ─── Account / Total Balance ──────────────────────────────────────────
 
     /** Current running balance for the user (creates a zero account on first access). */

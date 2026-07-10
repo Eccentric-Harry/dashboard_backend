@@ -123,9 +123,9 @@ public class DashboardService {
                 LocalDate monthEnd = currentMonth.atEndOfMonth();
 
                 // Fetch all transactions for the month (flattened from the daily logs)
-                List<TransactionDTO> transactions = financeService.getTransactionsBetween(
-                                monthStart.atStartOfDay(ZoneId.systemDefault()).toInstant(),
-                                monthEnd.atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant());
+                List<TransactionDTO> transactions = financeService.getTransactionsByDateStringRange(
+                                monthStart.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                                monthEnd.format(DateTimeFormatter.ISO_LOCAL_DATE));
 
                 // Separate expenses and income
                 BigDecimal totalExpenses = transactions.stream()
@@ -397,9 +397,9 @@ public class DashboardService {
                 LocalDate monthStart = month.atDay(1);
                 LocalDate monthEnd = month.atEndOfMonth();
 
-                List<TransactionDTO> transactions = financeService.getTransactionsBetween(
-                                monthStart.atStartOfDay(ZoneId.systemDefault()).toInstant(),
-                                monthEnd.atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant());
+                List<TransactionDTO> transactions = financeService.getTransactionsByDateStringRange(
+                                monthStart.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                                monthEnd.format(DateTimeFormatter.ISO_LOCAL_DATE));
 
                 // Calculate total spent
                 BigDecimal totalExpenses = transactions.stream()

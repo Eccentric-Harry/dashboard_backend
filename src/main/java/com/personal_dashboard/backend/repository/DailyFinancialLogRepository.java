@@ -15,5 +15,8 @@ public interface DailyFinancialLogRepository extends MongoRepository<DailyFinanc
 
     List<DailyFinancialLog> findByUserIdAndDateBetween(String userId, Instant startDate, Instant endDate);
 
+    List<DailyFinancialLog> findByUserIdAndDateStringGreaterThanEqualAndDateStringLessThanEqual(
+            String userId, String startDateString, String endDateString);
+
     List<DailyFinancialLog> findByUserId(String userId);
 }
