@@ -76,7 +76,7 @@ public class FinanceService {
     public List<TransactionDTO> getTransactionsByDateStringRange(String startDateString, String endDateString) {
         String userId = UserContext.getRequiredUserId();
         List<DailyFinancialLog> logs = dailyFinancialLogRepository
-                .findByUserIdAndDateStringGreaterThanEqualAndDateStringLessThanEqual(userId, startDateString, endDateString);
+                .findByUserIdAndDateStringBetween(userId, startDateString, endDateString);
         List<TransactionDTO> out = new ArrayList<>();
         for (DailyFinancialLog log : logs) {
             if (log.getTransactions() == null) continue;
