@@ -279,6 +279,38 @@ public class HealthController {
                 return ResponseEntity.ok(buildResponse(responseDto));
         }
 
+        /**
+         * Get hydration records for a date range (or the last N days), one entry per day.
+         */
+        @GetMapping("/hydration/range")
+        public ResponseEntity<ApiResponse<List<HydrationRecordDTO>>> getHydrationRange(
+                        @RequestParam(value = "days", required = false) Integer days,
+                        @RequestParam(value = "startDate", required = false) String startDateStr,
+                        @RequestParam(value = "endDate", required = false) String endDateStr) {
+
+                LocalDate endDate = LocalDate.now();
+                LocalDate startDate;
+
+                if (startDateStr != null && !startDateStr.isEmpty()) {
+                        startDate = LocalDate.parse(startDateStr, DATE_FORMATTER);
+                        if (endDateStr != null && !endDateStr.isEmpty()) {
+                                endDate = LocalDate.parse(endDateStr, DATE_FORMATTER);
+                        }
+                } else {
+                        int daysToSubtract = days != null ? days : 14;
+                        startDate = endDate.minusDays(daysToSubtract);
+                }
+
+                List<DailyFoodLog> dailyLogs = dailyFoodLogService.getDailyLogsForRange(startDate, endDate);
+
+                List<HydrationRecordDTO> dtos = dailyLogs.stream()
+                                .map(log -> dailyFoodLogService.toHydrationDto(log.getDateString(), log.getHydration()))
+                                .sorted(Comparator.comparing(HydrationRecordDTO::getDate))
+                                .collect(Collectors.toList());
+
+                return ResponseEntity.ok(buildResponse(dtos));
+        }
+
         @PutMapping("/hydration/{id}")
         public ResponseEntity<ApiResponse<HydrationRecordDTO>> updateHydration(
                         @PathVariable String id,
