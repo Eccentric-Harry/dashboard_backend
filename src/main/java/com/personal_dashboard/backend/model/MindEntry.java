@@ -56,6 +56,15 @@ public class MindEntry implements UserOwnedDocument {
 
     private LocalDate reviewDate;
 
+    /**
+     * True once this entry has ever been PARKED. Unlike reviewDate (cleared when a
+     * parked worry resurfaces to OPEN), this never resets — it's the only durable
+     * signal that a resolved/released/converted thought passed through the worry
+     * parking lot, which the Mind Intelligence "most worry doesn't need action"
+     * insight depends on.
+     */
+    private Boolean wasParked;
+
     private LocalDate date;
 
     @CreatedDate

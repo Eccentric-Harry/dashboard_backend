@@ -120,8 +120,11 @@ public class MindService {
         entry.setStatus(status);
 
         switch (status) {
-            case "PARKED" -> entry.setReviewDate(
-                    request.getReviewDate() != null ? LocalDate.parse(request.getReviewDate()) : null);
+            case "PARKED" -> {
+                entry.setReviewDate(
+                        request.getReviewDate() != null ? LocalDate.parse(request.getReviewDate()) : null);
+                entry.setWasParked(true);
+            }
             case "OPEN" -> {
                 entry.setReviewDate(null);
                 entry.setResolvedAt(null);
