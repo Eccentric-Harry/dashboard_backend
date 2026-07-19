@@ -14,7 +14,7 @@ public interface VisionProvider {
     String analyzeFoodImage(byte[] imageBytes, String prompt);
 
     /**
-     * Returns the user-friendly name of the provider (e.g. "Gemini", "Groq").
+     * Returns the user-friendly name of the provider (e.g. "Claude", "Gemini").
      *
      * @return Provider name
      */

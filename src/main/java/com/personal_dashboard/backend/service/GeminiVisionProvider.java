@@ -68,17 +68,22 @@ public class GeminiVisionProvider implements VisionProvider {
 
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
-            log.info("[GeminiVisionProvider] Sending request to Gemini API (model: {})", model);
+            log.info("[GeminiVisionProvider] Sending request to Gemini API (model: {}, hasImage: {})", model, imageBytes != null && imageBytes.length > 0);
+            long startedAt = System.currentTimeMillis();
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+            long elapsedMs = System.currentTimeMillis() - startedAt;
 
             if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                log.error("[GeminiVisionProvider] API call failed with status: {} after {}ms", response.getStatusCode(), elapsedMs);
                 throw new RuntimeException("Gemini API call failed with status: " + response.getStatusCode());
             }
 
+            log.info("[GeminiVisionProvider] Received response in {}ms", elapsedMs);
             return extractAndCleanJson(response.getBody());
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
+            log.error("[GeminiVisionProvider] Vision call failed: {}", e.getMessage());
             throw new RuntimeException("Error executing Gemini vision call", e);
         }
     }

@@ -1,13 +1,13 @@
 package com.personal_dashboard.backend.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.anthropic.errors.AnthropicServiceException;
+import com.anthropic.errors.RateLimitException;
 import com.personal_dashboard.backend.dto.GeminiAnalysisResult;
 import com.personal_dashboard.backend.model.UserAccount;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.annotation.PostConstruct;
 
@@ -16,12 +16,12 @@ import jakarta.annotation.PostConstruct;
  *
  * Orchestrates the two-stage LLM meal-analysis pipeline:
  *
- *   Stage 1 — Vision/Extraction  (multimodal model: Gemini Pro Vision / Groq LLaVA)
+ *   Stage 1 — Vision/Extraction  (multimodal model: Claude Sonnet / Gemini fallback)
  *             Analyses a food image and/or text description, maps every visible and
  *             HIDDEN ingredient to USDA FoodData Central nomenclature, and emits a
  *             raw ingredient JSON array with per-item gram weights.
  *
- *   Stage 2 — Clinical Reasoning (text-only model: Gemini 1.5 Pro / Groq Mixtral)
+ *   Stage 2 — Clinical Reasoning (text-only model: Claude Sonnet / Gemini fallback)
  *             Consumes the Stage-1 JSON plus the fully-populated UserAccount profile,
  *             runs strict macro math (1g P=4 kcal, 1g C=4 kcal, 1g F=9 kcal),
  *             applies WHO / AHA / ADA clinical guidelines, and returns a deep
@@ -46,8 +46,8 @@ public class NutritionPipelineService {
     private ObjectMapper objectMapper;
 
     public NutritionPipelineService(
-            @Qualifier("geminiVisionProvider") VisionProvider primaryProvider,
-            @Qualifier("groqVisionProvider") VisionProvider fallbackProvider) {
+            @Qualifier("claudeVisionProvider") VisionProvider primaryProvider,
+            @Qualifier("geminiVisionProvider") VisionProvider fallbackProvider) {
         this.primaryProvider = primaryProvider;
         this.fallbackProvider = fallbackProvider;
     }
@@ -90,7 +90,7 @@ public class NutritionPipelineService {
     }
 
     /**
-     * Executes the primary provider (Gemini) with fallback to Groq on 429 Too Many Requests.
+     * Executes the primary provider (Claude) with fallback to Gemini on rate-limit/overload.
      * Uses a default Stage 1 prompt for meal analysis.
      *
      * @param imageBytes Optional raw image bytes
@@ -102,7 +102,7 @@ public class NutritionPipelineService {
     }
 
     /**
-     * Executes the primary provider (Gemini) with fallback to Groq on 429 Too Many Requests.
+     * Executes the primary provider (Claude) with fallback to Gemini on rate-limit/overload.
      *
      * @param imageBytes Optional raw image bytes
      * @param prompt     Structured prompt/instructions
@@ -112,12 +112,12 @@ public class NutritionPipelineService {
         try {
             log.info("[NutritionPipeline] Invoking primary provider ({})", primaryProvider.getProviderName());
             return primaryProvider.analyzeFoodImage(imageBytes, prompt);
-        } catch (HttpClientErrorException.TooManyRequests e) {
-            log.warn("[MealAnalysis] Gemini rate-limit hit. Switching to fallback provider: Groq.");
+        } catch (RateLimitException e) {
+            log.warn("[MealAnalysis] Claude rate-limit hit. Switching to fallback provider: Gemini.");
             return fallbackProvider.analyzeFoodImage(imageBytes, prompt);
-        } catch (HttpStatusCodeException e) {
-            if (e.getStatusCode().value() == 429 || e.getStatusCode().value() == 503) {
-                log.warn("[MealAnalysis] Gemini busy or unavailable ({}). Switching to fallback provider: Groq.", e.getStatusCode().value());
+        } catch (AnthropicServiceException e) {
+            if (e.statusCode() == 429 || e.statusCode() == 503 || e.statusCode() == 529 || e.statusCode() >= 500) {
+                log.warn("[MealAnalysis] Claude busy or unavailable ({}). Switching to fallback provider: Gemini.", e.statusCode());
                 return fallbackProvider.analyzeFoodImage(imageBytes, prompt);
             }
             throw e;
