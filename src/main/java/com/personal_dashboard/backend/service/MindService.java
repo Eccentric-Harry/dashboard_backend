@@ -96,10 +96,14 @@ public class MindService {
                 .pinned(request.getPinned())
                 .date(date)
                 .build();
-        return mindEntryRepository.save(entry);
+        MindEntry saved = mindEntryRepository.save(entry);
+        // Entry content is never logged — mind entries are private mental-health data.
+        log.info("Created mind entry {} (type={}) for {}", saved.getId(), type, date);
+        return saved;
     }
 
     public MindEntry updateEntry(String id, MindEntryRequest request) {
+        log.info("Updating mind entry {}", id);
         MindEntry entry = requireEntry(id);
         entry.setText(request.getText().trim());
         if (request.getType() != null && !request.getType().isBlank()) {
@@ -117,6 +121,7 @@ public class MindService {
     public MindEntry updateStatus(String id, MindStatusRequest request) {
         MindEntry entry = requireEntry(id);
         String status = request.getStatus().toUpperCase();
+        log.info("Mind entry {} status: {} -> {}", id, entry.getStatus(), status);
         entry.setStatus(status);
 
         switch (status) {
@@ -153,6 +158,7 @@ public class MindService {
      * existing task service (so it appears in the calendar/tasks views) and records the link.
      */
     public MindEntry convertToTask(String id) {
+        log.info("Converting mind entry {} to a task", id);
         MindEntry entry = requireEntry(id);
 
         String title = entry.getText().trim();
@@ -169,6 +175,7 @@ public class MindService {
                 .completed(false)
                 .build();
         DailyTask task = dailyTaskService.createTask(taskRequest);
+        log.info("Linked mind entry {} to new task {}", id, task.getId());
 
         entry.setStatus("CONVERTED");
         entry.setLinkedTaskId(task.getId());
@@ -177,11 +184,13 @@ public class MindService {
     }
 
     public void deleteEntry(String id) {
+        log.info("Deleting mind entry {}", id);
         MindEntry entry = requireEntry(id);
         mindEntryRepository.delete(entry);
     }
 
     public DailyLog saveMood(LocalDate date, MindMoodRequest request) {
+        log.info("Saving mood check-in for {} (score={})", date, request.getMoodScore());
         DailyLogRequest logRequest = DailyLogRequest.builder()
                 .moodScore(request.getMoodScore())
                 .moodNote(request.getMoodNote())

@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -24,6 +25,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/push")
 @RequiredArgsConstructor
@@ -57,6 +59,7 @@ public class PushNotificationController {
             entity.setAuth(request.getAuth());
             entity.setTimezone(request.getTimezone());
             saved = pushSubscriptionRepository.save(entity);
+            log.info("Updated existing push subscription {} for userId={}", saved.getId(), userId);
         } else {
             PushSubscription newSub = PushSubscription.builder()
                     .userId(userId)
@@ -66,6 +69,7 @@ public class PushNotificationController {
                     .timezone(request.getTimezone())
                     .build();
             saved = pushSubscriptionRepository.save(newSub);
+            log.info("Registered new push subscription {} for userId={} (timezone={})", saved.getId(), userId, request.getTimezone());
         }
 
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.<PushSubscription>builder()
@@ -79,7 +83,12 @@ public class PushNotificationController {
     public ResponseEntity<ApiResponse<Void>> unsubscribe(@RequestParam String endpoint) {
         String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
         Optional<PushSubscription> existing = pushSubscriptionRepository.findByUserIdAndEndpoint(userId, endpoint);
-        existing.ifPresent(pushSubscriptionRepository::delete);
+        if (existing.isPresent()) {
+            log.info("Unsubscribing push endpoint for userId={}", userId);
+            pushSubscriptionRepository.delete(existing.get());
+        } else {
+            log.warn("Unsubscribe requested for unknown endpoint (userId={})", userId);
+        }
 
         return ResponseEntity.ok(ApiResponse.<Void>builder()
                 .data(null)

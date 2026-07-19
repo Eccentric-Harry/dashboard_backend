@@ -36,6 +36,7 @@ public class AuthController {
         String passcode = body.get("passcode");
 
         if (username == null || username.isBlank() || passcode == null || passcode.isBlank()) {
+            log.warn("Signup rejected: username and passcode are required");
             return badRequest("Username and passcode are required");
         }
 
@@ -43,10 +44,12 @@ public class AuthController {
         try {
             tokenOpt = authService.signup(username, displayName, passcode);
         } catch (IllegalArgumentException e) {
+            log.warn("Signup rejected for username '{}': {}", username, e.getMessage());
             return badRequest(e.getMessage());
         }
 
         if (tokenOpt.isEmpty()) {
+            log.error("Signup returned no token for username '{}' despite no exception", username);
             return badRequest("Signup failed. Please try again.");
         }
 
@@ -76,6 +79,7 @@ public class AuthController {
         String passcode = body.get("passcode");
 
         if (username == null || username.isBlank() || passcode == null || passcode.isBlank()) {
+            log.warn("Login rejected: username and passcode are required");
             return badRequest("Username and passcode are required");
         }
 

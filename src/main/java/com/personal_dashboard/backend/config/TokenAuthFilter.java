@@ -7,6 +7,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -14,6 +15,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+@Slf4j
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 @RequiredArgsConstructor
@@ -47,6 +49,7 @@ public class TokenAuthFilter extends OncePerRequestFilter {
         if (path.startsWith("/api/")) {
             String authHeader = request.getHeader("Authorization");
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                log.warn("Rejecting request to {} — missing or malformed Authorization header", path);
                 writeCorsError(request, response, "Missing or invalid Authorization header");
                 return;
             }
@@ -54,12 +57,14 @@ public class TokenAuthFilter extends OncePerRequestFilter {
             String token = authHeader.substring(7);
             var authToken = authService.validateToken(token);
             if (authToken.isEmpty()) {
+                log.warn("Rejecting request to {} — invalid or expired token", path);
                 writeCorsError(request, response, "Invalid or expired token");
                 return;
             }
 
             try {
                 UserContext.setUserId(authToken.get().getUserId());
+                log.debug("Authenticated request: {} {} (userId={})", request.getMethod(), path, authToken.get().getUserId());
                 filterChain.doFilter(request, response);
             } finally {
                 UserContext.clear();

@@ -75,7 +75,9 @@ public class DailyFoodLogService {
         // Recalculate totals
         recalculateTotals(dailyLog);
 
-        return dailyFoodLogRepository.save(dailyLog);
+        DailyFoodLog saved = dailyFoodLogRepository.save(dailyLog);
+        log.info("Added {} meal entry to log {} ({} cal, {}g protein)", mealType, dateStr, entry.getCalories(), entry.getProteinGrams());
+        return saved;
     }
 
     /**
@@ -83,9 +85,11 @@ public class DailyFoodLogService {
      * Returns the updated daily log, or null if nothing was found.
      */
     public DailyFoodLog removeMeal(String mealId, String entryId) {
+        log.info("Removing meal entry {} from log {}", entryId, mealId);
         String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
         DailyFoodLog dailyLog = dailyFoodLogRepository.findByUserIdAndDateString(userId, mealId).orElse(null);
         if (dailyLog == null || dailyLog.getMeals() == null) {
+            log.warn("No daily log found for {} — cannot remove meal entry {}", mealId, entryId);
             return null;
         }
 
@@ -101,6 +105,7 @@ public class DailyFoodLogService {
         }
 
         if (!removed) {
+            log.warn("Meal entry {} not found in log {} — nothing removed", entryId, mealId);
             return null;
         }
 
@@ -115,9 +120,11 @@ public class DailyFoodLogService {
      * Update a specific meal entry within a daily log.
      */
     public DailyFoodLog updateMeal(String mealId, String entryId, String newMealType, MealEntry updatedEntry) {
+        log.info("Updating meal entry {} in log {}", entryId, mealId);
         String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
         DailyFoodLog dailyLog = dailyFoodLogRepository.findByUserIdAndDateString(userId, mealId).orElse(null);
         if (dailyLog == null || dailyLog.getMeals() == null) {
+            log.warn("No daily log found for {} — cannot update meal entry {}", mealId, entryId);
             return null;
         }
 
@@ -139,6 +146,7 @@ public class DailyFoodLogService {
         }
 
         if (oldEntry == null) {
+            log.warn("Meal entry {} not found in log {} — nothing updated", entryId, mealId);
             return null;
         }
 
@@ -178,6 +186,7 @@ public class DailyFoodLogService {
         if (targetMl != null) dailyLog.getHydration().setTargetMl(targetMl);
         if (notes != null) dailyLog.getHydration().setNotes(notes);
 
+        log.info("Updated hydration for {}: {}ml / {}ml target", dateStr, waterIntakeMl, targetMl);
         return dailyFoodLogRepository.save(dailyLog);
     }
 
@@ -194,24 +203,25 @@ public class DailyFoodLogService {
         Double current = dailyLog.getHydration().getWaterIntakeMl();
         dailyLog.getHydration().setWaterIntakeMl(Math.max(0, current + amount));
 
+        log.info("Added {}ml water intake for {} (new total: {}ml)", amount, dateStr, dailyLog.getHydration().getWaterIntakeMl());
         return dailyFoodLogRepository.save(dailyLog);
     }
 
-    private void ensureGoalsInitialized(DailyFoodLog log, UserAccount user) {
-        if (log.getCalorieGoal() == null || log.getProteinGoal() == null) {
+    private void ensureGoalsInitialized(DailyFoodLog dailyLog, UserAccount user) {
+        if (dailyLog.getCalorieGoal() == null || dailyLog.getProteinGoal() == null) {
             if (user == null && userAccountRepository != null) {
-                user = userAccountRepository.findById(log.getUserId()).orElse(null);
+                user = userAccountRepository.findById(dailyLog.getUserId()).orElse(null);
             }
             if (user != null) {
-                if (log.getCalorieGoal() == null) {
-                    log.setCalorieGoal(user.getTargetCalories() != null ? user.getTargetCalories() : 2000);
+                if (dailyLog.getCalorieGoal() == null) {
+                    dailyLog.setCalorieGoal(user.getTargetCalories() != null ? user.getTargetCalories() : 2000);
                 }
-                if (log.getProteinGoal() == null) {
-                    log.setProteinGoal(user.getTargetProtein() != null ? user.getTargetProtein() : 100);
+                if (dailyLog.getProteinGoal() == null) {
+                    dailyLog.setProteinGoal(user.getTargetProtein() != null ? user.getTargetProtein() : 100);
                 }
             } else {
-                if (log.getCalorieGoal() == null) log.setCalorieGoal(2000);
-                if (log.getProteinGoal() == null) log.setProteinGoal(100);
+                if (dailyLog.getCalorieGoal() == null) dailyLog.setCalorieGoal(2000);
+                if (dailyLog.getProteinGoal() == null) dailyLog.setProteinGoal(100);
             }
         }
     }
@@ -290,7 +300,7 @@ public class DailyFoodLogService {
      * Calories and protein are read from first-class fields.
      * Carbs, fat, fiber, sugar, sodium are extracted from the Gemini-populated mealItems payload.
      */
-    public void recalculateTotals(DailyFoodLog log) {
+    public void recalculateTotals(DailyFoodLog dailyLog) {
         int totalCalories = 0;
         int totalProtein = 0;
         int totalCarbs = 0;
@@ -299,8 +309,8 @@ public class DailyFoodLogService {
         double totalSugar = 0.0;
         double totalSodium = 0.0;
 
-        if (log.getMeals() != null) {
-            for (List<MealEntry> entries : log.getMeals().values()) {
+        if (dailyLog.getMeals() != null) {
+            for (List<MealEntry> entries : dailyLog.getMeals().values()) {
                 if (entries != null) {
                     for (MealEntry entry : entries) {
                         totalCalories += entry.getCalories() != null ? entry.getCalories() : 0;
@@ -321,16 +331,18 @@ public class DailyFoodLogService {
             }
         }
 
-        if (log.getDailyTotals() == null) {
-            log.setDailyTotals(new DailyTotals());
+        if (dailyLog.getDailyTotals() == null) {
+            dailyLog.setDailyTotals(new DailyTotals());
         }
-        log.getDailyTotals().setTotalCalories(totalCalories);
-        log.getDailyTotals().setTotalProteinGrams(totalProtein);
-        log.getDailyTotals().setTotalCarbsGrams(totalCarbs);
-        log.getDailyTotals().setTotalFatGrams(totalFat);
-        log.getDailyTotals().setTotalFiberGrams(totalFiber);
-        log.getDailyTotals().setTotalSugarGrams(totalSugar);
-        log.getDailyTotals().setTotalSodiumMg(totalSodium);
+        dailyLog.getDailyTotals().setTotalCalories(totalCalories);
+        dailyLog.getDailyTotals().setTotalProteinGrams(totalProtein);
+        dailyLog.getDailyTotals().setTotalCarbsGrams(totalCarbs);
+        dailyLog.getDailyTotals().setTotalFatGrams(totalFat);
+        dailyLog.getDailyTotals().setTotalFiberGrams(totalFiber);
+        dailyLog.getDailyTotals().setTotalSugarGrams(totalSugar);
+        dailyLog.getDailyTotals().setTotalSodiumMg(totalSodium);
+        log.debug("Recalculated totals for log {}: {} cal, {}g protein, {}g carbs, {}g fat",
+                dailyLog.getDateString(), totalCalories, totalProtein, totalCarbs, totalFat);
     }
 
     /** Safe int extraction from a Map value (Number or null). */
@@ -349,11 +361,11 @@ public class DailyFoodLogService {
     /**
      * Convert a DailyFoodLog to its DTO representation.
      */
-    public DailyFoodLogDTO toDto(DailyFoodLog log) {
-        ensureGoalsInitialized(log, null);
+    public DailyFoodLogDTO toDto(DailyFoodLog dailyLog) {
+        ensureGoalsInitialized(dailyLog, null);
         Map<String, List<MealEntryDTO>> mealsDto = new LinkedHashMap<>();
-        if (log.getMeals() != null) {
-            for (Map.Entry<String, List<MealEntry>> entry : log.getMeals().entrySet()) {
+        if (dailyLog.getMeals() != null) {
+            for (Map.Entry<String, List<MealEntry>> entry : dailyLog.getMeals().entrySet()) {
                 List<MealEntryDTO> dtoList = entry.getValue() != null
                         ? entry.getValue().stream().map(this::toMealEntryDto).collect(Collectors.toList())
                         : new ArrayList<>();
@@ -362,20 +374,20 @@ public class DailyFoodLogService {
         }
 
         DailyFoodLogDTO.DailyTotalsDTO totalsDto = DailyFoodLogDTO.DailyTotalsDTO.builder()
-                .totalCalories(log.getDailyTotals() != null ? log.getDailyTotals().getTotalCalories() : 0)
-                .totalProteinGrams(log.getDailyTotals() != null ? log.getDailyTotals().getTotalProteinGrams() : 0)
+                .totalCalories(dailyLog.getDailyTotals() != null ? dailyLog.getDailyTotals().getTotalCalories() : 0)
+                .totalProteinGrams(dailyLog.getDailyTotals() != null ? dailyLog.getDailyTotals().getTotalProteinGrams() : 0)
                 .build();
 
-        String dateStr = log.getDateString();
+        String dateStr = dailyLog.getDateString();
 
         return DailyFoodLogDTO.builder()
-                .mealId(log.getDateString())
+                .mealId(dailyLog.getDateString())
                 .date(dateStr)
                 .dailyTotals(totalsDto)
                 .meals(mealsDto)
-                .hydration(toHydrationDto(dateStr, log.getHydration()))
-                .calorieGoal(log.getCalorieGoal())
-                .proteinGoal(log.getProteinGoal())
+                .hydration(toHydrationDto(dateStr, dailyLog.getHydration()))
+                .calorieGoal(dailyLog.getCalorieGoal())
+                .proteinGoal(dailyLog.getProteinGoal())
                 .build();
     }
 
@@ -440,13 +452,13 @@ public class DailyFoodLogService {
      * Flatten a DailyFoodLog into a list of FoodEntryDTOs (backward compatibility).
      * Each entry gets the mealType injected from its map key.
      */
-    public List<FoodEntryDTO> flattenToFoodEntryDTOs(DailyFoodLog log) {
+    public List<FoodEntryDTO> flattenToFoodEntryDTOs(DailyFoodLog dailyLog) {
         List<FoodEntryDTO> result = new ArrayList<>();
-        if (log.getMeals() == null) return result;
+        if (dailyLog.getMeals() == null) return result;
 
-        String dateStr = log.getDateString();
+        String dateStr = dailyLog.getDateString();
 
-        for (Map.Entry<String, List<MealEntry>> mealGroup : log.getMeals().entrySet()) {
+        for (Map.Entry<String, List<MealEntry>> mealGroup : dailyLog.getMeals().entrySet()) {
             String mealType = mealGroup.getKey();
             List<MealEntry> entries = mealGroup.getValue();
             if (entries == null) continue;

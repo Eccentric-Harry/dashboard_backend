@@ -67,6 +67,7 @@ public class DailyTaskService {
     }
 
     public DailyTask createTask(DailyTaskRequest request) {
+        log.info("Creating task '{}' on {}", request.getTitle(), request.getDate());
         LocalDate taskDate = LocalDate.parse(request.getDate());
         String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
         int nextOrder = dailyTaskRepository.findByUserIdAndDateRange(userId, taskDate, taskDate.plusDays(1)).size();
@@ -98,10 +99,13 @@ public class DailyTaskService {
                 .tags(request.getTags())
                 .origin(com.personal_dashboard.backend.model.EventOrigin.local())
                 .build();
-        return dailyTaskRepository.save(task);
+        DailyTask saved = dailyTaskRepository.save(task);
+        log.info("Created task {} '{}'", saved.getId(), saved.getTitle());
+        return saved;
     }
 
     public DailyTask updateTask(String id, DailyTaskRequest request) {
+        log.info("Updating task {}", id);
         String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
         DailyTask existing = dailyTaskRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new IllegalArgumentException("Task not found with id: " + id));
@@ -164,6 +168,7 @@ public class DailyTaskService {
     }
 
     public DailyTask toggleTask(String id, LocalDate occurrenceDate) {
+        log.info("Toggling completion for task {} (occurrence={})", id, occurrenceDate);
         String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
         DailyTask existing = dailyTaskRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new IllegalArgumentException("Task not found with id: " + id));
@@ -201,8 +206,10 @@ public class DailyTaskService {
         // Soft delete: never hard-remove, so a later pull cannot resurrect it.
         // The soft-deleted save drives outbound cancellation to linked Google remotes.
         if (Boolean.TRUE.equals(existing.getDeleted())) {
+            log.debug("Task {} already soft-deleted — skipping (idempotent)", id);
             return; // idempotent — already soft-deleted
         }
+        log.info("Soft-deleting task {} '{}'", id, existing.getTitle());
         existing.setDeleted(true);
         existing.setDeletedAt(java.time.Instant.now());
         dailyTaskRepository.save(existing);

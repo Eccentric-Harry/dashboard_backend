@@ -7,6 +7,7 @@ import com.personal_dashboard.backend.model.*;
 import com.personal_dashboard.backend.service.DailyFoodLogService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +18,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/health")
 @RequiredArgsConstructor
@@ -37,6 +39,7 @@ public class HealthController {
         @PostMapping("/food")
         public ResponseEntity<ApiResponse<FoodEntryDTO>> createFoodEntry(
                         @Valid @RequestBody FoodEntryRequest request) {
+                log.info("POST /health/food — {} on {}", request.getMealType(), request.getDate());
 
                 MealEntry entry = MealEntry.builder()
                                 .description(request.getDescription())
@@ -105,6 +108,7 @@ public class HealthController {
                         @PathVariable String mealId,
                         @PathVariable String entryId,
                         @Valid @RequestBody FoodEntryRequest request) {
+                log.info("PUT /health/food/{}/meal/{}", mealId, entryId);
 
                 MealEntry updatedEntry = MealEntry.builder()
                                 .description(request.getDescription())
@@ -174,6 +178,7 @@ public class HealthController {
         public ResponseEntity<ApiResponse<Void>> deleteFoodEntry(
                         @PathVariable String mealId,
                         @PathVariable String entryId) {
+                log.info("DELETE /health/food/{}/meal/{}", mealId, entryId);
 
                 DailyFoodLog result = dailyFoodLogService.removeMeal(mealId, entryId);
                 if (result == null) {
@@ -211,7 +216,7 @@ public class HealthController {
 
                 // Flatten daily logs into individual FoodEntryDTOs
                 List<FoodEntryDTO> dtos = dailyLogs.stream()
-                                .flatMap(log -> dailyFoodLogService.flattenToFoodEntryDTOs(log).stream())
+                                .flatMap(dailyLog -> dailyFoodLogService.flattenToFoodEntryDTOs(dailyLog).stream())
                                 .sorted((a, b) -> b.getDate().compareTo(a.getDate()))
                                 .collect(Collectors.toList());
 
@@ -238,8 +243,8 @@ public class HealthController {
                                 ? dateStr
                                 : LocalDate.now().format(DATE_FORMATTER);
 
-                DailyFoodLog log = dailyFoodLogService.getDailyLog(targetDate);
-                DailyFoodLogDTO dto = dailyFoodLogService.toDto(log);
+                DailyFoodLog dailyLog = dailyFoodLogService.getDailyLog(targetDate);
+                DailyFoodLogDTO dto = dailyFoodLogService.toDto(dailyLog);
 
                 return ResponseEntity.ok(buildResponse(dto));
         }
@@ -252,14 +257,14 @@ public class HealthController {
 
                 double target = request.getTargetMl() != null ? request.getTargetMl() : DEFAULT_TARGET_ML;
 
-                DailyFoodLog log = dailyFoodLogService.updateHydration(
+                DailyFoodLog dailyLog = dailyFoodLogService.updateHydration(
                                 request.getDate(),
                                 request.getWaterIntakeMl(),
                                 target,
                                 request.getNotes());
 
                 HydrationRecordDTO responseDto = dailyFoodLogService.toHydrationDto(request.getDate(),
-                                log.getHydration());
+                                dailyLog.getHydration());
 
                 return ResponseEntity.status(HttpStatus.CREATED).body(buildResponse(responseDto));
         }
@@ -273,8 +278,8 @@ public class HealthController {
                                 ? dateStr
                                 : LocalDate.now().format(DATE_FORMATTER);
 
-                DailyFoodLog log = dailyFoodLogService.getDailyLog(targetDate);
-                HydrationRecordDTO responseDto = dailyFoodLogService.toHydrationDto(targetDate, log.getHydration());
+                DailyFoodLog dailyLog = dailyFoodLogService.getDailyLog(targetDate);
+                HydrationRecordDTO responseDto = dailyFoodLogService.toHydrationDto(targetDate, dailyLog.getHydration());
 
                 return ResponseEntity.ok(buildResponse(responseDto));
         }
@@ -304,7 +309,7 @@ public class HealthController {
                 List<DailyFoodLog> dailyLogs = dailyFoodLogService.getDailyLogsForRange(startDate, endDate);
 
                 List<HydrationRecordDTO> dtos = dailyLogs.stream()
-                                .map(log -> dailyFoodLogService.toHydrationDto(log.getDateString(), log.getHydration()))
+                                .map(dailyLog -> dailyFoodLogService.toHydrationDto(dailyLog.getDateString(), dailyLog.getHydration()))
                                 .sorted(Comparator.comparing(HydrationRecordDTO::getDate))
                                 .collect(Collectors.toList());
 
@@ -325,7 +330,7 @@ public class HealthController {
                 // Hydration is now part of the daily log, we don't 'delete' it usually,
                 // but we can reset it if needed. For now, let's just return success
                 // since the user wants to rely on daily_food_logs and hydration is embedded.
-
+                log.info("Resetting hydration for {}", id);
                 dailyFoodLogService.updateHydration(id, 0.0, DEFAULT_TARGET_ML, null);
 
                 return ResponseEntity.ok(buildResponse(null));
@@ -340,8 +345,8 @@ public class HealthController {
                                 ? dateStr
                                 : LocalDate.now().format(DATE_FORMATTER);
 
-                DailyFoodLog log = dailyFoodLogService.addWaterIntake(targetDate, amount);
-                HydrationRecordDTO responseDto = dailyFoodLogService.toHydrationDto(targetDate, log.getHydration());
+                DailyFoodLog dailyLog = dailyFoodLogService.addWaterIntake(targetDate, amount);
+                HydrationRecordDTO responseDto = dailyFoodLogService.toHydrationDto(targetDate, dailyLog.getHydration());
 
                 return ResponseEntity.ok(buildResponse(responseDto));
         }

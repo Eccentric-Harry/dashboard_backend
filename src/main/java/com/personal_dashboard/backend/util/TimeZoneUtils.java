@@ -1,7 +1,10 @@
 package com.personal_dashboard.backend.util;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.time.ZoneId;
 
+@Slf4j
 public class TimeZoneUtils {
 
     /**
@@ -34,6 +37,7 @@ public class TimeZoneUtils {
         try {
             return ZoneId.of(normalizeTimeZone(tz));
         } catch (Exception e) {
+            log.warn("Invalid timezone '{}', falling back to UTC: {}", tz, e.getMessage());
             return ZoneId.of("UTC");
         }
     }

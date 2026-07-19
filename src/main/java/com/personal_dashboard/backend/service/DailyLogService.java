@@ -31,20 +31,22 @@ public class DailyLogService {
 
     public DailyLog upsertForDate(LocalDate date, DailyLogRequest request) {
         String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
-        DailyLog log = firstLogForDate(date)
+        DailyLog dailyLog = firstLogForDate(date)
                 .orElse(DailyLog.builder().userId(userId).date(date).dateString(date.toString()).build());
 
         if (request.getMoodRating() != null) {
-            log.setMoodRating(request.getMoodRating());
+            dailyLog.setMoodRating(request.getMoodRating());
         }
         if (request.getMoodScore() != null) {
-            log.setMoodScore(request.getMoodScore());
+            dailyLog.setMoodScore(request.getMoodScore());
         }
         if (request.getMoodNote() != null) {
-            log.setMoodNote(request.getMoodNote());
+            // Note content itself is never logged — personal reflection.
+            dailyLog.setMoodNote(request.getMoodNote());
         }
 
-        return dailyLogRepository.save(log);
+        log.info("Upserting daily log for {}", date);
+        return dailyLogRepository.save(dailyLog);
     }
 
     public Optional<DailyLog> findByDate(LocalDate date) {

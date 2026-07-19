@@ -5,6 +5,7 @@ import com.personal_dashboard.backend.dto.ApiResponse;
 import com.personal_dashboard.backend.dto.InfrastructureMetricsDTO;
 import com.personal_dashboard.backend.service.InfrastructureService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Instant;
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/infrastructure")
 @RequiredArgsConstructor
@@ -22,7 +24,7 @@ public class InfrastructureController {
 
     @GetMapping("/metrics")
     public ResponseEntity<ApiResponse<InfrastructureMetricsDTO>> getInfrastructureMetrics() {
-
+        log.debug("GET /infrastructure/metrics");
         InfrastructureMetricsDTO metrics = infrastructureService.getServerMetrics();
 
         ApiMeta meta = ApiMeta.builder()

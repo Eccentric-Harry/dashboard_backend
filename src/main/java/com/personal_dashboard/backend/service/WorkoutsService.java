@@ -79,6 +79,7 @@ public class WorkoutsService {
      * Get the pinned featured Strava embed from RDH cache
      */
     public Object getFeaturedEmbed() {
+        log.info("Fetching featured Strava embed from RDH cache");
         return cacheService.getCacheData("workouts_featured_embed", Object.class).orElse(null);
     }
 
@@ -86,6 +87,7 @@ public class WorkoutsService {
      * Update the pinned featured Strava embed in RDH cache
      */
     public Object updateFeaturedEmbed(Object data) {
+        log.info("Updating featured Strava embed in RDH cache");
         cacheService.saveCacheData("workouts_featured_embed", data, "manual_featured_update");
         return data;
     }

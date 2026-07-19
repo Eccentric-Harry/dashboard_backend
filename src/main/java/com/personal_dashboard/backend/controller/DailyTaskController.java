@@ -34,6 +34,7 @@ public class DailyTaskController {
     @Operation(summary = "Get tasks", description = "Fetch all tasks or filter by a specific date")
     public ResponseEntity<ApiResponse<List<DailyTask>>> getTasks(
             @RequestParam(name = "date", required = false) String dateStr) {
+        log.debug("GET /learnings/tasks date={}", dateStr);
         List<DailyTask> tasks = dateStr != null && !dateStr.isBlank()
                 ? dailyTaskService.getTasksForDateWithIncompletePrevious(LocalDate.parse(dateStr, DATE_FORMATTER))
                 : dailyTaskService.getAllTasks();
@@ -48,6 +49,7 @@ public class DailyTaskController {
     public ResponseEntity<ApiResponse<List<DailyTask>>> getTasksRange(
             @RequestParam(name = "startDate") String startDateStr,
             @RequestParam(name = "endDate") String endDateStr) {
+        log.debug("GET /learnings/tasks/range {} to {}", startDateStr, endDateStr);
         LocalDate startDate = LocalDate.parse(startDateStr, DATE_FORMATTER);
         LocalDate endDate = LocalDate.parse(endDateStr, DATE_FORMATTER);
         List<DailyTask> tasks = dailyTaskService.getTasksForRange(startDate, endDate);

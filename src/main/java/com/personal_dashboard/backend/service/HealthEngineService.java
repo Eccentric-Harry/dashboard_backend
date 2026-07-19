@@ -12,6 +12,7 @@ public class HealthEngineService {
 
     public void calculateHealthMetrics(UserAccount user) {
         if (user == null) {
+            log.warn("calculateHealthMetrics called with null user, skipping.");
             return;
         }
 
@@ -119,6 +120,9 @@ public class HealthEngineService {
         user.setAge(age);
         user.setHeight(height);
         user.setWeight(weight);
+
+        log.info("Recalculated health metrics for userId={}: BMI={} BMR={} TDEE={} targetCalories={}",
+                user.getId(), user.getBmi(), user.getBmr(), user.getTdee(), targetCalories);
     }
 
     private double roundToOnedp(double value) {

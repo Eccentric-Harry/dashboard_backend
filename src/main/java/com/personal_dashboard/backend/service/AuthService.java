@@ -82,6 +82,7 @@ public class AuthService {
                 .build();
         authTokenRepository.save(authToken);
 
+        log.info("Signed up new user: {}", sanitizedUsername);
         return Optional.of(token);
     }
 
@@ -98,6 +99,7 @@ public class AuthService {
         List<Passcode> userPasscodes = passcodeRepository.findByUserId(sanitizedUsername);
         Optional<Passcode> passcodeOpt = userPasscodes.isEmpty() ? Optional.empty() : Optional.of(userPasscodes.getFirst());
         if (passcodeOpt.isEmpty() || !passcodeOpt.get().getHash().equals(inputHash)) {
+            log.warn("Failed login attempt for username: {}", sanitizedUsername);
             return Optional.empty();
         }
 
@@ -122,6 +124,7 @@ public class AuthService {
                 .build();
         authTokenRepository.save(authToken);
 
+        log.info("Logged in user: {}", sanitizedUsername);
         return Optional.of(token);
     }
 
@@ -153,6 +156,7 @@ public class AuthService {
             byte[] hash = digest.digest(raw.getBytes());
             return HexFormat.of().formatHex(hash);
         } catch (NoSuchAlgorithmException e) {
+            log.error("SHA-256 not available in this JVM", e);
             throw new RuntimeException("SHA-256 not available", e);
         }
     }
