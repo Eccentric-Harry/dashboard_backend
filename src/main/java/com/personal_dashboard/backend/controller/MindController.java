@@ -39,6 +39,7 @@ public class MindController {
     public ResponseEntity<ApiResponse<List<MindEntry>>> getEntries(
             @RequestParam(name = "type", required = false) String type,
             @RequestParam(name = "status", required = false) String status) {
+        log.debug("GET /mind/entries type={} status={}", type, status);
         List<MindEntry> entries = mindService.getEntries(type, status);
         return ResponseEntity.ok(ApiResponse.<List<MindEntry>>builder()
                 .data(entries)
@@ -120,6 +121,7 @@ public class MindController {
         LocalDate date = (dateStr != null && !dateStr.isBlank())
                 ? LocalDate.parse(dateStr, DATE_FORMATTER)
                 : null;
+        log.debug("GET /mind/summary date={}", date);
         MindSummaryResponse summary = mindService.getSummary(date);
         return ResponseEntity.ok(ApiResponse.<MindSummaryResponse>builder()
                 .data(summary)

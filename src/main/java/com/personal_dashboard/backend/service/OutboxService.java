@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.Optional;
 
 /**
  * Enqueues durable outbox entries for outbound pushes. Coalesces repeated changes
@@ -23,17 +24,19 @@ public class OutboxService {
         if (taskId == null || taskId.isBlank()) return;
         Instant now = Instant.now();
 
-        SyncOutboxEntry entry = outboxRepository.findFirstByTaskIdAndStatus(taskId, "PENDING")
-                .orElseGet(() -> SyncOutboxEntry.builder()
-                        .taskId(taskId)
-                        .status("PENDING")
-                        .createdAt(now)
-                        .build());
+        Optional<SyncOutboxEntry> existing = outboxRepository.findFirstByTaskIdAndStatus(taskId, "PENDING");
+        SyncOutboxEntry entry = existing.orElseGet(() -> SyncOutboxEntry.builder()
+                .taskId(taskId)
+                .status("PENDING")
+                .createdAt(now)
+                .build());
         // (Re)arm for immediate processing; reset attempts on a fresh change.
         entry.setStatus("PENDING");
         entry.setAttempts(0);
         entry.setNextAttemptAt(now);
         entry.setUpdatedAt(now);
         outboxRepository.save(entry);
+        log.debug("Enqueued outbox entry for task {} ({})", taskId,
+                existing.isPresent() ? "coalesced into existing pending entry" : "new entry");
     }
 }

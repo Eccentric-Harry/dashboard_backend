@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -29,6 +30,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/calendar/items")
 @RequiredArgsConstructor
@@ -43,6 +45,7 @@ public class CalendarController {
     public ResponseEntity<ApiResponse<List<CalendarItemOccurrence>>> getOccurrences(
             @RequestParam String startDate,
             @RequestParam String endDate) {
+        log.debug("GET /calendar/items/range {} to {}", startDate, endDate);
         LocalDate start = LocalDate.parse(startDate, DATE_FORMATTER);
         LocalDate end = LocalDate.parse(endDate, DATE_FORMATTER);
         return ResponseEntity.ok(ApiResponse.<List<CalendarItemOccurrence>>builder()

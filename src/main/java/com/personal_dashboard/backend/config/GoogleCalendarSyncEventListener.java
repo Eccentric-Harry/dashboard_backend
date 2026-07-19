@@ -36,10 +36,12 @@ public class GoogleCalendarSyncEventListener extends AbstractMongoEventListener<
     public void onAfterSave(AfterSaveEvent<DailyTask> event) {
         if (GoogleSyncContext.isBypass()) {
             // Save originated from inbound sync or an outbound bookkeeping write — don't echo it.
+            log.debug("Skipping outbox enqueue for task save — GoogleSyncContext bypass active");
             return;
         }
         DailyTask task = event.getSource();
         if (task.getUserId() == null || task.getUserId().isBlank()) return;
+        log.debug("Task {} saved — enqueueing outbox entry for Google Calendar sync", task.getId());
         outboxService.enqueue(task.getId());
     }
 
@@ -50,6 +52,7 @@ public class GoogleCalendarSyncEventListener extends AbstractMongoEventListener<
         // stray hard delete still triggers reconciliation of any linked remotes.
         Document queryDoc = event.getSource();
         if (queryDoc == null || !queryDoc.containsKey("_id")) return;
+        log.warn("Unexpected hard delete of task {} — enqueueing defensive outbox reconciliation", queryDoc.get("_id"));
         outboxService.enqueue(queryDoc.get("_id").toString());
     }
 }

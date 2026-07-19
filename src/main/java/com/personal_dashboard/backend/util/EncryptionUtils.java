@@ -1,5 +1,6 @@
 package com.personal_dashboard.backend.util;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -11,6 +12,7 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
 
+@Slf4j
 @Component
 public class EncryptionUtils {
 
@@ -26,7 +28,9 @@ public class EncryptionUtils {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] keyBytes = digest.digest(rawKey.getBytes(StandardCharsets.UTF_8));
             this.secretKey = new SecretKeySpec(keyBytes, "AES");
+            log.info("EncryptionUtils initialized with AES-256 key derived from configured secret");
         } catch (Exception e) {
+            log.error("Failed to initialize encryption key", e);
             throw new IllegalStateException("Failed to initialize encryption key", e);
         }
     }
@@ -52,6 +56,7 @@ public class EncryptionUtils {
 
             return Base64.getEncoder().encodeToString(encrypted);
         } catch (Exception e) {
+            log.error("Encryption failed: {}", e.getMessage());
             throw new RuntimeException("Error occurred during encryption", e);
         }
     }
@@ -77,6 +82,7 @@ public class EncryptionUtils {
             byte[] decrypted = cipher.doFinal(cipherText);
             return new String(decrypted, StandardCharsets.UTF_8);
         } catch (Exception e) {
+            log.error("Decryption failed: {}", e.getMessage());
             throw new RuntimeException("Error occurred during decryption", e);
         }
     }

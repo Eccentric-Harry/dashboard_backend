@@ -4,6 +4,7 @@ import com.personal_dashboard.backend.dto.ApiResponse;
 import com.personal_dashboard.backend.dto.LearningsSummaryResponse;
 import com.personal_dashboard.backend.service.DashboardService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,6 +15,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.time.Instant;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/dashboard")
 @RequiredArgsConstructor
@@ -31,6 +33,7 @@ public class DashboardController {
         LocalDate targetDate = date != null && !date.isBlank()
                 ? LocalDate.parse(date, DATE_FORMATTER)
                 : LocalDate.now();
+        log.debug("GET /dashboard date={}", targetDate);
 
         ApiResponse<Map<String, Object>> response = dashboardService.getDashboardData(targetDate);
         return ResponseEntity.ok(response);

@@ -1,8 +1,8 @@
 package com.personal_dashboard.backend.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.anthropic.errors.AnthropicServiceException;
 import com.anthropic.errors.RateLimitException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.personal_dashboard.backend.dto.GeminiAnalysisResult;
 import com.personal_dashboard.backend.model.UserAccount;
 import lombok.extern.slf4j.Slf4j;

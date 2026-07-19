@@ -3,6 +3,7 @@ package com.personal_dashboard.backend.controller;
 import com.personal_dashboard.backend.dto.ApiResponse;
 import com.personal_dashboard.backend.service.CsvImportService;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -10,6 +11,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/admin")
 @AllArgsConstructor
@@ -21,8 +23,12 @@ public class AdminController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> importCsvFiles(
             @RequestParam(value = "foodCsv", required = false) MultipartFile foodCsv,
             @RequestParam(value = "spendingCsv", required = false) MultipartFile spendingCsv) {
+        log.info("CSV import requested: foodCsv={} spendingCsv={}",
+                foodCsv != null ? foodCsv.getOriginalFilename() : "none",
+                spendingCsv != null ? spendingCsv.getOriginalFilename() : "none");
         try {
             Map<String, Object> result = csvImportService.importCsvFiles(foodCsv, spendingCsv);
+            log.info("CSV import completed successfully");
 
             ApiResponse<Map<String, Object>> response = ApiResponse.<Map<String, Object>>builder()
                     .data(result)
@@ -30,6 +36,7 @@ public class AdminController {
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            log.error("CSV import failed", e);
             Map<String, Object> error = Map.of("error", e.getMessage());
 
             ApiResponse<Map<String, Object>> response = ApiResponse.<Map<String, Object>>builder()

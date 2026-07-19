@@ -5,6 +5,7 @@ import com.personal_dashboard.backend.dto.request.CalendarItemRequest;
 import com.personal_dashboard.backend.model.DailyTask;
 import com.personal_dashboard.backend.repository.DailyTaskRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -17,6 +18,7 @@ import com.personal_dashboard.backend.model.TaskHistoryEvent;
 import java.util.Locale;
 import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CalendarItemService {
@@ -58,6 +60,8 @@ public class CalendarItemService {
     }
 
     public DailyTask createItem(CalendarItemRequest request) {
+        log.info("Creating calendar item '{}' on {} (type={}, recurrence={})",
+                request.getTitle(), request.getDate(), request.getItemType(), request.getRecurrenceFrequency());
         LocalDate date = LocalDate.parse(request.getDate());
         validateRequest(request);
         String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
@@ -109,10 +113,13 @@ public class CalendarItemService {
                 .recurrenceUntil(parseOptionalDate(request.getRecurrenceUntil()))
                 .origin(com.personal_dashboard.backend.model.EventOrigin.local())
                 .build();
-        return dailyTaskRepository.save(item);
+        DailyTask saved = dailyTaskRepository.save(item);
+        log.info("Created calendar item {} '{}'", saved.getId(), saved.getTitle());
+        return saved;
     }
 
     public DailyTask updateItem(String id, CalendarItemRequest request) {
+        log.info("Updating calendar item {}", id);
         validateRequest(request);
         DailyTask existing = getItem(id);
         String recurrence = defaultText(request.getRecurrenceFrequency(), "NONE").toUpperCase(Locale.ROOT);
@@ -225,6 +232,7 @@ public class CalendarItemService {
     }
 
     public DailyTask toggleItem(String id, LocalDate occurrenceDate) {
+        log.info("Toggling completion for calendar item {} (occurrence={})", id, occurrenceDate);
         DailyTask existing = getItem(id);
         String recurrence = existing.getRecurrenceFrequency() != null ? existing.getRecurrenceFrequency() : "NONE";
 
@@ -270,6 +278,7 @@ public class CalendarItemService {
     }
 
     public DailyTask toggleCancelItem(String id, LocalDate occurrenceDate) {
+        log.info("Toggling cancellation for calendar item {} (occurrence={})", id, occurrenceDate);
         DailyTask existing = getItem(id);
         String recurrence = existing.getRecurrenceFrequency() != null ? existing.getRecurrenceFrequency() : "NONE";
 
@@ -301,14 +310,17 @@ public class CalendarItemService {
         // Soft delete (soft-delete) — retained indefinitely so a later pull cannot
         // resurrect it; the save drives outbound cancellation to Google remotes.
         if (Boolean.TRUE.equals(existing.getDeleted())) {
+            log.debug("Calendar item {} already soft-deleted — skipping (idempotent)", id);
             return; // idempotent
         }
+        log.info("Soft-deleting calendar item {} '{}'", id, existing.getTitle());
         existing.setDeleted(true);
         existing.setDeletedAt(java.time.Instant.now());
         dailyTaskRepository.save(existing);
     }
 
     public void deleteOccurrence(String id, LocalDate date) {
+        log.info("Excluding occurrence {} from recurring calendar item {}", date, id);
         DailyTask existing = getItem(id);
         List<LocalDate> excludedDates = existing.getExcludedDates();
         if (excludedDates == null) {

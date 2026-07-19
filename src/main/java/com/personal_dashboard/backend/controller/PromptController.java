@@ -8,6 +8,7 @@ import com.personal_dashboard.backend.model.Prompt;
 import com.personal_dashboard.backend.repository.PromptRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/prompts")
 @RequiredArgsConstructor
@@ -59,6 +61,7 @@ public class PromptController {
                                 .build();
 
                 Prompt savedPrompt = promptRepository.save(prompt);
+                log.info("Created prompt {} '{}'", savedPrompt.getId(), savedPrompt.getTitle());
 
                 ApiResponse<PromptDTO> response = ApiResponse.<PromptDTO>builder()
                                 .data(mapToDTO(savedPrompt))
@@ -84,6 +87,7 @@ public class PromptController {
                 existingPrompt.setUpdatedAt(Instant.now());
 
                 Prompt savedPrompt = promptRepository.save(existingPrompt);
+                log.info("Updated prompt {}", id);
 
                 ApiResponse<PromptDTO> response = ApiResponse.<PromptDTO>builder()
                                 .data(mapToDTO(savedPrompt))
@@ -99,6 +103,7 @@ public class PromptController {
                 Prompt existingPrompt = promptRepository.findByIdAndUserId(id, userId)
                                 .orElseThrow(() -> new RuntimeException("Prompt not found: " + id));
 
+                log.info("Deleting prompt {}", id);
                 promptRepository.delete(existingPrompt);
 
                 ApiResponse<Void> response = ApiResponse.<Void>builder()

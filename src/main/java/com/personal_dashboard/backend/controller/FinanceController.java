@@ -14,6 +14,7 @@ import com.personal_dashboard.backend.security.UserContext;
 import com.personal_dashboard.backend.service.FinanceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +29,7 @@ import java.util.UUID;
  * {@link DailyFinancialLog} per user per day (grouped by category); there is no
  * separate flat transactions collection.
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/finance")
 @RequiredArgsConstructor
@@ -39,6 +41,7 @@ public class FinanceController {
         @GetMapping("/daily-logs")
         public ResponseEntity<ApiResponse<List<DailyFinancialLog>>> getDailyLogs(
                         @RequestParam(value = "days", defaultValue = "30") int days) {
+                log.debug("GET /finance/daily-logs days={}", days);
                 return ResponseEntity.ok(wrap(financeService.getDailyLogs(days)));
         }
 
