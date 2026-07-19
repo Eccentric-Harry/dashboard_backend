@@ -8,6 +8,7 @@ import com.personal_dashboard.backend.model.LendingRecord;
 import com.personal_dashboard.backend.repository.LendingRecordRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/finance/lending")
 @RequiredArgsConstructor
@@ -70,6 +72,7 @@ public class LendingController {
                 .build();
 
         LendingRecord savedRecord = lendingRecordRepository.save(record);
+        log.info("Created lending record {} for borrower '{}' amount={}", savedRecord.getId(), savedRecord.getBorrower(), savedRecord.getAmount());
 
         ApiMeta meta = ApiMeta.builder()
                 .requestId(UUID.randomUUID().toString())
@@ -105,6 +108,7 @@ public class LendingController {
         existingRecord.setNotes(request.getNotes());
 
         LendingRecord savedRecord = lendingRecordRepository.save(existingRecord);
+        log.info("Updated lending record {}", id);
 
         ApiMeta meta = ApiMeta.builder()
                 .requestId(UUID.randomUUID().toString())
@@ -133,6 +137,7 @@ public class LendingController {
         }
 
         LendingRecord savedRecord = lendingRecordRepository.save(existingRecord);
+        log.info("Toggled lending record {} status to {}", id, savedRecord.getStatus());
 
         ApiMeta meta = ApiMeta.builder()
                 .requestId(UUID.randomUUID().toString())
@@ -154,6 +159,7 @@ public class LendingController {
         LendingRecord existingRecord = lendingRecordRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new RuntimeException("Lending record not found: " + id));
 
+        log.info("Deleting lending record {}", id);
         lendingRecordRepository.delete(existingRecord);
 
         ApiMeta meta = ApiMeta.builder()

@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,6 +18,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/sleep")
 @RequiredArgsConstructor
@@ -30,6 +32,7 @@ public class SleepController {
     public ResponseEntity<ApiResponse<List<SleepLog>>> getSleepEntries(
             @RequestParam(name = "startDate") String startDate,
             @RequestParam(name = "endDate") String endDate) {
+        log.debug("GET /sleep {} to {}", startDate, endDate);
         List<SleepLog> entries = sleepService.getRange(LocalDate.parse(startDate), LocalDate.parse(endDate));
         return ResponseEntity.ok(ApiResponse.<List<SleepLog>>builder()
                 .data(entries)

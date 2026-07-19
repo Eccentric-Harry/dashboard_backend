@@ -6,6 +6,7 @@ import com.personal_dashboard.backend.dto.SubscriptionDTO;
 import com.personal_dashboard.backend.model.Subscription;
 import com.personal_dashboard.backend.repository.SubscriptionRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/subscriptions")
 @RequiredArgsConstructor
@@ -71,6 +73,7 @@ public class SubscriptionController {
                 .build();
 
         Subscription saved = subscriptionRepository.save(subscription);
+        log.info("Created subscription {} '{}' (cost={})", saved.getId(), saved.getName(), saved.getCost());
 
         SubscriptionDTO dto = SubscriptionDTO.builder()
                 .id(saved.getId())
@@ -99,6 +102,7 @@ public class SubscriptionController {
         Subscription subscription = subscriptionRepository.findById(id)
                 .filter(sub -> userId.equals(sub.getUserId()))
                 .orElseThrow(() -> new IllegalArgumentException("Subscription not found: " + id));
+        log.info("Deleting subscription {} '{}'", id, subscription.getName());
         subscriptionRepository.delete(subscription);
 
         ApiMeta meta = ApiMeta.builder()

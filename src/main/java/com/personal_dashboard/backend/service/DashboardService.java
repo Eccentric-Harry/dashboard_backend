@@ -4,6 +4,7 @@ import com.personal_dashboard.backend.dto.*;
 import com.personal_dashboard.backend.model.*;
 import com.personal_dashboard.backend.repository.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -16,6 +17,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DashboardService {
@@ -37,6 +39,7 @@ public class DashboardService {
          * Aggregates data for the dashboard for a given target date.
          */
         public HealthMetrics aggregateHealthData(LocalDate targetDate) {
+                log.debug("Aggregating health dashboard data for {}", targetDate);
                 // Fetch today's daily food log
                 String dateStr = targetDate.format(DATE_FORMATTER);
                 DailyFoodLog dailyLog = dailyFoodLogService.getDailyLog(dateStr);
@@ -118,6 +121,7 @@ public class DashboardService {
          * Aggregates financial data for the current month.
          */
         public FinanceMetrics aggregateFinanceData(LocalDate targetDate) {
+                log.debug("Aggregating finance dashboard data for month of {}", targetDate);
                 YearMonth currentMonth = YearMonth.from(targetDate);
                 LocalDate monthStart = currentMonth.atDay(1);
                 LocalDate monthEnd = currentMonth.atEndOfMonth();
@@ -165,6 +169,7 @@ public class DashboardService {
          * Aggregates coding activity for the last 7 days.
          */
         public CodingMetrics aggregateCodingData(LocalDate targetDate) {
+                log.debug("Aggregating coding/learning heatmap for the 7 days ending {}", targetDate);
                 LocalDate sevenDaysAgo = targetDate.minusDays(6); // Include target date = 7 days total
 
                 String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
@@ -172,17 +177,17 @@ public class DashboardService {
 
                 // Build learning heatmap
                 List<LearningHeatmapEntry> heatmapEntries = dailyLogs.stream()
-                                .map(log -> {
+                                .map(dailyLog -> {
                                         // Calculate intensity (0-4) based on learning count
                                         int intensity = calculateIntensity(
-                                                        log.getNewLearnings() != null ? log.getNewLearnings().size()
+                                                        dailyLog.getNewLearnings() != null ? dailyLog.getNewLearnings().size()
                                                                         : 0);
-                                        String topic = log.getNewLearnings() != null && !log.getNewLearnings().isEmpty()
-                                                        ? log.getNewLearnings().get(0)
+                                        String topic = dailyLog.getNewLearnings() != null && !dailyLog.getNewLearnings().isEmpty()
+                                                        ? dailyLog.getNewLearnings().get(0)
                                                         : "General";
 
                                         return LearningHeatmapEntry.builder()
-                                                        .date(log.getDate().format(DATE_FORMATTER))
+                                                        .date(dailyLog.getDate().format(DATE_FORMATTER))
                                                         .intensity(intensity)
                                                         .topic(topic)
                                                         .build();
@@ -303,6 +308,7 @@ public class DashboardService {
          * Main method: Get complete dashboard data for a target date
          */
         public ApiResponse<Map<String, Object>> getDashboardData(LocalDate targetDate) {
+                log.info("Building full dashboard payload for {}", targetDate);
                 HealthMetrics health = aggregateHealthData(targetDate);
                 FinanceMetrics finance = aggregateFinanceData(targetDate);
                 CodingMetrics coding = aggregateCodingData(targetDate);
@@ -329,6 +335,7 @@ public class DashboardService {
          * Get nutrition summary for a specific date (with 7-day trend)
          */
         public Map<String, Object> getNutritionSummary(LocalDate targetDate) {
+                log.debug("Building nutrition summary for {} with 7-day trend", targetDate);
                 LocalDate sevenDaysAgo = targetDate.minusDays(6);
 
                 List<DailyFoodLog> dailyLogs = dailyFoodLogService.getDailyLogsForRange(sevenDaysAgo, targetDate);
@@ -344,11 +351,11 @@ public class DashboardService {
                 }
 
                 // Fill in actual data from daily logs
-                for (DailyFoodLog log : dailyLogs) {
-                        String dateKey = log.getDateString();
-                        if (log.getDailyTotals() != null) {
-                                dailyCalories.put(dateKey, log.getDailyTotals().getTotalCalories());
-                                dailyProtein.put(dateKey, log.getDailyTotals().getTotalProteinGrams());
+                for (DailyFoodLog dailyLog : dailyLogs) {
+                        String dateKey = dailyLog.getDateString();
+                        if (dailyLog.getDailyTotals() != null) {
+                                dailyCalories.put(dateKey, dailyLog.getDailyTotals().getTotalCalories());
+                                dailyProtein.put(dateKey, dailyLog.getDailyTotals().getTotalProteinGrams());
                         }
                 }
 
@@ -394,6 +401,7 @@ public class DashboardService {
          * Get spending summary for a specific month
          */
         public Map<String, Object> getSpendingSummary(YearMonth month) {
+                log.debug("Building spending summary for {}", month);
                 LocalDate monthStart = month.atDay(1);
                 LocalDate monthEnd = month.atEndOfMonth();
 
@@ -442,6 +450,7 @@ public class DashboardService {
          */
         @SuppressWarnings("unused")
         public LearningsSummaryResponse getLearningsSummary(LocalDate targetDate) {
+                log.debug("Building learnings summary for {} (14-day window)", targetDate);
                 LocalDate startDate = targetDate.minusDays(13); // 14 days total
 
                 String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
@@ -457,7 +466,7 @@ public class DashboardService {
                 Map<LocalDate, List<DailyTask>> tasksByDate = rangeTasks.stream()
                                 .collect(Collectors.groupingBy(DailyTask::getDate));
                 Map<LocalDate, DailyLog> logsByDate = rangeLogs.stream()
-                                .collect(Collectors.toMap(DailyLog::getDate, log -> log, (a, b) -> a));
+                                .collect(Collectors.toMap(DailyLog::getDate, entry -> entry, (a, b) -> a));
 
                 List<LearningsTimelineDay> timeline = new ArrayList<>();
                 for (LocalDate date = startDate; !date.isAfter(targetDate); date = date.plusDays(1)) {

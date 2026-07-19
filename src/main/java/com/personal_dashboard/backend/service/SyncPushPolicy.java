@@ -3,6 +3,7 @@ package com.personal_dashboard.backend.service;
 import com.personal_dashboard.backend.model.DailyTask;
 import com.personal_dashboard.backend.model.EventOrigin;
 import com.personal_dashboard.backend.model.GoogleSyncStore;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Decides whether a local change to {@code task} should be pushed to a given
@@ -16,6 +17,7 @@ import com.personal_dashboard.backend.model.GoogleSyncStore;
  *
  * LOCAL-origin events (and legacy events with a null origin) push to all accounts.
  */
+@Slf4j
 public final class SyncPushPolicy {
 
     private SyncPushPolicy() {}
@@ -32,8 +34,14 @@ public final class SyncPushPolicy {
         String originAccount = origin.getAccountId();
         boolean sameAccount = originAccount != null && originAccount.equalsIgnoreCase(store.getEmail());
         if (sameAccount) {
+            log.debug("Skipping push of task {} to {} — same account it was pulled from (loop prevention)",
+                    task.getId(), store.getEmail());
             return false; // never push back to the source account
         }
-        return Boolean.TRUE.equals(store.getCrossAccountPush()); // opt-in fan-out only
+        boolean crossAccountOptIn = Boolean.TRUE.equals(store.getCrossAccountPush());
+        if (!crossAccountOptIn) {
+            log.debug("Skipping push of task {} to {} — cross-account push not opted in", task.getId(), store.getEmail());
+        }
+        return crossAccountOptIn; // opt-in fan-out only
     }
 }

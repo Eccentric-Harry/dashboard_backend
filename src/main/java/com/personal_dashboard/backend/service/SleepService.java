@@ -39,11 +39,16 @@ public class SleepService {
 
         SleepLog entry = sleepLogRepository.findByUserIdAndDate(userId, date)
                 .orElseGet(() -> SleepLog.builder().userId(userId).date(date).build());
+        boolean isUpdate = entry.getId() != null;
         applyRequest(entry, request);
-        return sleepLogRepository.save(entry);
+        SleepLog saved = sleepLogRepository.save(entry);
+        log.info("{} sleep log for {} — {} to {} ({} min)", isUpdate ? "Updated" : "Created", date,
+                request.getBedtime(), request.getWakeTime(), saved.getDurationMinutes());
+        return saved;
     }
 
     public SleepLog updateEntry(String id, SleepLogRequest request) {
+        log.info("Updating sleep entry {}", id);
         SleepLog entry = requireEntry(id);
         entry.setDate(LocalDate.parse(request.getDate()));
         applyRequest(entry, request);
@@ -51,6 +56,7 @@ public class SleepService {
     }
 
     public void deleteEntry(String id) {
+        log.info("Deleting sleep entry {}", id);
         sleepLogRepository.delete(requireEntry(id));
     }
 

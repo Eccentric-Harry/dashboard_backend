@@ -11,6 +11,7 @@ import com.personal_dashboard.backend.repository.DailyFinancialLogRepository;
 import com.personal_dashboard.backend.repository.FinanceAccountRepository;
 import com.personal_dashboard.backend.security.UserContext;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -36,6 +37,7 @@ import java.util.UUID;
  * <p>There is deliberately no separate flat {@code transactions} collection — a
  * transaction only ever exists embedded inside its day's log.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class FinanceService {
@@ -64,8 +66,8 @@ public class FinanceService {
         String userId = UserContext.getRequiredUserId();
         List<DailyFinancialLog> logs = dailyFinancialLogRepository.findByUserIdAndDateBetween(userId, start, end);
         List<TransactionDTO> out = new ArrayList<>();
-        for (DailyFinancialLog log : logs) {
-            log.getTransactions().forEach((category, txs) ->
+        for (DailyFinancialLog dailyLog : logs) {
+            dailyLog.getTransactions().forEach((category, txs) ->
                     txs.forEach(tx -> out.add(toDto(tx, category))));
         }
         out.sort(Comparator.comparing(TransactionDTO::getDate).reversed());
@@ -78,9 +80,9 @@ public class FinanceService {
         List<DailyFinancialLog> logs = dailyFinancialLogRepository
                 .findByUserIdAndDateStringBetween(userId, startDateString, endDateString);
         List<TransactionDTO> out = new ArrayList<>();
-        for (DailyFinancialLog log : logs) {
-            if (log.getTransactions() == null) continue;
-            log.getTransactions().forEach((category, txs) -> {
+        for (DailyFinancialLog dailyLog : logs) {
+            if (dailyLog.getTransactions() == null) continue;
+            dailyLog.getTransactions().forEach((category, txs) -> {
                 if (txs != null) txs.forEach(tx -> out.add(toDto(tx, category)));
             });
         }
@@ -97,6 +99,7 @@ public class FinanceService {
     /** Sets the Total Balance to an absolute value ("I have ₹X right now"). */
     public FinanceAccountDTO setBalance(BigDecimal balance) {
         FinanceAccount account = getOrCreateAccount();
+        log.info("Setting balance to {} for userId={} (was {})", balance, account.getUserId(), account.getBalance());
         account.setBalance(balance);
         return toDto(financeAccountRepository.save(account));
     }
@@ -112,6 +115,7 @@ public class FinanceService {
     /** Sets the user's monthly spending budget. */
     public FinanceAccountDTO setMonthlyBudget(BigDecimal budget) {
         FinanceAccount account = getOrCreateAccount();
+        log.info("Setting monthly budget to {} for userId={}", budget, account.getUserId());
         account.setMonthlyBudget(budget);
         return toDto(financeAccountRepository.save(account));
     }
@@ -119,6 +123,8 @@ public class FinanceService {
     // ─── Writes (CRUD) ────────────────────────────────────────────────────
 
     public TransactionDTO createTransaction(TransactionRequest request) {
+        log.info("Creating {} transaction '{}' amount={} category={} date={}",
+                request.getType(), request.getDescription(), request.getAmount(), request.getCategory(), request.getDate());
         Instant timestamp = toInstant(request.getDate());
         FinancialTransaction tx = FinancialTransaction.builder()
                 .id(UUID.randomUUID().toString())
@@ -129,10 +135,12 @@ public class FinanceService {
                 .build();
 
         addToLog(request.getDate(), timestamp, request.getCategory(), tx);
+        log.info("Created transaction {} in category '{}'", tx.getId(), request.getCategory());
         return toDto(tx, request.getCategory());
     }
 
     public TransactionDTO updateTransaction(String id, TransactionRequest request) {
+        log.info("Updating transaction {}", id);
         // Remove the old copy wherever it currently lives, then re-insert with new values.
         DailyFinancialLog oldLog = findLogContaining(id)
                 .orElseThrow(() -> new IllegalArgumentException("Transaction not found: " + id));
@@ -152,9 +160,10 @@ public class FinanceService {
     }
 
     public void deleteTransaction(String id) {
-        DailyFinancialLog log = findLogContaining(id)
+        log.info("Deleting transaction {}", id);
+        DailyFinancialLog dailyLog = findLogContaining(id)
                 .orElseThrow(() -> new IllegalArgumentException("Transaction not found: " + id));
-        removeFromLog(log, id);
+        removeFromLog(dailyLog, id);
     }
 
     /**
@@ -162,6 +171,7 @@ public class FinanceService {
      * preserving the parsed timestamp. Runs in the current user's context.
      */
     public void addImportedExpense(String description, BigDecimal amount, String category, Instant timestamp) {
+        log.info("Importing expense '{}' amount={} category={} timestamp={}", description, amount, category, timestamp);
         String dateString = timestamp.atZone(ZoneId.systemDefault()).toLocalDate().toString();
         FinancialTransaction tx = FinancialTransaction.builder()
                 .id(UUID.randomUUID().toString())
@@ -177,7 +187,7 @@ public class FinanceService {
 
     private void addToLog(String dateString, Instant timestamp, String category, FinancialTransaction tx) {
         String userId = UserContext.getRequiredUserId();
-        DailyFinancialLog log = dailyFinancialLogRepository.findByUserIdAndDateString(userId, dateString)
+        DailyFinancialLog dailyLog = dailyFinancialLogRepository.findByUserIdAndDateString(userId, dateString)
                 .orElseGet(() -> DailyFinancialLog.builder()
                         .userId(userId)
                         .dateString(dateString)
@@ -186,35 +196,41 @@ public class FinanceService {
                         .transactions(new LinkedHashMap<>())
                         .build());
 
-        log.getTransactions().computeIfAbsent(category, k -> new ArrayList<>()).add(tx);
-        applyToTotals(log, tx.getType(), tx.getAmount());
-        dailyFinancialLogRepository.save(log);
+        dailyLog.getTransactions().computeIfAbsent(category, k -> new ArrayList<>()).add(tx);
+        applyToTotals(dailyLog, tx.getType(), tx.getAmount());
+        dailyFinancialLogRepository.save(dailyLog);
+        log.debug("Added {} transaction {} to log {}", tx.getType(), tx.getId(), dateString);
 
         // Money in/out also moves the running Total Balance.
         applyToBalance(tx.getType(), tx.getAmount());
     }
 
-    /** Removes the transaction with {@code id} from {@code log}, adjusts totals, and persists. */
-    private void removeFromLog(DailyFinancialLog log, String id) {
-        for (Map.Entry<String, List<FinancialTransaction>> entry : log.getTransactions().entrySet()) {
+    /** Removes the transaction with {@code id} from {@code dailyLog}, adjusts totals, and persists. */
+    private void removeFromLog(DailyFinancialLog dailyLog, String id) {
+        boolean found = false;
+        for (Map.Entry<String, List<FinancialTransaction>> entry : dailyLog.getTransactions().entrySet()) {
             Optional<FinancialTransaction> match = entry.getValue().stream()
                     .filter(t -> id.equals(t.getId())).findFirst();
             if (match.isPresent()) {
                 FinancialTransaction tx = match.get();
                 entry.getValue().remove(tx);
-                applyToTotals(log, tx.getType(), tx.getAmount().negate());
+                applyToTotals(dailyLog, tx.getType(), tx.getAmount().negate());
                 // Reverse the transaction's effect on the running Total Balance.
                 applyToBalance(tx.getType(), tx.getAmount().negate());
+                found = true;
                 break;
             }
         }
+        if (!found) {
+            log.warn("Transaction {} not found in expected log {} during removal", id, dailyLog.getId());
+        }
         // Drop empty category buckets to keep the document tidy.
-        log.getTransactions().values().removeIf(List::isEmpty);
-        dailyFinancialLogRepository.save(log);
+        dailyLog.getTransactions().values().removeIf(List::isEmpty);
+        dailyFinancialLogRepository.save(dailyLog);
     }
 
-    private void applyToTotals(DailyFinancialLog log, String type, BigDecimal delta) {
-        FinancialTotals totals = log.getDailyTotals();
+    private void applyToTotals(DailyFinancialLog dailyLog, String type, BigDecimal delta) {
+        FinancialTotals totals = dailyLog.getDailyTotals();
         if (INCOME.equalsIgnoreCase(type)) {
             totals.setTotalIncome(totals.getTotalIncome().add(delta));
         } else {

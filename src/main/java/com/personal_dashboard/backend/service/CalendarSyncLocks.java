@@ -1,5 +1,6 @@
 package com.personal_dashboard.backend.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -13,12 +14,16 @@ import java.util.concurrent.locks.ReentrantLock;
  * Locks are reentrant (a 410 full-resync re-enters syncCalendar on the same
  * thread) and shared across GoogleSyncService and the outbound event listener.
  */
+@Slf4j
 @Component
 public class CalendarSyncLocks {
 
     private final ConcurrentHashMap<String, ReentrantLock> locks = new ConcurrentHashMap<>();
 
     public ReentrantLock forStore(String storeId) {
-        return locks.computeIfAbsent(storeId, k -> new ReentrantLock());
+        return locks.computeIfAbsent(storeId, k -> {
+            log.debug("Creating new sync lock for storeId={}", storeId);
+            return new ReentrantLock();
+        });
     }
 }

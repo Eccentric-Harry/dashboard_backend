@@ -7,6 +7,7 @@ import com.personal_dashboard.backend.model.RunSession;
 import com.personal_dashboard.backend.repository.RunSessionRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +19,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/fitness")
 @RequiredArgsConstructor
@@ -30,6 +32,7 @@ public class FitnessController {
     @PostMapping("/runs")
     public ResponseEntity<ApiResponse<Map<String, Object>>> createRunSession(
             @Valid @RequestBody RunSessionRequest request) {
+        log.info("Creating run session on {} ({}km)", request.getDate(), request.getDistanceKm());
 
         LocalDate localDate = LocalDate.parse(request.getDate(), DATE_FORMATTER);
 
@@ -55,6 +58,7 @@ public class FitnessController {
                 .build();
 
         RunSession savedSession = runSessionRepository.save(runSession);
+        log.info("Created run session {} on {}", savedSession.getId(), savedSession.getDate());
 
         // Build response map
         Map<String, Object> responseData = new HashMap<>();

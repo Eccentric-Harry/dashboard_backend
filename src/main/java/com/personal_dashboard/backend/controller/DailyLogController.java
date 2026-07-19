@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,6 +18,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/daily-log")
 @RequiredArgsConstructor
@@ -31,9 +33,9 @@ public class DailyLogController {
     public ResponseEntity<ApiResponse<DailyLog>> getDailyLog(
             @RequestParam(name = "date") String dateStr) {
         LocalDate date = LocalDate.parse(dateStr, DATE_FORMATTER);
-        DailyLog log = dailyLogService.getOrEmptyForDate(date);
+        DailyLog dailyLog = dailyLogService.getOrEmptyForDate(date);
         return ResponseEntity.ok(ApiResponse.<DailyLog>builder()
-                .data(log)
+                .data(dailyLog)
                 .meta(buildMeta("fetch"))
                 .build());
     }
@@ -43,6 +45,7 @@ public class DailyLogController {
     public ResponseEntity<ApiResponse<java.util.List<DailyLog>>> getDailyLogRange(
             @RequestParam(name = "startDate") String startDateStr,
             @RequestParam(name = "endDate") String endDateStr) {
+        log.debug("GET /daily-log/range {} to {}", startDateStr, endDateStr);
         LocalDate startDate = LocalDate.parse(startDateStr, DATE_FORMATTER);
         LocalDate endDate = LocalDate.parse(endDateStr, DATE_FORMATTER);
         return ResponseEntity.ok(ApiResponse.<java.util.List<DailyLog>>builder()
