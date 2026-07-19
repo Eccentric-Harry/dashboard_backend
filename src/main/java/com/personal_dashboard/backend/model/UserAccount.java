@@ -48,6 +48,10 @@ public class UserAccount {
     private String title;
     private String status;
 
+    // Three Non-Negotiables targets (rings). Null until the user edits them;
+    // read through RingTargets.resolved() so defaults apply everywhere.
+    private RingTargets ringTargets;
+
     @CreatedDate
     private Instant createdAt;
 
@@ -74,5 +78,41 @@ public class UserAccount {
         private Integer calculatedProtein;
         private Integer calculatedCarbs;
         private Integer calculatedFat;
+    }
+
+    /**
+     * The user's own commitments for the Three Non-Negotiables. Targets are
+     * never adapted automatically — the app must not silently lower them.
+     * dayRolloverHour shifts the ring-day boundary off midnight so late work
+     * and early sleep logs land on the day they belong to.
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RingTargets {
+        private Integer sleepTargetMinutes;
+        private Integer focusTargetMinutes;
+        private Integer moveTargetMinutes;
+        private Integer dayRolloverHour;
+
+        public static final int DEFAULT_SLEEP_TARGET_MINUTES = 450;
+        public static final int DEFAULT_FOCUS_TARGET_MINUTES = 120;
+        public static final int DEFAULT_MOVE_TARGET_MINUTES = 15;
+        public static final int DEFAULT_DAY_ROLLOVER_HOUR = 4;
+
+        /** A copy with every null field replaced by its default. */
+        public RingTargets resolved() {
+            return RingTargets.builder()
+                    .sleepTargetMinutes(sleepTargetMinutes != null ? sleepTargetMinutes : DEFAULT_SLEEP_TARGET_MINUTES)
+                    .focusTargetMinutes(focusTargetMinutes != null ? focusTargetMinutes : DEFAULT_FOCUS_TARGET_MINUTES)
+                    .moveTargetMinutes(moveTargetMinutes != null ? moveTargetMinutes : DEFAULT_MOVE_TARGET_MINUTES)
+                    .dayRolloverHour(dayRolloverHour != null ? dayRolloverHour : DEFAULT_DAY_ROLLOVER_HOUR)
+                    .build();
+        }
+
+        public static RingTargets defaults() {
+            return new RingTargets().resolved();
+        }
     }
 }

@@ -48,6 +48,11 @@ public class UserController {
             existing = userAccountRepository.save(existing);
         }
 
+        // Ring targets always come back resolved so clients never re-derive defaults.
+        existing.setRingTargets(existing.getRingTargets() != null
+                ? existing.getRingTargets().resolved()
+                : UserAccount.RingTargets.defaults());
+
         return ResponseEntity.ok(
                 ApiResponse.<UserAccount>builder()
                         .data(existing)
@@ -88,6 +93,19 @@ public class UserController {
         existing.setActivityLevel(updated.getActivityLevel());
         existing.setFitnessGoal(updated.getFitnessGoal());
         existing.setMedicalConditions(updated.getMedicalConditions());
+
+        // Ring targets: merge only the fields the client sent, keep the rest.
+        if (updated.getRingTargets() != null) {
+            UserAccount.RingTargets current = existing.getRingTargets() != null
+                    ? existing.getRingTargets()
+                    : new UserAccount.RingTargets();
+            UserAccount.RingTargets incoming = updated.getRingTargets();
+            if (incoming.getSleepTargetMinutes() != null) current.setSleepTargetMinutes(incoming.getSleepTargetMinutes());
+            if (incoming.getFocusTargetMinutes() != null) current.setFocusTargetMinutes(incoming.getFocusTargetMinutes());
+            if (incoming.getMoveTargetMinutes() != null) current.setMoveTargetMinutes(incoming.getMoveTargetMinutes());
+            if (incoming.getDayRolloverHour() != null) current.setDayRolloverHour(incoming.getDayRolloverHour());
+            existing.setRingTargets(current);
+        }
         
         // Re-run calculations
         healthEngineService.calculateHealthMetrics(existing);

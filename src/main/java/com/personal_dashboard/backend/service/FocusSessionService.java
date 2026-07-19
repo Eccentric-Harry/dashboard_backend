@@ -52,6 +52,27 @@ public class FocusSessionService {
                 .toList();
     }
 
+    /**
+     * Completed focus minutes grouped by "ring day" — a day that rolls over at
+     * rolloverHour (04:00 by default) instead of midnight, so a session started
+     * at 01:00 counts toward the previous calendar day. Same repository query
+     * as {@link #getDailyHistory}; only the grouping key shifts. The plain
+     * calendar grouping stays untouched for GET /focus/history.
+     */
+    public Map<LocalDate, Long> getRingDayMinutes(
+            String userId, LocalDate startDate, LocalDate endDate, int rolloverHour) {
+        Instant windowStart = startDate.atStartOfDay(ZONE).plusHours(rolloverHour).toInstant();
+        Instant windowEnd = endDate.plusDays(1).atStartOfDay(ZONE).plusHours(rolloverHour).toInstant();
+
+        return repository
+                .findByUserIdAndStatusAndStartTimeBetween(userId, FocusSessionStatus.COMPLETED, windowStart, windowEnd)
+                .stream()
+                .filter(s -> s.getStartTime() != null)
+                .collect(Collectors.groupingBy(
+                        s -> LocalDate.ofInstant(s.getStartTime().minusSeconds(rolloverHour * 3600L), ZONE),
+                        Collectors.summingLong(s -> Math.max(0, s.getDurationMinutes()))));
+    }
+
     public FocusSession startSession(String activePursuit, int durationMinutes, String userId) {
         cancelExistingSession(userId);
 
