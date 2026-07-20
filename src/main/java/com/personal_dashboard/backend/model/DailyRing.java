@@ -75,6 +75,13 @@ public class DailyRing implements UserOwnedDocument {
     /** A streak freeze covered this day — chain held, no XP, not perfect. */
     private boolean frozen;
 
+    /**
+     * Fuel XP (Phase 2): +10 per logged meal, +25 when the day's protein goal
+     * was met — recomputed from daily_food_logs, folded into xpEarned by the
+     * streak replay (and zeroed with the rest when the day is frozen).
+     */
+    private int fuelXp;
+
     private int xpEarned;
 
     private Instant computedAt;

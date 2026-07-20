@@ -1,12 +1,15 @@
 package com.personal_dashboard.backend.service;
 
 import com.personal_dashboard.backend.dto.request.ManualMoveRequest;
+import com.personal_dashboard.backend.model.DailyFoodLog;
 import com.personal_dashboard.backend.model.DailyRing;
 import com.personal_dashboard.backend.model.FocusSession;
 import com.personal_dashboard.backend.model.FocusSessionStatus;
+import com.personal_dashboard.backend.model.MealEntry;
 import com.personal_dashboard.backend.model.SleepLog;
 import com.personal_dashboard.backend.model.StravaActivity;
 import com.personal_dashboard.backend.model.StreakState;
+import com.personal_dashboard.backend.repository.DailyFoodLogRepository;
 import com.personal_dashboard.backend.repository.DailyRingRepository;
 import com.personal_dashboard.backend.repository.FocusSessionRepository;
 import com.personal_dashboard.backend.repository.SleepLogRepository;
@@ -63,6 +66,7 @@ class RingsServiceTest {
     @Mock private UserAccountRepository userAccountRepository;
     @Mock private DailyRingRepository dailyRingRepository;
     @Mock private StreakStateRepository streakStateRepository;
+    @Mock private DailyFoodLogRepository dailyFoodLogRepository;
 
     private RingsService ringsService;
 
@@ -72,6 +76,7 @@ class RingsServiceTest {
     private final Map<String, Map<LocalDate, SleepLog>> sleepStore = new HashMap<>();
     private final Map<String, Map<LocalDate, Long>> focusStore = new HashMap<>();
     private final Map<String, Map<LocalDate, List<StravaActivity>>> stravaStore = new HashMap<>();
+    private final Map<String, Map<String, DailyFoodLog>> foodStore = new HashMap<>();
     private final AtomicInteger idSequence = new AtomicInteger();
 
     @BeforeEach
@@ -79,7 +84,8 @@ class RingsServiceTest {
         UserContext.setUserId(USER);
         ringsService = new RingsService(
                 sleepLogRepository, focusSessionService, stravaActivityRepository,
-                userAccountRepository, dailyRingRepository, streakStateRepository);
+                userAccountRepository, dailyRingRepository, streakStateRepository,
+                dailyFoodLogRepository);
         setNow(TODAY, 12);
 
         when(userAccountRepository.findById(anyString())).thenReturn(Optional.empty());
@@ -159,6 +165,12 @@ class RingsServiceTest {
                     .flatMap(e -> e.getValue().stream())
                     .toList();
         });
+
+        when(dailyFoodLogRepository.findByUserIdAndDateString(anyString(), anyString())).thenAnswer(inv ->
+                Optional.ofNullable(foodStore.getOrDefault(inv.<String>getArgument(0), Map.of())
+                        .get(inv.<String>getArgument(1))));
+        when(dailyFoodLogRepository.findByUserIdAndDateStringRange(anyString(), anyString(), anyString()))
+                .thenReturn(List.of());
     }
 
     @AfterEach
@@ -258,6 +270,65 @@ class RingsServiceTest {
     void dayWithNoSourceDataCreatesNoDocument() {
         assertNull(ringsService.computeDay(TODAY));
         assertTrue(ringsFor(USER).isEmpty());
+    }
+
+    // ---------- fuel XP ----------
+
+    @Test
+    void mealsAndProteinGoalEarnFuelXp() {
+        givenSleep(USER, TODAY, 460); // rest closed → +20 ring XP
+        givenMeals(USER, TODAY, 90, 3, 40, 30, 25); // goal 90, 3 meals, 95g total
+
+        DailyRing ring = ringsService.computeDay(TODAY);
+
+        assertEquals(3 * 10 + 25, ring.getFuelXp());
+        assertEquals(20 + 55, ring.getXpEarned());
+    }
+
+    @Test
+    void proteinUnderGoalEarnsOnlyMealXp() {
+        givenMeals(USER, TODAY, 120, 2, 30, 25); // 55g of 120 — goal missed
+
+        DailyRing ring = ringsService.computeDay(TODAY);
+
+        assertEquals(20, ring.getFuelXp());
+        assertEquals(0, ring.getRingsClosed());
+        assertEquals(20, ring.getXpEarned()); // fuel only — no rings closed
+    }
+
+    @Test
+    void mealsAloneCreateARingDayDocument() {
+        givenMeals(USER, TODAY, 0, 1, 20);
+
+        DailyRing ring = ringsService.computeDay(TODAY);
+
+        assertNotNull(ring); // a logged meal is real activity — the day exists
+        assertEquals(10, ring.getFuelXp());
+    }
+
+    @Test
+    void frozenDayZeroesFuelXpToo() {
+        seedPerfectDays(USER, TODAY.minusDays(3), TODAY.minusDays(2));
+        seedDay(USER, TODAY.minusDays(1), 1, false);
+        ringsFor(USER).get(TODAY.minusDays(1)).setFuelXp(35); // meals were logged that day
+        seedPerfectDays(USER, TODAY, TODAY);
+
+        StreakState state = ringsService.recomputeStreak();
+
+        DailyRing frozen = ringsFor(USER).get(TODAY.minusDays(1));
+        assertTrue(frozen.isFrozen());
+        assertEquals(0, frozen.getXpEarned()); // the freeze zeroes the whole day, fuel included
+        assertEquals(300, state.getTotalXp()); // 3 perfect days, nothing else
+    }
+
+    @Test
+    void replayBanksFuelXpFromUnfrozenDays() {
+        seedPerfectDays(USER, TODAY.minusDays(1), TODAY);
+        ringsFor(USER).get(TODAY).setFuelXp(30);
+
+        StreakState state = ringsService.recomputeStreak();
+
+        assertEquals(230, state.getTotalXp()); // 100 + 100 + 30 fuel
     }
 
     // ---------- rollover ----------
@@ -490,6 +561,25 @@ class RingsServiceTest {
 
     private void givenFocus(String userId, LocalDate date, long minutes) {
         focusStore.computeIfAbsent(userId, k -> new HashMap<>()).put(date, minutes);
+    }
+
+    /** Seed a food log: {@code proteinGoal}, then one protein value per meal. */
+    private void givenMeals(String userId, LocalDate date, int proteinGoal, int mealCount, int... proteinPerMeal) {
+        List<MealEntry> meals = new ArrayList<>();
+        for (int i = 0; i < mealCount; i++) {
+            meals.add(MealEntry.builder()
+                    .description("meal-" + i)
+                    .proteinGrams(i < proteinPerMeal.length ? proteinPerMeal[i] : 0)
+                    .build());
+        }
+        DailyFoodLog log = DailyFoodLog.builder()
+                .userId(userId)
+                .dateString(date.toString())
+                .date(date)
+                .proteinGoal(proteinGoal > 0 ? proteinGoal : null)
+                .meals(new java.util.LinkedHashMap<>(Map.of("Meals", meals)))
+                .build();
+        foodStore.computeIfAbsent(userId, k -> new HashMap<>()).put(date.toString(), log);
     }
 
     private void givenStrava(String userId, LocalDate date, double minutes) {

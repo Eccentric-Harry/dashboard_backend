@@ -2,12 +2,15 @@ package com.personal_dashboard.backend.service;
 
 import com.personal_dashboard.backend.dto.RingDayResponse;
 import com.personal_dashboard.backend.dto.request.ManualMoveRequest;
+import com.personal_dashboard.backend.model.DailyFoodLog;
 import com.personal_dashboard.backend.model.DailyRing;
+import com.personal_dashboard.backend.model.MealEntry;
 import com.personal_dashboard.backend.model.SleepLog;
 import com.personal_dashboard.backend.model.StravaActivity;
 import com.personal_dashboard.backend.model.StreakState;
 import com.personal_dashboard.backend.model.UserAccount;
 import com.personal_dashboard.backend.model.UserAccount.RingTargets;
+import com.personal_dashboard.backend.repository.DailyFoodLogRepository;
 import com.personal_dashboard.backend.repository.DailyRingRepository;
 import com.personal_dashboard.backend.repository.SleepLogRepository;
 import com.personal_dashboard.backend.repository.StravaActivityRepository;
@@ -16,6 +19,7 @@ import com.personal_dashboard.backend.repository.UserAccountRepository;
 import com.personal_dashboard.backend.security.UserContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -54,6 +58,9 @@ public class RingsService {
     static final int XP_PER_RING = 20;
     static final int XP_PERFECT_BONUS = 40;
     static final int FREEZES_PER_MONTH = 2;
+    // Fuel XP (Phase 2) — mirrored by FUEL_XP_* in dashboard_ui/src/lib/insights/nutrition.ts.
+    static final int FUEL_XP_PER_MEAL = 10;
+    static final int FUEL_XP_PROTEIN_GOAL = 25;
 
     public static final String MOVE_SOURCE_STRAVA = "STRAVA";
     public static final String MOVE_SOURCE_MANUAL = "MANUAL";
@@ -64,6 +71,7 @@ public class RingsService {
     private final UserAccountRepository userAccountRepository;
     private final DailyRingRepository dailyRingRepository;
     private final StreakStateRepository streakStateRepository;
+    private final DailyFoodLogRepository dailyFoodLogRepository;
 
     /** Injectable for tests; defaults to the system clock. */
     private Clock clock = Clock.system(ZONE);
@@ -196,7 +204,12 @@ public class RingsService {
             moveSource = MOVE_SOURCE_STRAVA;
         }
 
-        boolean hasAnyData = restMinutes > 0 || deepMinutes > 0 || moveMinutes > 0;
+        // Fuel XP — +10 per logged meal, +25 when the day's protein goal was
+        // met. Banked here (not display-only) so the header line and the level
+        // bar can never disagree.
+        int fuelXp = computeFuelXp(userId, date);
+
+        boolean hasAnyData = restMinutes > 0 || deepMinutes > 0 || moveMinutes > 0 || fuelXp > 0;
         if (!hasAnyData && ring.getId() == null) {
             return null;
         }
@@ -219,11 +232,22 @@ public class RingsService {
                 + (ring.isMoveClosed() ? 1 : 0);
         ring.setRingsClosed(ringsClosed);
         ring.setPerfect(ringsClosed == 3);
+        ring.setFuelXp(fuelXp);
         // Base XP; the streak replay zeroes it if a freeze ends up covering this day.
-        ring.setXpEarned(ringsClosed * XP_PER_RING + (ring.isPerfect() ? XP_PERFECT_BONUS : 0));
+        ring.setXpEarned(ringsClosed * XP_PER_RING + (ring.isPerfect() ? XP_PERFECT_BONUS : 0) + fuelXp);
         ring.setComputedAt(Instant.now(clock));
 
-        return dailyRingRepository.save(ring);
+        try {
+            return dailyRingRepository.save(ring);
+        } catch (DuplicateKeyException e) {
+            // Another concurrent computeDay() call for the same userId+date won
+            // the insert race first. Fold our freshly computed fields onto that
+            // document instead of failing the request.
+            DailyRing existing = dailyRingRepository.findByUserIdAndDate(userId, date).orElseThrow(() -> e);
+            ring.setId(existing.getId());
+            ring.setCreatedAt(existing.getCreatedAt());
+            return dailyRingRepository.save(ring);
+        }
     }
 
     /**
@@ -300,8 +324,9 @@ public class RingsService {
             longest = Math.max(longest, streak);
 
             int xp = frozen ? 0
-                    : ring != null ? ring.getRingsClosed() * XP_PER_RING + (qualified ? XP_PERFECT_BONUS : 0)
-                    : 0;
+                    : ring != null
+                        ? ring.getRingsClosed() * XP_PER_RING + (qualified ? XP_PERFECT_BONUS : 0) + ring.getFuelXp()
+                        : 0;
             xpFromDays += xp;
 
             if (frozen && ring == null) {
@@ -344,6 +369,23 @@ public class RingsService {
         ZonedDateTime now = ZonedDateTime.now(clock.withZone(ZONE));
         LocalDate day = now.toLocalDate();
         return now.getHour() < rolloverHour ? day.minusDays(1) : day;
+    }
+
+    /** +10 per logged meal, +25 when protein met the day's goal — from daily_food_logs. */
+    private int computeFuelXp(String userId, LocalDate date) {
+        return dailyFoodLogRepository.findByUserIdAndDateString(userId, date.toString())
+                .map(log -> {
+                    List<MealEntry> meals = log.getMeals() == null
+                            ? List.<MealEntry>of()
+                            : log.getMeals().values().stream().flatMap(List::stream).toList();
+                    int proteinSum = meals.stream()
+                            .mapToInt(m -> m.getProteinGrams() != null ? m.getProteinGrams() : 0)
+                            .sum();
+                    boolean proteinGoalMet = log.getProteinGoal() != null && log.getProteinGoal() > 0
+                            && proteinSum >= log.getProteinGoal();
+                    return meals.size() * FUEL_XP_PER_MEAL + (proteinGoalMet ? FUEL_XP_PROTEIN_GOAL : 0);
+                })
+                .orElse(0);
     }
 
     public RingTargets effectiveTargets(String userId) {
@@ -408,6 +450,9 @@ public class RingsService {
                 mergeLatest(latest, s.getDate(), s.getUpdatedAt() != null ? s.getUpdatedAt() : s.getCreatedAt()));
         stravaActivityRepository.findByUserIdAndDateBetween(userId, startDate, endDate).forEach(a ->
                 mergeLatest(latest, a.getDate(), a.getUpdatedAt() != null ? a.getUpdatedAt() : a.getCreatedAt()));
+        dailyFoodLogRepository.findByUserIdAndDateStringRange(userId, startDate.toString(), endDate.toString())
+                .forEach(f -> mergeLatest(latest, f.getDate() != null ? f.getDate() : parseDateString(f),
+                        f.getUpdatedAt() != null ? f.getUpdatedAt() : f.getCreatedAt()));
         // Focus sessions carry no per-day write timestamp we can range-query
         // cheaply, so any day with focus minutes counts as touched "now" only
         // when it has no ring yet; today/yesterday are recomputed regardless.
@@ -419,6 +464,14 @@ public class RingsService {
                     }
                 });
         return latest;
+    }
+
+    private LocalDate parseDateString(DailyFoodLog foodLog) {
+        try {
+            return foodLog.getDateString() != null ? LocalDate.parse(foodLog.getDateString()) : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private void mergeLatest(Map<LocalDate, Instant> latest, LocalDate date, Instant candidate) {
