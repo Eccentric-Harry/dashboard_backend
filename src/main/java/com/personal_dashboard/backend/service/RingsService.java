@@ -2,6 +2,7 @@ package com.personal_dashboard.backend.service;
 
 import com.personal_dashboard.backend.dto.RingDayResponse;
 import com.personal_dashboard.backend.dto.request.ManualMoveRequest;
+import com.personal_dashboard.backend.model.DailyFinancialLog;
 import com.personal_dashboard.backend.model.DailyFoodLog;
 import com.personal_dashboard.backend.model.DailyRing;
 import com.personal_dashboard.backend.model.MealEntry;
@@ -10,6 +11,7 @@ import com.personal_dashboard.backend.model.StravaActivity;
 import com.personal_dashboard.backend.model.StreakState;
 import com.personal_dashboard.backend.model.UserAccount;
 import com.personal_dashboard.backend.model.UserAccount.RingTargets;
+import com.personal_dashboard.backend.repository.DailyFinancialLogRepository;
 import com.personal_dashboard.backend.repository.DailyFoodLogRepository;
 import com.personal_dashboard.backend.repository.DailyRingRepository;
 import com.personal_dashboard.backend.repository.SleepLogRepository;
@@ -61,6 +63,8 @@ public class RingsService {
     // Fuel XP (Phase 2) — mirrored by FUEL_XP_* in dashboard_ui/src/lib/insights/nutrition.ts.
     static final int FUEL_XP_PER_MEAL = 10;
     static final int FUEL_XP_PROTEIN_GOAL = 25;
+    // Finance XP (Phase 4) — mirrored by FINANCE_XP_NO_SPEND in dashboard_ui/src/lib/insights/finance.ts.
+    static final int FINANCE_XP_NO_SPEND = 30;
 
     public static final String MOVE_SOURCE_STRAVA = "STRAVA";
     public static final String MOVE_SOURCE_MANUAL = "MANUAL";
@@ -72,6 +76,7 @@ public class RingsService {
     private final DailyRingRepository dailyRingRepository;
     private final StreakStateRepository streakStateRepository;
     private final DailyFoodLogRepository dailyFoodLogRepository;
+    private final DailyFinancialLogRepository dailyFinancialLogRepository;
 
     /** Injectable for tests; defaults to the system clock. */
     private Clock clock = Clock.system(ZONE);
@@ -209,7 +214,11 @@ public class RingsService {
         // bar can never disagree.
         int fuelXp = computeFuelXp(userId, date);
 
-        boolean hasAnyData = restMinutes > 0 || deepMinutes > 0 || moveMinutes > 0 || fuelXp > 0;
+        // Finance XP — a completed no-spend day is the single most
+        // behaviour-changing signal on /finance; restraint earns, spending never does.
+        int financeXp = computeFinanceXp(userId, date);
+
+        boolean hasAnyData = restMinutes > 0 || deepMinutes > 0 || moveMinutes > 0 || fuelXp > 0 || financeXp > 0;
         if (!hasAnyData && ring.getId() == null) {
             return null;
         }
@@ -233,8 +242,9 @@ public class RingsService {
         ring.setRingsClosed(ringsClosed);
         ring.setPerfect(ringsClosed == 3);
         ring.setFuelXp(fuelXp);
+        ring.setFinanceXp(financeXp);
         // Base XP; the streak replay zeroes it if a freeze ends up covering this day.
-        ring.setXpEarned(ringsClosed * XP_PER_RING + (ring.isPerfect() ? XP_PERFECT_BONUS : 0) + fuelXp);
+        ring.setXpEarned(ringsClosed * XP_PER_RING + (ring.isPerfect() ? XP_PERFECT_BONUS : 0) + fuelXp + financeXp);
         ring.setComputedAt(Instant.now(clock));
 
         try {
@@ -325,7 +335,7 @@ public class RingsService {
 
             int xp = frozen ? 0
                     : ring != null
-                        ? ring.getRingsClosed() * XP_PER_RING + (qualified ? XP_PERFECT_BONUS : 0) + ring.getFuelXp()
+                        ? ring.getRingsClosed() * XP_PER_RING + (qualified ? XP_PERFECT_BONUS : 0) + ring.getFuelXp() + ring.getFinanceXp()
                         : 0;
             xpFromDays += xp;
 
@@ -386,6 +396,31 @@ public class RingsService {
                     return meals.size() * FUEL_XP_PER_MEAL + (proteinGoalMet ? FUEL_XP_PROTEIN_GOAL : 0);
                 })
                 .orElse(0);
+    }
+
+
+    /**
+     * +30 for a completed no-spend day: the ring day has rolled over, the day
+     * has zero expense transactions, and the month has at least one financial
+     * log (proof the tracker was in use — absence of data alone earns nothing).
+     */
+    private int computeFinanceXp(String userId, LocalDate date) {
+        if (!date.isBefore(ringDayToday())) {
+            return 0; // today is still in progress — you haven't finished not-spending yet
+        }
+        String monthStart = date.withDayOfMonth(1).toString();
+        String monthEnd = date.withDayOfMonth(date.lengthOfMonth()).toString();
+        List<DailyFinancialLog> monthLogs =
+                dailyFinancialLogRepository.findByUserIdAndDateStringBetween(userId, monthStart, monthEnd);
+        if (monthLogs.isEmpty()) {
+            return 0;
+        }
+        boolean hasExpenseThatDay = monthLogs.stream()
+                .filter(l -> date.toString().equals(l.getDateString()))
+                .anyMatch(l -> l.getTransactions() != null && l.getTransactions().values().stream()
+                        .flatMap(List::stream)
+                        .anyMatch(tx -> "Expense".equalsIgnoreCase(tx.getType())));
+        return hasExpenseThatDay ? 0 : FINANCE_XP_NO_SPEND;
     }
 
     public RingTargets effectiveTargets(String userId) {
@@ -453,6 +488,9 @@ public class RingsService {
         dailyFoodLogRepository.findByUserIdAndDateStringRange(userId, startDate.toString(), endDate.toString())
                 .forEach(f -> mergeLatest(latest, f.getDate() != null ? f.getDate() : parseDateString(f),
                         f.getUpdatedAt() != null ? f.getUpdatedAt() : f.getCreatedAt()));
+        dailyFinancialLogRepository.findByUserIdAndDateStringBetween(userId, startDate.toString(), endDate.toString())
+                .forEach(f -> mergeLatest(latest, parseFinDateString(f),
+                        f.getUpdatedAt() != null ? f.getUpdatedAt() : f.getCreatedAt()));
         // Focus sessions carry no per-day write timestamp we can range-query
         // cheaply, so any day with focus minutes counts as touched "now" only
         // when it has no ring yet; today/yesterday are recomputed regardless.
@@ -469,6 +507,14 @@ public class RingsService {
     private LocalDate parseDateString(DailyFoodLog foodLog) {
         try {
             return foodLog.getDateString() != null ? LocalDate.parse(foodLog.getDateString()) : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private LocalDate parseFinDateString(DailyFinancialLog finLog) {
+        try {
+            return finLog.getDateString() != null ? LocalDate.parse(finLog.getDateString()) : null;
         } catch (Exception e) {
             return null;
         }

@@ -82,6 +82,14 @@ public class DailyRing implements UserOwnedDocument {
      */
     private int fuelXp;
 
+    /**
+     * Finance XP (Phase 4): +30 for a completed no-spend day — zero expense
+     * transactions on a day that has already rolled over, in a month where
+     * finance tracking is actually in use (≥1 log that month). Restraint is
+     * rewarded; spending never is.
+     */
+    private int financeXp;
+
     private int xpEarned;
 
     private Instant computedAt;

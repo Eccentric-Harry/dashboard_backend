@@ -1,14 +1,17 @@
 package com.personal_dashboard.backend.service;
 
 import com.personal_dashboard.backend.dto.request.ManualMoveRequest;
+import com.personal_dashboard.backend.model.DailyFinancialLog;
 import com.personal_dashboard.backend.model.DailyFoodLog;
 import com.personal_dashboard.backend.model.DailyRing;
 import com.personal_dashboard.backend.model.FocusSession;
+import com.personal_dashboard.backend.model.FinancialTransaction;
 import com.personal_dashboard.backend.model.FocusSessionStatus;
 import com.personal_dashboard.backend.model.MealEntry;
 import com.personal_dashboard.backend.model.SleepLog;
 import com.personal_dashboard.backend.model.StravaActivity;
 import com.personal_dashboard.backend.model.StreakState;
+import com.personal_dashboard.backend.repository.DailyFinancialLogRepository;
 import com.personal_dashboard.backend.repository.DailyFoodLogRepository;
 import com.personal_dashboard.backend.repository.DailyRingRepository;
 import com.personal_dashboard.backend.repository.FocusSessionRepository;
@@ -67,6 +70,7 @@ class RingsServiceTest {
     @Mock private DailyRingRepository dailyRingRepository;
     @Mock private StreakStateRepository streakStateRepository;
     @Mock private DailyFoodLogRepository dailyFoodLogRepository;
+    @Mock private DailyFinancialLogRepository dailyFinancialLogRepository;
 
     private RingsService ringsService;
 
@@ -77,6 +81,7 @@ class RingsServiceTest {
     private final Map<String, Map<LocalDate, Long>> focusStore = new HashMap<>();
     private final Map<String, Map<LocalDate, List<StravaActivity>>> stravaStore = new HashMap<>();
     private final Map<String, Map<String, DailyFoodLog>> foodStore = new HashMap<>();
+    private final Map<String, Map<String, DailyFinancialLog>> finStore = new HashMap<>();
     private final AtomicInteger idSequence = new AtomicInteger();
 
     @BeforeEach
@@ -85,7 +90,7 @@ class RingsServiceTest {
         ringsService = new RingsService(
                 sleepLogRepository, focusSessionService, stravaActivityRepository,
                 userAccountRepository, dailyRingRepository, streakStateRepository,
-                dailyFoodLogRepository);
+                dailyFoodLogRepository, dailyFinancialLogRepository);
         setNow(TODAY, 12);
 
         when(userAccountRepository.findById(anyString())).thenReturn(Optional.empty());
@@ -171,6 +176,16 @@ class RingsServiceTest {
                         .get(inv.<String>getArgument(1))));
         when(dailyFoodLogRepository.findByUserIdAndDateStringRange(anyString(), anyString(), anyString()))
                 .thenReturn(List.of());
+
+        when(dailyFinancialLogRepository.findByUserIdAndDateStringBetween(anyString(), anyString(), anyString()))
+                .thenAnswer(inv -> {
+                    String from = inv.getArgument(1);
+                    String to = inv.getArgument(2);
+                    return finStore.getOrDefault(inv.<String>getArgument(0), Map.of()).entrySet().stream()
+                            .filter(e -> e.getKey().compareTo(from) >= 0 && e.getKey().compareTo(to) <= 0)
+                            .map(Map.Entry::getValue)
+                            .toList();
+                });
     }
 
     @AfterEach
@@ -329,6 +344,51 @@ class RingsServiceTest {
         StreakState state = ringsService.recomputeStreak();
 
         assertEquals(230, state.getTotalXp()); // 100 + 100 + 30 fuel
+    }
+
+
+    // ---------- finance XP (no-spend days) ----------
+
+    @Test
+    void completedNoSpendDayEarnsThirtyXp() {
+        // The month is actively tracked: an expense exists on another day.
+        givenExpenseDay(USER, TODAY.minusDays(3));
+        givenSleep(USER, TODAY.minusDays(1), 460);
+
+        DailyRing yesterday = ringsService.computeDay(TODAY.minusDays(1));
+
+        assertEquals(30, yesterday.getFinanceXp());
+        assertEquals(20 + 30, yesterday.getXpEarned()); // rest ring + no-spend
+    }
+
+    @Test
+    void todayNeverEarnsNoSpendXpWhileInProgress() {
+        givenExpenseDay(USER, TODAY.minusDays(3));
+        givenSleep(USER, TODAY, 460);
+
+        DailyRing ring = ringsService.computeDay(TODAY);
+
+        assertEquals(0, ring.getFinanceXp()); // the day has not rolled over yet
+    }
+
+    @Test
+    void aDayWithExpensesEarnsNoFinanceXp() {
+        givenExpenseDay(USER, TODAY.minusDays(1));
+        givenSleep(USER, TODAY.minusDays(1), 460);
+
+        DailyRing ring = ringsService.computeDay(TODAY.minusDays(1));
+
+        assertEquals(0, ring.getFinanceXp());
+    }
+
+    @Test
+    void anUntrackedMonthEarnsNoFinanceXp() {
+        // No financial logs at all — absence of data is not restraint.
+        givenSleep(USER, TODAY.minusDays(1), 460);
+
+        DailyRing ring = ringsService.computeDay(TODAY.minusDays(1));
+
+        assertEquals(0, ring.getFinanceXp());
     }
 
     // ---------- rollover ----------
@@ -561,6 +621,18 @@ class RingsServiceTest {
 
     private void givenFocus(String userId, LocalDate date, long minutes) {
         focusStore.computeIfAbsent(userId, k -> new HashMap<>()).put(date, minutes);
+    }
+
+    /** Seed a financial log with one expense transaction on the date. */
+    private void givenExpenseDay(String userId, LocalDate date) {
+        DailyFinancialLog log = DailyFinancialLog.builder()
+                .userId(userId)
+                .dateString(date.toString())
+                .transactions(new java.util.LinkedHashMap<>(Map.of(
+                        "Food", List.of(FinancialTransaction.builder()
+                                .description("lunch").amount(new java.math.BigDecimal("120")).type("Expense").build()))))
+                .build();
+        finStore.computeIfAbsent(userId, k -> new HashMap<>()).put(date.toString(), log);
     }
 
     /** Seed a food log: {@code proteinGoal}, then one protein value per meal. */
