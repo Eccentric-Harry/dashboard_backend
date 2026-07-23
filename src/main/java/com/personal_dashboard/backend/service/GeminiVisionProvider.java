@@ -70,7 +70,7 @@ public class GeminiVisionProvider implements VisionProvider {
                             "maxOutputTokens", 32768,
                             "responseMimeType", "application/json",
                             "thinkingConfig", Map.of(
-                                    "thinkingLevel", "minimal"
+                                    "thinkingLevel", "medium"
                             )));
 
             HttpHeaders headers = new HttpHeaders();
