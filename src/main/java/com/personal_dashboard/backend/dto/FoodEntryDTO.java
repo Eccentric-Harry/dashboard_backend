@@ -29,6 +29,8 @@ public class FoodEntryDTO {
 
     private String mealQuality;
 
+    private String imageUrl;
+
     private String notes;
 
     private String recipeCategory;

@@ -13,6 +13,7 @@ import java.util.*;
 
 /**
  * Primary Gemini implementation of the VisionProvider strategy.
+ * Claude is the fallback provider (see NutritionPipelineService).
  */
 @Component("geminiVisionProvider")
 @Slf4j
@@ -37,18 +38,23 @@ public class GeminiVisionProvider implements VisionProvider {
     }
 
     @Override
-    public String analyzeFoodImage(byte[] imageBytes, String prompt) {
+    public String analyzeFoodImage(List<byte[]> images, String prompt) {
         try {
             List<Map<String, Object>> parts = new ArrayList<>();
             parts.add(Map.of("text", prompt));
 
-            if (imageBytes != null && imageBytes.length > 0) {
-                String mimeType = resolveMimeType(imageBytes);
-                String base64Image = Base64.getEncoder().encodeToString(imageBytes);
-                parts.add(Map.of(
-                        "inline_data", Map.of(
-                                "mime_type", mimeType,
-                                "data", base64Image)));
+            int imageCount = 0;
+            if (images != null) {
+                for (byte[] imageBytes : images) {
+                    if (imageBytes == null || imageBytes.length == 0) continue;
+                    String mimeType = resolveMimeType(imageBytes);
+                    String base64Image = Base64.getEncoder().encodeToString(imageBytes);
+                    parts.add(Map.of(
+                            "inline_data", Map.of(
+                                    "mime_type", mimeType,
+                                    "data", base64Image)));
+                    imageCount++;
+                }
             }
 
             String url = endpoint + "?key=" + apiKey;
@@ -68,7 +74,7 @@ public class GeminiVisionProvider implements VisionProvider {
 
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
-            log.info("[GeminiVisionProvider] Sending request to Gemini API (model: {}, hasImage: {})", model, imageBytes != null && imageBytes.length > 0);
+            log.info("[GeminiVisionProvider] Sending request to Gemini API (model: {}, images: {})", model, imageCount);
             long startedAt = System.currentTimeMillis();
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
             long elapsedMs = System.currentTimeMillis() - startedAt;

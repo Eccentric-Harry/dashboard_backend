@@ -42,6 +42,10 @@ public class MealAnalysisController {
     private final NutritionPipelineService nutritionPipelineService;
     private final DailyFoodLogService dailyFoodLogService;
     private final UserAccountRepository userAccountRepository;
+    private final com.personal_dashboard.backend.service.GeminiImageGenerationService imageGenerationService;
+
+    /** Maximum images accepted per meal scan. */
+    private static final int MAX_IMAGES = 3;
 
     /**
      * Analyze a meal using the Gemini AI pipeline, persist, and return the full analysis.
@@ -56,13 +60,27 @@ public class MealAnalysisController {
             summary = "AI Meal Analysis",
             description = "Runs a two-stage Gemini pipeline: Stage 1 identifies food items from image/text, Stage 2 calculates full nutrition and medical analysis. Persists to MongoDB and returns the enriched result.")
     public ResponseEntity<ApiResponse<MealAnalysisResponse>> analyzeMeal(
+            @RequestPart(value = "files", required = false) List<MultipartFile> files,
             @RequestPart(value = "file", required = false) MultipartFile file,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam("mealType") String mealType,
             @RequestParam(value = "date", required = false) String date) {
 
+        // ── Collect images (multi-image "files" part, plus legacy single "file") ──
+        List<MultipartFile> images = new ArrayList<>();
+        if (files != null) {
+            for (MultipartFile f : files) {
+                if (f != null && !f.isEmpty()) images.add(f);
+            }
+        }
+        if (file != null && !file.isEmpty()) images.add(file);
+        if (images.size() > MAX_IMAGES) {
+            log.warn("[MealAnalysis] {} images supplied; using the first {}", images.size(), MAX_IMAGES);
+            images = images.subList(0, MAX_IMAGES);
+        }
+
         // ── Validation ──────────────────────────────────────────────────
-        boolean hasImage = file != null && !file.isEmpty();
+        boolean hasImage = !images.isEmpty();
         boolean hasText = description != null && !description.isBlank();
 
         if (!hasImage && !hasText) {
@@ -88,7 +106,7 @@ public class MealAnalysisController {
         GeminiAnalysisResult analysis;
         try {
             analysis = nutritionPipelineService.analyzeWithTwoStage(
-                    hasImage ? file : null,
+                    hasImage ? images : null,
                     hasText ? description : null,
                     userProfile);
         } catch (Exception e) {
@@ -104,6 +122,10 @@ public class MealAnalysisController {
 
         // Build description from identified items
         String mealDescription = buildDescription(analysis, description);
+
+        // Generate a pastel top-view dish image (best-effort; null falls back to a
+        // keyword-matched bundled asset on the frontend). Never blocks the meal log.
+        String generatedImageUrl = imageGenerationService.generatePastelFoodImageDataUri(mealDescription);
 
         // Map ingredients to List<Map<String,Object>> for MealEntry.mealItems
         List<Map<String, Object>> mealItemsMaps = mapIngredients(analysis.getIngredientsBreakdown());
@@ -121,6 +143,7 @@ public class MealAnalysisController {
                 .calories(calories)
                 .proteinGrams(protein)
                 .mealQuality(score != null ? score.getLetterGrade() : null)
+                .imageUrl(generatedImageUrl)
                 .timestamp(Instant.now())
                 .mealItems(mealItemsMaps)
                 .totalSummary(buildTotalSummaryMap(totals))
@@ -151,6 +174,7 @@ public class MealAnalysisController {
                 .description(mealDescription)
                 .calories(calories)
                 .proteinGrams(protein)
+                .imageUrl(generatedImageUrl)
                 .analysis(analysis)
                 .build();
 

@@ -1,7 +1,5 @@
 package com.personal_dashboard.backend.service;
 
-import com.anthropic.errors.AnthropicServiceException;
-import com.anthropic.errors.RateLimitException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.personal_dashboard.backend.dto.GeminiAnalysisResult;
 import com.personal_dashboard.backend.model.UserAccount;
@@ -11,17 +9,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.annotation.PostConstruct;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * NutritionPipelineService
  *
  * Orchestrates the two-stage LLM meal-analysis pipeline:
  *
- *   Stage 1 — Vision/Extraction  (multimodal model: Claude Sonnet / Gemini fallback)
- *             Analyses a food image and/or text description, maps every visible and
- *             HIDDEN ingredient to USDA FoodData Central nomenclature, and emits a
+ *   Stage 1 — Vision/Extraction  (multimodal model: Gemini / Claude fallback)
+ *             Analyses up to 3 food images and/or a text description, maps every visible
+ *             and HIDDEN ingredient to USDA FoodData Central nomenclature, and emits a
  *             raw ingredient JSON array with per-item gram weights.
  *
- *   Stage 2 — Clinical Reasoning (text-only model: Claude Sonnet / Gemini fallback)
+ *   Stage 2 — Clinical Reasoning (text-only model: Gemini / Claude fallback)
  *             Consumes the Stage-1 JSON plus the fully-populated UserAccount profile,
  *             runs strict macro math (1g P=4 kcal, 1g C=4 kcal, 1g F=9 kcal),
  *             applies WHO / AHA / ADA clinical guidelines, and returns a deep
@@ -46,8 +47,8 @@ public class NutritionPipelineService {
     private ObjectMapper objectMapper;
 
     public NutritionPipelineService(
-            @Qualifier("claudeVisionProvider") VisionProvider primaryProvider,
-            @Qualifier("geminiVisionProvider") VisionProvider fallbackProvider) {
+            @Qualifier("geminiVisionProvider") VisionProvider primaryProvider,
+            @Qualifier("claudeVisionProvider") VisionProvider fallbackProvider) {
         this.primaryProvider = primaryProvider;
         this.fallbackProvider = fallbackProvider;
     }
@@ -62,21 +63,29 @@ public class NutritionPipelineService {
     /**
      * Runs the full two-stage pipeline.
      *
-     * @param imageFile       Optional uploaded image file
+     * @param imageFiles      Optional uploaded image files (up to 3)
      * @param textDescription Optional text description of the meal
      * @param userProfile     User profile for personalised nutrition targets and medical context
      * @return Full GeminiAnalysisResult from Stage 2
      */
     public GeminiAnalysisResult analyzeWithTwoStage(
-            MultipartFile imageFile,
+            List<MultipartFile> imageFiles,
             String textDescription,
             UserAccount userProfile) throws Exception {
 
         log.info("[NutritionPipeline] Starting Stage 1 — food identification");
-        byte[] imageBytes = (imageFile != null && !imageFile.isEmpty()) ? imageFile.getBytes() : null;
+        List<byte[]> images = new ArrayList<>();
+        if (imageFiles != null) {
+            for (MultipartFile file : imageFiles) {
+                if (file != null && !file.isEmpty()) {
+                    images.add(file.getBytes());
+                }
+            }
+        }
+        log.info("[NutritionPipeline] Stage 1 received {} image(s)", images.size());
 
         String textInstruction = buildStage1Prompt(textDescription);
-        String stage1Json = processMealAnalysis(imageBytes, textInstruction);
+        String stage1Json = processMealAnalysis(images, textInstruction);
         stage1Json = cleanJsonResponse(stage1Json);
         log.info("[NutritionPipeline] Stage 1 complete. Items: {}", stage1Json);
 
@@ -90,37 +99,39 @@ public class NutritionPipelineService {
     }
 
     /**
-     * Executes the primary provider (Claude) with fallback to Gemini on rate-limit/overload.
+     * Executes the primary provider (Gemini) with fallback to Claude on any failure.
      * Uses a default Stage 1 prompt for meal analysis.
      *
-     * @param imageBytes Optional raw image bytes
+     * @param images Optional raw image byte arrays
      * @return Extracted JSON response string
      */
-    public String processMealAnalysis(byte[] imageBytes) {
+    public String processMealAnalysis(List<byte[]> images) {
         String defaultPrompt = buildStage1Prompt(null);
-        return processMealAnalysis(imageBytes, defaultPrompt);
+        return processMealAnalysis(images, defaultPrompt);
     }
 
     /**
-     * Executes the primary provider (Claude) with fallback to Gemini on rate-limit/overload.
+     * Executes the primary provider (Gemini) and, if it errors or is unavailable,
+     * transparently retries once with the fallback provider (Claude).
      *
-     * @param imageBytes Optional raw image bytes
-     * @param prompt     Structured prompt/instructions
+     * @param images Optional raw image byte arrays (null/empty for text-only calls)
+     * @param prompt Structured prompt/instructions
      * @return Extracted JSON response string
      */
-    public String processMealAnalysis(byte[] imageBytes, String prompt) {
+    public String processMealAnalysis(List<byte[]> images, String prompt) {
         try {
             log.info("[NutritionPipeline] Invoking primary provider ({})", primaryProvider.getProviderName());
-            return primaryProvider.analyzeFoodImage(imageBytes, prompt);
-        } catch (RateLimitException e) {
-            log.warn("[MealAnalysis] Claude rate-limit hit. Switching to fallback provider: Gemini.");
-            return fallbackProvider.analyzeFoodImage(imageBytes, prompt);
-        } catch (AnthropicServiceException e) {
-            if (e.statusCode() == 429 || e.statusCode() == 503 || e.statusCode() == 529 || e.statusCode() >= 500) {
-                log.warn("[MealAnalysis] Claude busy or unavailable ({}). Switching to fallback provider: Gemini.", e.statusCode());
-                return fallbackProvider.analyzeFoodImage(imageBytes, prompt);
+            return primaryProvider.analyzeFoodImage(images, prompt);
+        } catch (Exception primaryError) {
+            log.warn("[MealAnalysis] Primary provider ({}) failed: {}. Switching to fallback provider ({}).",
+                    primaryProvider.getProviderName(), primaryError.getMessage(), fallbackProvider.getProviderName());
+            try {
+                return fallbackProvider.analyzeFoodImage(images, prompt);
+            } catch (Exception fallbackError) {
+                log.error("[MealAnalysis] Fallback provider ({}) also failed: {}",
+                        fallbackProvider.getProviderName(), fallbackError.getMessage());
+                throw fallbackError;
             }
-            throw e;
         }
     }
 
@@ -311,6 +322,12 @@ public class NutritionPipelineService {
      */
     private String buildStage2Prompt(String stage1Json, UserAccount user) {
 
+        // Null-safe: an unauthenticated/unknown user still gets a general analysis
+        // (dynamic targets fall back to clinical defaults below).
+        if (user == null) {
+            user = new UserAccount();
+        }
+
         // ── 1. Resolve medical condition flags ────────────────────────────────
         boolean hasAcne          = user.getMedicalConditions() != null &&
                                    user.getMedicalConditions().stream()
@@ -412,9 +429,37 @@ public class NutritionPipelineService {
         double consumedFiberG    = 0.0;
 
         // ── 4. Build medical condition context block ──────────────────────────
-        String medicalConditionList = (user.getMedicalConditions() == null || user.getMedicalConditions().isEmpty())
-                ? "None reported"
-                : String.join(", ", user.getMedicalConditions());
+        boolean hasAnyCondition = user.getMedicalConditions() != null && !user.getMedicalConditions().isEmpty();
+        String medicalConditionList = hasAnyCondition
+                ? String.join(", ", user.getMedicalConditions())
+                : "None reported";
+
+        // Health analysis is driven by the user's OWN profile. With no conditions on
+        // file we run a gentle, general-population analysis instead of assuming acne/
+        // diabetes/etc. — the profile is the single source of truth here.
+        String healthProfileClause = hasAnyCondition
+                ? ("""
+                  HEALTH PROFILE — tailor the analysis to the user's OWN conditions.
+                  Active conditions from the user's profile: %s.
+                  Base every clinical finding and recommendation on THESE conditions.
+                  For any listed condition that has no specific protocol below, apply
+                  standard evidence-based dietary guidance for it. Do NOT introduce
+                  conditions the user did not report.
+                """).formatted(medicalConditionList)
+                : """
+                  HEALTH PROFILE — no specific conditions on file.
+                  The user has NOT reported any medical conditions, so run a balanced,
+                  general-population analysis:
+                    • Do NOT assume or invent conditions (no presumed acne, diabetes,
+                      PCOS, hypertension, etc.) and do NOT apply condition-specific fear
+                      framing. The health_analysis should contain only conditions with a
+                      genuine, food-driven finding — otherwise return an empty analysis.
+                    • Judge the meal on general nutrition quality. Highlight genuine
+                      strengths; keep concerns proportionate, practical and non-alarmist.
+                    • Still compute glycaemic load and flag only genuinely significant
+                      issues (very high free sugar, very high sodium, trans fat). Do not
+                      manufacture clinical risk the food does not warrant.
+                """;
 
         String acneClause = hasAcne ? """
 
@@ -673,8 +718,9 @@ public class NutritionPipelineService {
                   Primary Nutrition Goal    : %s
 
                 ################################################################################
-                ##  CLINICAL CONDITION PROTOCOLS  (Mandatory — apply all that are flagged)
+                ##  HEALTH PROFILE & CONDITION PROTOCOLS  (tailored to the user's profile)
                 ################################################################################
+                %s
                 %s
                 %s
                 %s
@@ -982,7 +1028,8 @@ public class NutritionPipelineService {
                         "None reported",  // currentMedications — not available in current model
                         "None reported",  // dietaryRestrictions — not available in current model
                         primaryGoal,
-                        // Condition-specific clauses
+                        // Health profile (dynamic) + condition-specific clauses
+                        healthProfileClause,
                         acneClause,
                         diabetesClause,
                         hypertensionClause,

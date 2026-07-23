@@ -33,6 +33,9 @@ public class MealAnalysisResponse {
     /** Protein grams saved to the MealEntry */
     private int proteinGrams;
 
+    /** AI-generated pastel dish image as a data: URI (null if generation was skipped/failed) */
+    private String imageUrl;
+
     /** Full Gemini Stage 2 analysis result for the frontend results panel */
     private GeminiAnalysisResult analysis;
 }

@@ -14,14 +14,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import jakarta.annotation.PostConstruct;
 
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Primary Claude implementation of the VisionProvider strategy.
- * Gemini remains as the fallback provider (see NutritionPipelineService) for
- * when Claude is rate-limited or unavailable.
+ * Fallback Claude implementation of the VisionProvider strategy.
+ * Gemini is the primary provider (see NutritionPipelineService); Claude is used
+ * when Gemini errors or is unavailable.
  */
 @Component("claudeVisionProvider")
 @Slf4j
@@ -41,25 +42,28 @@ public class ClaudeVisionProvider implements VisionProvider {
     }
 
     @Override
-    public String analyzeFoodImage(byte[] imageBytes, String prompt) {
+    public String analyzeFoodImage(List<byte[]> images, String prompt) {
         try {
-            List<ContentBlockParam> content;
-            if (imageBytes != null && imageBytes.length > 0) {
-                Base64ImageSource.MediaType mediaType = resolveMediaType(imageBytes);
-                String base64Image = Base64.getEncoder().encodeToString(imageBytes);
-                content = List.of(
-                        ContentBlockParam.ofImage(
-                                ImageBlockParam.builder()
-                                        .source(
-                                                Base64ImageSource.builder()
-                                                        .mediaType(mediaType)
-                                                        .data(base64Image)
-                                                        .build())
-                                        .build()),
-                        ContentBlockParam.ofText(TextBlockParam.builder().text(prompt).build()));
-            } else {
-                content = List.of(ContentBlockParam.ofText(TextBlockParam.builder().text(prompt).build()));
+            List<ContentBlockParam> content = new ArrayList<>();
+            int imageCount = 0;
+            if (images != null) {
+                for (byte[] imageBytes : images) {
+                    if (imageBytes == null || imageBytes.length == 0) continue;
+                    Base64ImageSource.MediaType mediaType = resolveMediaType(imageBytes);
+                    String base64Image = Base64.getEncoder().encodeToString(imageBytes);
+                    content.add(ContentBlockParam.ofImage(
+                            ImageBlockParam.builder()
+                                    .source(
+                                            Base64ImageSource.builder()
+                                                    .mediaType(mediaType)
+                                                    .data(base64Image)
+                                                    .build())
+                                    .build()));
+                    imageCount++;
+                }
             }
+            // Text prompt goes after the images so the model has the visual context first.
+            content.add(ContentBlockParam.ofText(TextBlockParam.builder().text(prompt).build()));
 
             MessageCreateParams params = MessageCreateParams.builder()
                     .model(model)
@@ -71,7 +75,7 @@ public class ClaudeVisionProvider implements VisionProvider {
                     .addUserMessageOfBlockParams(content)
                     .build();
 
-            log.info("[ClaudeVisionProvider] Sending request to Claude API (model: {}, hasImage: {})", model, imageBytes != null && imageBytes.length > 0);
+            log.info("[ClaudeVisionProvider] Sending request to Claude API (model: {}, images: {})", model, imageCount);
             long startedAt = System.currentTimeMillis();
             Message message = client.messages().create(params);
             long elapsedMs = System.currentTimeMillis() - startedAt;

@@ -32,6 +32,13 @@ public class MealEntry {
 
     private String mealQuality;
 
+    /**
+     * Optional AI-generated pastel dish image, stored as a self-contained data: URI.
+     * Populated by the AI meal-scan pipeline; null for manual entries (which fall back
+     * to the keyword-matched bundled asset on the frontend).
+     */
+    private String imageUrl;
+
     private String notes;
 
     private String recipeCategory;
