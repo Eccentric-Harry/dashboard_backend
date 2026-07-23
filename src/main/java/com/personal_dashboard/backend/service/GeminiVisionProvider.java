@@ -59,14 +59,18 @@ public class GeminiVisionProvider implements VisionProvider {
 
             String url = endpoint + "?key=" + apiKey;
 
+            // Gemini 3.x uses thinkingLevel (minimal|low|medium|high); thinkingBudget was
+            // removed and 0 (full thinking-off) is rejected with INVALID_ARGUMENT — 3.x Flash
+            // cannot disable thinking. "minimal" keeps latency/cost low. Thinking tokens are
+            // drawn from maxOutputTokens, so it is set high enough for the large Stage-2 JSON.
             Map<String, Object> body = Map.of(
                     "contents", List.of(Map.of("parts", parts)),
                     "generationConfig", Map.of(
                             "temperature", 0.1,
-                            "maxOutputTokens", 8192,
+                            "maxOutputTokens", 32768,
                             "responseMimeType", "application/json",
                             "thinkingConfig", Map.of(
-                                    "thinkingBudget", 0
+                                    "thinkingLevel", "minimal"
                             )));
 
             HttpHeaders headers = new HttpHeaders();
