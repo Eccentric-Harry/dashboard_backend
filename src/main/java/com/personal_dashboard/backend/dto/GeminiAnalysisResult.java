@@ -380,6 +380,9 @@ public class GeminiAnalysisResult {
     @AllArgsConstructor
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class MealScore {
+        @JsonProperty("meal_context")
+        private String mealContext;
+
         @JsonProperty("overall_score")
         private int overallScore;
 

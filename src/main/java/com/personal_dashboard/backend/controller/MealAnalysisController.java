@@ -298,6 +298,9 @@ public class MealAnalysisController {
             m.put("overall_score", score.getOverallScore());
             m.put("score_rationale", score.getScoreRationale());
             m.put("fitness_alignment", score.getScoreRationale());
+            if (score.getMealContext() != null) {
+                m.put("meal_context", score.getMealContext());
+            }
         }
 
         // Strengths from positive_highlights

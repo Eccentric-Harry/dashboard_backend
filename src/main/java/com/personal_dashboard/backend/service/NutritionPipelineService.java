@@ -431,6 +431,10 @@ public class NutritionPipelineService {
                     • Omega-6 dominant oils (sunflower, corn, soybean): FLAG as MODERATE_RISK
                       (pro-inflammatory pathway via arachidonic acid).
                     • Omega-3 rich foods: FLAG as PROTECTIVE. Note the anti-inflammatory benefit.
+                    • Whole, low-GI fruits and vegetables with intact fibre (apple,
+                      berries, citrus, leafy greens): treat as PROTECTIVE / NEUTRAL,
+                      NOT an acne trigger. Their fibre blunts the glucose→insulin→IGF-1
+                      pathway. Never flag the intrinsic sugar of whole fruit as high-risk.
                     • Calculate and report the meal's estimated Glycaemic Load (GL).
                 """ : "";
 
@@ -495,22 +499,103 @@ public class NutritionPipelineService {
 
         // ── 5. Build glycaemic reality clause (always present) ────────────────
         String glycaemicRealityClause = """
-                  GLYCAEMIC REALITY MANDATE (enforced for ALL users):
-                  You MUST treat the following foods with the same physiological scrutiny
-                  as refined table sugar:
-                    • White rice (GI 64–72): A 200g serving has approximately 52g net
-                      carbohydrate and a glycaemic load of ~33. This triggers a significant
-                      insulin response equivalent to consuming concentrated sugar.
+                  GLYCAEMIC REALITY MANDATE (physiological accuracy, NOT moralisation):
+
+                  A) REFINED / FREE-SUGAR carbohydrates — apply full scrutiny. These
+                     drive a rapid glucose and insulin response and MUST be called out:
+                    • White rice (GI 64–72): a 200g serving is ~52g net carbohydrate,
+                      glycaemic load ~33 — a significant insulin response.
                     • White bread, maida (all-purpose flour) products: GI 70–85.
-                    • Refined breakfast cereals, instant oats (with added sugar): GI 70+.
-                    • Fruit juices (even 100%% natural): concentrated fructose, GI 50–70,
-                      glycaemic load often HIGH because fibre is removed.
-                  Do NOT describe these foods as "neutral," "fine in moderation," or use
-                  any softening language that obscures their insulin impact.
-                  You MUST state the mechanistic pathway: rapid glucose absorption →
-                  insulin spike → downstream hormonal and metabolic consequences.
-                  This rule applies regardless of whether the user has diabetes or acne.
-                  The goal is physiological accuracy, not dietary moralisation.
+                    • Refined / sugar-added breakfast cereals and instant oats: GI 70+.
+                    • Sugar, honey, jaggery, syrups, and sugar-sweetened drinks.
+                    • Fruit JUICE (even 100%% natural): fibre is removed, so its sugar
+                      behaves like free sugar — score it as free sugar.
+                    For these, state the mechanistic pathway: rapid glucose absorption →
+                    insulin spike → downstream hormonal and metabolic consequences.
+
+                  B) WHOLE-FOOD CARVE-OUT — equally mandatory; do NOT over-flag:
+                    Whole fruits and vegetables, legumes, nuts/seeds and intact whole
+                    grains carry their sugar INSIDE an intact fibre matrix, which blunts
+                    the glycaemic response. Their intrinsic sugar is NOT free sugar.
+                    • Do NOT flag whole fruit/veg as HIGH_SUGAR. Use INTRINSIC_SUGAR
+                      (informational) and let fibre + true GL reflect the real impact.
+                    • Do NOT describe a whole apple, banana or bowl of dal as an
+                      "insulin spike" — their glycaemic load is modest and their fibre,
+                      vitamins and polyphenols are protective.
+                    • `added_sugar_g` counts FREE sugar ONLY (added/refined sugar plus
+                      juice sugar). It must NEVER include the intrinsic sugar of whole
+                      fruit, vegetables or plain dairy.
+                    • Never stack glycaemic + sugar + "empty calorie" penalties on a
+                      whole food. Scrutinise refined carbs and free sugar; protect
+                      genuine whole foods. This applies to ALL users.
+                """;
+
+        // ── 5b. Build context-aware scoring rubric (always present) ───────────
+        // Plain-text block (not run through String.format) so raw % signs are fine.
+        String scoringRubricClause = """
+                  Compute meal_score.overall_score (0–100) and letter_grade with the
+                  CONTEXT-AWARE rubric below. FIRST decide meal_context:
+
+                    • "main"  → meal_type ∈ {Breakfast, Lunch, Dinner, Post Workout}
+                                OR this meal is ≥ 25% of the daily calorie target.
+                    • "light" → everything else (Snack, Mid-Morning, Midnight).
+
+                  A snack is not a failed dinner. Judge every meal by its own job:
+                  protein is the BACKBONE of a main meal but only a BONUS for a light
+                  snack. Never penalise a food for a role it was never meant to play.
+
+                  WHOLE-FOOD GRADE FLOORS (compute the raw banded score, then take the
+                  HIGHER of the raw score and any floor that applies):
+                    • A meal made ENTIRELY of whole / minimally-processed foods (NOVA 1)
+                      — fresh fruit, veg, legumes, plain nuts, plain dairy, intact whole
+                      grains — with free sugar ≤ 5g, sodium < 400mg and saturated fat
+                      < 3g scores AT LEAST 80 (grade A) if light, or AT LEAST 70
+                      (grade B) if main. A single whole fruit is an A-grade snack.
+                    • A meal that is ≥ 75% whole-food by calories, with free sugar ≤ 12g,
+                      sodium < 500mg and saturated fat < 5g scores AT LEAST 60 (grade C).
+                      Whole food is never graded "poor".
+                    • Floors NEVER apply to ultra-processed foods, deep-fried foods,
+                      added-sugar products, or refined-grain-dominant meals.
+
+                  MAIN meals (per-meal protein target ≈ daily protein target ÷ 4):
+                   1. Protein (30): ≥35g→30 · 25–34→22 · 15–24→14 · 10–14→8 · 5–9→4 · <5→1
+                   2. Glycaemic (25): meal GL<10→23–25 · 10–14→17–20 · 15–19→10–14 ·
+                      20–29→4–8 · ≥30→1–3. Score glycaemic load from FREE sugar /
+                      refined carbs harshly; whole-fruit GL is treated gently.
+                   3. Macro balance (20): protein ≥25% kcal, fat 20–35%, carbs 35–55%:
+                      all in→20 · 1 out→14 · 2 out→8 · 3 out→3
+                   4. Fibre & micros (15): ≥6g→12–15 · 4–5.9→9–11 · 2–3.9→6–8 ·
+                      1–1.9→3–5 · <1→1–2 (+≤3 bonus for micronutrient diversity /
+                      anti-inflammatory spices / fermented foods; cap 15)
+                   5. Sodium & sat fat (10): <400mg AND <3g→10 · one of the two→7 ·
+                      400–700 AND 3–5g→4 · >700 OR >5g→1–2
+
+                  LIGHT meals (snacks judged as snacks — protein is a bonus, not backbone):
+                   1. Food quality (30): all whole / minimally processed→26–30 ·
+                      mostly whole→18–25 · mixed→10–17 · mostly ultra-processed→1–9
+                   2. Glycaemic (25): same bands as MAIN
+                   3. Fibre & micros (20): ≥5g→17–20 · 3–4.9→12–16 · 1.5–2.9→7–11 ·
+                      <1.5→1–6 (+bonus as above; cap 20)
+                   4. Protein contribution (15): ≥15g→15 · 8–14.9→11 · 4–7.9→7 ·
+                      1–3.9→4 · <1→1
+                   5. Sodium & sat fat (10): same as MAIN
+
+                  Grades: A 85–100 (excellent) · B 70–84 (good) · C 55–69 (fair) ·
+                  D 40–54 (poor) · F <40 (very poor). Clamp 0–100. letter_grade MUST
+                  match overall_score to these bands. meal_score.score_rationale MUST
+                  name the context ("As a snack, …" / "As a main meal, …") and MUST
+                  cite genuine strengths, not only faults.
+
+                  CALIBRATION ANCHORS (do not output):
+                    • "1 apple, Snack" → light, entirely whole food, free sugar 0 →
+                      whole-food floor → ~90, grade A. Fruit is a good snack.
+                    • "Apple + 240ml apple juice, Snack" → light; the juice is free
+                      sugar (fibre removed) so the 75%-whole floor is NOT met, but the
+                      whole apple keeps it out of "poor": land ~C (fair), with the juice
+                      named as the single lever to improve.
+                    • "Lemon rice, Lunch" (200g white rice, 20g peanuts) → main;
+                      protein ~10g, GL high, no floor → ~35, grade F. A protein-free
+                      high-GL lunch is not a good recomposition meal.
                 """;
 
         return """
@@ -603,6 +688,11 @@ public class NutritionPipelineService {
                 %s
 
                 ################################################################################
+                ##  MEAL SCORING RUBRIC  (Always Active — governs meal_score)
+                ################################################################################
+                %s
+
+                ################################################################################
                 ##  STAGE-1 EXTRACTION INPUT
                 ################################################################################
                 The following JSON was produced by the multimodal Vision stage.
@@ -681,6 +771,13 @@ public class NutritionPipelineService {
                     [Step 6 — Glycaemic Load Calculation]
                       For each high-GI ingredient: GL = (GI × net_carbs_g) / 100.
                       Sum for total meal GL. Classify: Low (<10), Medium (10–19), High (≥20).
+                      Separate FREE-sugar / refined-carb GL from whole-fruit GL.
+
+                    [Step 7 — Contextual Scoring]
+                      State meal_context (main vs light) and WHY. Walk the MEAL SCORING
+                      RUBRIC band by band, show each component score, sum them, then apply
+                      any whole-food floor (take the higher value). State the final
+                      overall_score and the matching letter_grade band.
 
                 ################################################################################
                 ##  REQUIRED OUTPUT — STRICT JSON SCHEMA
@@ -810,13 +907,14 @@ public class NutritionPipelineService {
                   ],
 
                   "meal_score": {
-                    "overall_score": <integer 0–100: composite clinical nutrition score>,
-                    "score_rationale": "<string: explain how the score was derived — what raised and lowered it>",
+                    "meal_context": "<'main' | 'light' — per the MEAL SCORING RUBRIC>",
+                    "overall_score": <integer 0–100: from the context-aware rubric, AFTER applying whole-food floors>,
+                    "score_rationale": "<string: MUST name the context ('As a snack, …' / 'As a main meal, …'), cite genuine strengths, and explain what raised and lowered the score>",
                     "macro_balance_score": <integer 0–100>,
-                    "glycaemic_score": <integer 0–100: 100=low GL, 0=very high GL>,
+                    "glycaemic_score": <integer 0–100: 100=low GL, 0=very high GL. Whole-fruit GL is scored gently — do not tank this for intrinsic fruit sugar>,
                     "micronutrient_density_score": <integer 0–100>,
                     "condition_safety_score": <integer 0–100: 100=no condition flags, decreases per active flag>,
-                    "letter_grade": "<'A' | 'B' | 'C' | 'D' | 'F'>"
+                    "letter_grade": "<'A' | 'B' | 'C' | 'D' | 'F' — MUST match overall_score to the rubric bands>"
                   },
 
                   "recommendations": [
@@ -893,6 +991,8 @@ public class NutritionPipelineService {
                         kidneyClause,
                         // Glycaemic reality clause (always present)
                         glycaemicRealityClause,
+                        // Context-aware scoring rubric (always present)
+                        scoringRubricClause,
                         // Stage-1 JSON
                         stage1Json,
                         // Budget echo into JSON schema (pre-filled for model convenience)
