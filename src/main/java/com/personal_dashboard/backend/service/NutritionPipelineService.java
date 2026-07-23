@@ -549,7 +549,7 @@ public class NutritionPipelineService {
                     • A meal made ENTIRELY of whole / minimally-processed foods (NOVA 1)
                       — fresh fruit, veg, legumes, plain nuts, plain dairy, intact whole
                       grains — with free sugar ≤ 5g, sodium < 400mg and saturated fat
-                      < 3g scores AT LEAST 80 (grade A) if light, or AT LEAST 70
+                      < 3g scores AT LEAST 85 (grade A) if light, or AT LEAST 70
                       (grade B) if main. A single whole fruit is an A-grade snack.
                     • A meal that is ≥ 75% whole-food by calories, with free sugar ≤ 12g,
                       sodium < 500mg and saturated fat < 5g scores AT LEAST 60 (grade C).
