@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import jakarta.annotation.PostConstruct;
@@ -33,7 +34,14 @@ public class GeminiVisionProvider implements VisionProvider {
 
     @PostConstruct
     private void init() {
-        this.restTemplate = new RestTemplate();
+        // Bound each Gemini call so a stuck upstream can never hang the request
+        // thread indefinitely (which would exhaust the pool and stall other users).
+        // Timeouts are generous — well above normal vision latency — so they only
+        // trip on genuine hangs, not slow-but-healthy responses.
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(15_000);   // 15s to establish the connection
+        factory.setReadTimeout(120_000);      // 120s ceiling per stage response
+        this.restTemplate = new RestTemplate(factory);
         this.objectMapper = new ObjectMapper();
     }
 

@@ -8,6 +8,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import jakarta.annotation.PostConstruct;
@@ -43,7 +44,13 @@ public class GeminiImageGenerationService {
 
     @PostConstruct
     private void init() {
-        this.restTemplate = new RestTemplate();
+        // Image generation is best-effort, so bound it tightly: if the model is slow
+        // we would rather fall back to the bundled asset than inflate the total
+        // request time (and risk tripping an upstream proxy timeout on the caller).
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(15_000);   // 15s to establish the connection
+        factory.setReadTimeout(90_000);       // 90s ceiling — then fall back to a bundled image
+        this.restTemplate = new RestTemplate(factory);
         this.objectMapper = new ObjectMapper();
     }
 
