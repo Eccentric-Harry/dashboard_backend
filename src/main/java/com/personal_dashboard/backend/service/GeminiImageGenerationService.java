@@ -39,6 +39,15 @@ public class GeminiImageGenerationService {
     @Value("${ai.providers.gemini.api-key}")
     private String apiKey;
 
+    /**
+     * Feature flag for the pastel dish-image step. Disabled by default; flip
+     * {@code GEMINI_IMAGE_GENERATION_ENABLED=true} (or the property) to turn it
+     * back on without any code change. When off, meals fall back to the bundled
+     * keyword-matched asset on the frontend, exactly as they do on a failure.
+     */
+    @Value("${ai.providers.gemini.image-generation.enabled:false}")
+    private boolean imageGenerationEnabled;
+
     private RestTemplate restTemplate;
     private ObjectMapper objectMapper;
 
@@ -62,6 +71,10 @@ public class GeminiImageGenerationService {
      * @return {@code data:image/png;base64,...} URI, or {@code null} on any failure
      */
     public String generatePastelFoodImageDataUri(String dishDescription) {
+        if (!imageGenerationEnabled) {
+            log.debug("[GeminiImageGen] Image generation disabled — using bundled asset fallback");
+            return null;
+        }
         if (dishDescription == null || dishDescription.isBlank()) {
             return null;
         }
