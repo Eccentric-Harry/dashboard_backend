@@ -73,7 +73,6 @@ public class NutritionPipelineService {
             String textDescription,
             UserAccount userProfile) throws Exception {
 
-        log.info("[NutritionPipeline] Starting Stage 1 — food identification");
         List<byte[]> images = new ArrayList<>();
         if (imageFiles != null) {
             for (MultipartFile file : imageFiles) {
@@ -82,6 +81,21 @@ public class NutritionPipelineService {
                 }
             }
         }
+        return analyzeWithTwoStageFromBytes(images, textDescription, userProfile);
+    }
+
+    /**
+     * Byte-array entrypoint for the two-stage pipeline. Used by the asynchronous
+     * job worker, which reads the uploaded images on the request thread (multipart
+     * data is not readable once the request completes) and hands raw bytes here.
+     */
+    public GeminiAnalysisResult analyzeWithTwoStageFromBytes(
+            List<byte[]> imageBytes,
+            String textDescription,
+            UserAccount userProfile) throws Exception {
+
+        log.info("[NutritionPipeline] Starting Stage 1 — food identification");
+        List<byte[]> images = imageBytes != null ? imageBytes : new ArrayList<>();
         log.info("[NutritionPipeline] Stage 1 received {} image(s)", images.size());
 
         String textInstruction = buildStage1Prompt(textDescription);
