@@ -20,8 +20,16 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class GeminiAnalysisResult {
 
-    @JsonProperty("_reasoning_scratchpad")
-    private String reasoningScratchpad;
+    /**
+     * Compact arithmetic trace (macro→calorie sum, gate result, glycaemic load).
+     *
+     * <p>Replaces the former {@code _reasoning_scratchpad}, which asked the model to
+     * transcribe a full seven-step chain of thought — hundreds of output tokens per
+     * scan for a field that was never persisted onto the MealEntry or rendered. The
+     * model still reasons internally; only the transcription was dropped.
+     */
+    @JsonProperty("_verification")
+    private String verification;
 
     @JsonProperty("pipeline_stage")
     private String pipelineStage;

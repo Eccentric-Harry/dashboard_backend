@@ -5,10 +5,12 @@ import com.anthropic.client.okhttp.AnthropicOkHttpClient;
 import com.anthropic.models.messages.ContentBlockParam;
 import com.anthropic.models.messages.ImageBlockParam;
 import com.anthropic.models.messages.Base64ImageSource;
+import com.anthropic.models.messages.CacheControlEphemeral;
 import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageCreateParams;
 import com.anthropic.models.messages.TextBlockParam;
 import com.anthropic.models.messages.ThinkingConfigDisabled;
+import com.anthropic.models.messages.Usage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -43,6 +45,19 @@ public class ClaudeVisionProvider implements VisionProvider {
 
     @Override
     public String analyzeFoodImage(List<byte[]> images, String prompt) {
+        return analyzeFoodImage(images, prompt, null);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The static prefix is sent as its own text block carrying a {@code cache_control}
+     * breakpoint, so repeat scans bill that (large, unchanging) rules block at cache-read
+     * rates instead of full input price. The volatile tail follows in a separate,
+     * uncached block.
+     */
+    @Override
+    public String analyzeFoodImage(List<byte[]> images, String staticPrefix, String volatileSuffix) {
         try {
             List<ContentBlockParam> content = new ArrayList<>();
             int imageCount = 0;
@@ -63,7 +78,14 @@ public class ClaudeVisionProvider implements VisionProvider {
                 }
             }
             // Text prompt goes after the images so the model has the visual context first.
-            content.add(ContentBlockParam.ofText(TextBlockParam.builder().text(prompt).build()));
+            // The stable rules block is cached; the per-request tail is not.
+            content.add(ContentBlockParam.ofText(TextBlockParam.builder()
+                    .text(staticPrefix)
+                    .cacheControl(CacheControlEphemeral.builder().build())
+                    .build()));
+            if (volatileSuffix != null && !volatileSuffix.isEmpty()) {
+                content.add(ContentBlockParam.ofText(TextBlockParam.builder().text(volatileSuffix).build()));
+            }
 
             MessageCreateParams params = MessageCreateParams.builder()
                     .model(model)
@@ -90,7 +112,7 @@ public class ClaudeVisionProvider implements VisionProvider {
                 throw new RuntimeException("Claude API returned no text content (stop reason: " + message.stopReason() + ")");
             }
 
-            log.info("[ClaudeVisionProvider] Received response in {}ms (stop reason: {})", elapsedMs, message.stopReason());
+            logUsage(message, elapsedMs);
             return extractAndCleanJson(text);
         } catch (RuntimeException e) {
             throw e;
@@ -103,6 +125,22 @@ public class ClaudeVisionProvider implements VisionProvider {
     @Override
     public String getProviderName() {
         return "Claude";
+    }
+
+    /**
+     * Emits the per-call token bill. A {@code cacheRead} that stays at 0 across repeat
+     * scans means the supposedly static prefix is varying between requests — the whole
+     * point of the prefix/suffix split is lost, and it should be investigated.
+     */
+    private void logUsage(Message message, long elapsedMs) {
+        Usage usage = message.usage();
+        log.info("[ClaudeVisionProvider] Received response in {}ms (stop reason: {}) — tokens: input={}, cacheWrite={}, cacheRead={}, output={}",
+                elapsedMs,
+                message.stopReason(),
+                usage.inputTokens(),
+                usage.cacheCreationInputTokens().orElse(0L),
+                usage.cacheReadInputTokens().orElse(0L),
+                usage.outputTokens());
     }
 
     private String extractAndCleanJson(String text) {

@@ -29,6 +29,9 @@ public class GeminiVisionProvider implements VisionProvider {
     @Value("${ai.providers.gemini.model}")
     private String model;
 
+    /** Hard ceiling on generated tokens, including Gemini's own thinking tokens. */
+    private static final int MAX_OUTPUT_TOKENS = 8192;
+
     private RestTemplate restTemplate;
     private ObjectMapper objectMapper;
 
@@ -70,12 +73,16 @@ public class GeminiVisionProvider implements VisionProvider {
             // Gemini 3.x uses thinkingLevel (minimal|low|medium|high); thinkingBudget was
             // removed and 0 (full thinking-off) is rejected with INVALID_ARGUMENT — 3.x Flash
             // cannot disable thinking. "minimal" keeps latency/cost low. Thinking tokens are
-            // drawn from maxOutputTokens, so it is set high enough for the large Stage-2 JSON.
+            // drawn from maxOutputTokens.
+            //
+            // The cap is a cost guardrail, not a target: the trimmed Stage-2 schema lands
+            // well under 8k output tokens, so anything approaching this ceiling is a runaway
+            // generation we would rather truncate than pay for in full.
             Map<String, Object> body = Map.of(
                     "contents", List.of(Map.of("parts", parts)),
                     "generationConfig", Map.of(
                             "temperature", 0.1,
-                            "maxOutputTokens", 32768,
+                            "maxOutputTokens", MAX_OUTPUT_TOKENS,
                             "responseMimeType", "application/json",
                             "thinkingConfig", Map.of(
                                     "thinkingLevel", "minimal"
@@ -96,8 +103,9 @@ public class GeminiVisionProvider implements VisionProvider {
                 throw new RuntimeException("Gemini API call failed with status: " + response.getStatusCode());
             }
 
-            log.info("[GeminiVisionProvider] Received response in {}ms", elapsedMs);
-            return extractAndCleanJson(response.getBody());
+            JsonNode root = objectMapper.readTree(response.getBody());
+            logUsage(root, elapsedMs);
+            return extractAndCleanJson(root);
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
@@ -111,8 +119,28 @@ public class GeminiVisionProvider implements VisionProvider {
         return "Gemini";
     }
 
-    private String extractAndCleanJson(String rawResponse) throws Exception {
-        JsonNode root = objectMapper.readTree(rawResponse);
+    /**
+     * Emits the per-call token bill so spend is observable in the logs. {@code cached}
+     * counts prefix tokens served from Gemini's implicit context cache — if that stays
+     * at zero across scans, something is varying inside the supposedly static prompt
+     * prefix and the caching win has been lost.
+     */
+    private void logUsage(JsonNode root, long elapsedMs) {
+        JsonNode usage = root.path("usageMetadata");
+        if (usage.isMissingNode()) {
+            log.info("[GeminiVisionProvider] Received response in {}ms (no usage metadata)", elapsedMs);
+            return;
+        }
+        log.info("[GeminiVisionProvider] Received response in {}ms — tokens: prompt={} (cached={}), thinking={}, output={}, total={}",
+                elapsedMs,
+                usage.path("promptTokenCount").asInt(),
+                usage.path("cachedContentTokenCount").asInt(),
+                usage.path("thoughtsTokenCount").asInt(),
+                usage.path("candidatesTokenCount").asInt(),
+                usage.path("totalTokenCount").asInt());
+    }
+
+    private String extractAndCleanJson(JsonNode root) throws Exception {
         String text = root.path("candidates").get(0)
                 .path("content").path("parts").get(0)
                 .path("text").asText();

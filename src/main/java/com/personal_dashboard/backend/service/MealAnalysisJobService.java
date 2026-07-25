@@ -35,7 +35,6 @@ public class MealAnalysisJobService {
     private final NutritionPipelineService nutritionPipelineService;
     private final DailyFoodLogService dailyFoodLogService;
     private final UserAccountRepository userAccountRepository;
-    private final GeminiImageGenerationService imageGenerationService;
     private final MealAnalysisJobRepository jobRepository;
 
     /**
@@ -104,13 +103,15 @@ public class MealAnalysisJobService {
 
             String mealDescription = buildDescription(analysis, description);
 
-            // Best-effort pastel image; never blocks or fails the meal log.
-            String generatedImageUrl = imageGenerationService.generatePastelFoodImageDataUri(mealDescription);
+            // AI dish-image generation is intentionally not wired in: it was a second
+            // paid model call per meal log for a decorative thumbnail. The frontend
+            // falls back to its bundled keyword-matched asset when imageUrl is null.
+            String generatedImageUrl = null;
 
             List<Map<String, Object>> mealItemsMaps = mapIngredients(analysis.getIngredientsBreakdown());
             Map<String, Object> medicalAnalysisMap = buildMedicalAnalysisMap(analysis);
             Map<String, Object> overallAssessmentMap = buildOverallAssessmentMap(analysis);
-            Map<String, Object> dailyTargetProgressMap = buildDailyTargetMap(analysis.getDailyBudgetAnalysis());
+            Map<String, Object> dailyTargetProgressMap = applyDailyTargets(analysis, userProfile);
 
             int calories = totals != null ? (int) Math.round(totals.getCaloriesKcal()) : 0;
             int protein = totals != null ? (int) Math.round(totals.getProteinG()) : 0;
@@ -320,30 +321,74 @@ public class MealAnalysisJobService {
         return m;
     }
 
-    private Map<String, Object> buildDailyTargetMap(GeminiAnalysisResult.DailyBudgetAnalysis budget) {
-        if (budget == null) return Collections.emptyMap();
+    /**
+     * Computes the daily-target progress block from the meal's macro totals and the
+     * user's resolved targets, and writes it back onto the analysis.
+     *
+     * <p>This used to be requested from the model, which meant paying output tokens for
+     * division the JVM does for free — and trusting an LLM with arithmetic that drives a
+     * progress bar. It is set back onto {@code analysis} because the API response carries
+     * the analysis object straight to the meal-scan modal, which renders the macro bars
+     * from {@code daily_budget_analysis.percentage_of_daily_goals_this_meal}.
+     *
+     * @return the same values as a map, in the shape persisted on {@code MealEntry.dailyContext}
+     */
+    private Map<String, Object> applyDailyTargets(GeminiAnalysisResult analysis, UserAccount user) {
+        GeminiAnalysisResult.MacroTotals totals = analysis.getMacroTotals();
+        if (totals == null) return Collections.emptyMap();
+
+        NutritionTargets targets = NutritionTargets.from(user);
+
+        double caloriesPct = NutritionTargets.percentOf(totals.getCaloriesKcal(), targets.calories());
+        double proteinPct  = NutritionTargets.percentOf(totals.getProteinG(), targets.proteinG());
+        double carbsPct    = NutritionTargets.percentOf(totals.getCarbohydratesG(), targets.carbsG());
+        double fatPct      = NutritionTargets.percentOf(totals.getFatG(), targets.fatG());
+        double sodiumPct   = NutritionTargets.percentOf(totals.getSodiumMg(), targets.sodiumMg());
+
+        GeminiAnalysisResult.DailyGoalPercentages percentages = GeminiAnalysisResult.DailyGoalPercentages.builder()
+                .caloriesPct(caloriesPct)
+                .proteinPct(proteinPct)
+                .carbsPct(carbsPct)
+                .fatPct(fatPct)
+                .sodiumPct(sodiumPct)
+                .build();
+
+        GeminiAnalysisResult.BudgetStatus status = GeminiAnalysisResult.BudgetStatus.builder()
+                .calories(budgetStatus(caloriesPct))
+                .protein(budgetStatus(proteinPct))
+                .carbs(budgetStatus(carbsPct))
+                .fat(budgetStatus(fatPct))
+                .sodium(budgetStatus(sodiumPct))
+                .build();
+
+        analysis.setDailyBudgetAnalysis(GeminiAnalysisResult.DailyBudgetAnalysis.builder()
+                .percentageOfDailyGoalsThisMeal(percentages)
+                .budgetStatus(status)
+                .build());
+
         Map<String, Object> m = new LinkedHashMap<>();
+        m.put("calories_pct", caloriesPct);
+        m.put("protein_pct", proteinPct);
+        m.put("carbs_pct", carbsPct);
+        m.put("fat_pct", fatPct);
+        m.put("sodium_pct", sodiumPct);
 
-        if (budget.getPercentageOfDailyGoalsThisMeal() != null) {
-            GeminiAnalysisResult.DailyGoalPercentages pct = budget.getPercentageOfDailyGoalsThisMeal();
-            m.put("calories_pct", pct.getCaloriesPct());
-            m.put("protein_pct", pct.getProteinPct());
-            m.put("carbs_pct", pct.getCarbsPct());
-            m.put("fat_pct", pct.getFatPct());
-            m.put("sodium_pct", pct.getSodiumPct());
-        }
-
-        if (budget.getBudgetStatus() != null) {
-            Map<String, Object> status = new LinkedHashMap<>();
-            status.put("calories", budget.getBudgetStatus().getCalories());
-            status.put("protein", budget.getBudgetStatus().getProtein());
-            status.put("carbs", budget.getBudgetStatus().getCarbs());
-            status.put("fat", budget.getBudgetStatus().getFat());
-            status.put("sodium", budget.getBudgetStatus().getSodium());
-            m.put("budget_status", status);
-        }
+        Map<String, Object> statusMap = new LinkedHashMap<>();
+        statusMap.put("calories", status.getCalories());
+        statusMap.put("protein", status.getProtein());
+        statusMap.put("carbs", status.getCarbs());
+        statusMap.put("fat", status.getFat());
+        statusMap.put("sodium", status.getSodium());
+        m.put("budget_status", statusMap);
 
         return m;
+    }
+
+    /** Mirrors the three-band wording the Stage-2 prompt previously produced. */
+    private String budgetStatus(double percentOfDailyTarget) {
+        if (percentOfDailyTarget > 100.0) return "Over Budget";
+        if (percentOfDailyTarget > 80.0) return "Near Limit (>80%)";
+        return "Under Budget";
     }
 
     private int severityRank(String severity) {
