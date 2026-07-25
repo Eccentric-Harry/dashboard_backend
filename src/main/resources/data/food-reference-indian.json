@@ -1,0 +1,341 @@
+{
+  "source": "Curated South Indian / Indian composite dishes",
+  "license": "Authored for this project — no third-party licence",
+  "units": "per 100 g as served; sodium/potassium/cholesterol in mg, rest in g",
+  "accuracy_note": "These are STANDARD REFERENCE APPROXIMATIONS for home-style preparations, not laboratory measurements. USDA SR Legacy (food-reference-usda.json) has almost no coverage of South Indian composite dishes, and the widely-mirrored IFCT 2017 package is AGPL-3.0 which would reach a served application. So these are hand-authored. Recipes vary widely — especially oil content. Treat every value as a starting prior that USER-sourced corrections should override (see FoodReferenceService source precedence: USER > CURATED > USDA). Anything you weigh yourself is worth more than anything in this file.",
+  "portion_note": "The `portions` ladder is the important part. Asking a vision model to pick '3 idlis, standard' is far better calibrated than asking it for '165 g'. Sizes reflect typical Indian home/restaurant servings.",
+  "foods": [
+    {
+      "id": "in-idli", "name": "Idli, steamed rice and black gram cake",
+      "aliases": ["idli", "idly", "iddli", "rice cake"], "veg": true, "gi": 70,
+      "per100g": {"kcal": 105, "protein": 2.7, "carbs": 22.0, "fat": 0.4, "fiber": 1.0, "sugar": 0.3, "sodium": 190, "satFat": 0.1},
+      "portions": [
+        {"label": "1 idli, small", "grams": 40},
+        {"label": "1 idli, standard", "grams": 55, "default": true},
+        {"label": "1 idli, large", "grams": 70}
+      ]
+    },
+    {
+      "id": "in-dosa-plain", "name": "Dosa, plain",
+      "aliases": ["dosa", "dosai", "plain dosa", "sada dosa"], "veg": true, "gi": 77,
+      "per100g": {"kcal": 145, "protein": 3.4, "carbs": 25.0, "fat": 3.6, "fiber": 1.1, "sugar": 0.4, "sodium": 210, "satFat": 1.4},
+      "portions": [
+        {"label": "1 dosa, small", "grams": 90},
+        {"label": "1 dosa, standard", "grams": 120, "default": true},
+        {"label": "1 dosa, large", "grams": 160}
+      ]
+    },
+    {
+      "id": "in-dosa-masala", "name": "Masala dosa, with potato filling",
+      "aliases": ["masala dosa", "masaladosa"], "veg": true, "gi": 74,
+      "per100g": {"kcal": 168, "protein": 3.3, "carbs": 26.0, "fat": 5.8, "fiber": 1.8, "sugar": 0.9, "sodium": 260, "satFat": 2.4},
+      "portions": [{"label": "1 masala dosa", "grams": 200, "default": true}]
+    },
+    {
+      "id": "in-vada-medu", "name": "Medu vada, deep-fried black gram fritter",
+      "aliases": ["vada", "vadai", "medu vada", "urad vada"], "veg": true, "gi": 60,
+      "per100g": {"kcal": 298, "protein": 7.4, "carbs": 29.0, "fat": 16.8, "fiber": 3.0, "sugar": 0.6, "sodium": 330, "satFat": 7.2},
+      "portions": [{"label": "1 vada", "grams": 45, "default": true}]
+    },
+    {
+      "id": "in-sambar", "name": "Sambar, lentil and vegetable stew",
+      "aliases": ["sambar", "sambhar", "saambar"], "veg": true, "gi": 35,
+      "per100g": {"kcal": 56, "protein": 2.6, "carbs": 7.4, "fat": 1.8, "fiber": 2.1, "sugar": 1.4, "sodium": 320, "satFat": 0.4},
+      "portions": [
+        {"label": "1 ladle", "grams": 80},
+        {"label": "1 katori (150 ml)", "grams": 160, "default": true}
+      ]
+    },
+    {
+      "id": "in-rasam", "name": "Rasam, tamarind and pepper broth",
+      "aliases": ["rasam", "saaru", "charu"], "veg": true, "gi": 30,
+      "per100g": {"kcal": 32, "protein": 1.2, "carbs": 4.4, "fat": 1.1, "fiber": 0.8, "sugar": 1.0, "sodium": 350, "satFat": 0.2},
+      "portions": [{"label": "1 katori (150 ml)", "grams": 155, "default": true}]
+    },
+    {
+      "id": "in-chutney-coconut", "name": "Coconut chutney",
+      "aliases": ["coconut chutney", "chutney", "thengai chutney"], "veg": true, "gi": 45,
+      "per100g": {"kcal": 194, "protein": 3.1, "carbs": 7.6, "fat": 17.2, "fiber": 4.2, "sugar": 2.4, "sodium": 280, "satFat": 14.5},
+      "portions": [
+        {"label": "1 tbsp", "grams": 18},
+        {"label": "2 tbsp", "grams": 36, "default": true}
+      ]
+    },
+    {
+      "id": "in-chutney-tomato", "name": "Tomato chutney",
+      "aliases": ["tomato chutney", "thakkali chutney"], "veg": true, "gi": 40,
+      "per100g": {"kcal": 92, "protein": 1.6, "carbs": 9.2, "fat": 5.6, "fiber": 2.0, "sugar": 4.4, "sodium": 310, "satFat": 0.8},
+      "portions": [{"label": "2 tbsp", "grams": 36, "default": true}]
+    },
+    {
+      "id": "in-upma", "name": "Upma, semolina",
+      "aliases": ["upma", "uppuma", "rava upma"], "veg": true, "gi": 66,
+      "per100g": {"kcal": 152, "protein": 3.6, "carbs": 23.0, "fat": 5.2, "fiber": 1.6, "sugar": 1.2, "sodium": 340, "satFat": 2.2},
+      "portions": [{"label": "1 katori (150 ml)", "grams": 150, "default": true}]
+    },
+    {
+      "id": "in-pongal", "name": "Ven pongal, rice and mung dal",
+      "aliases": ["pongal", "ven pongal", "khara pongal"], "veg": true, "gi": 56,
+      "per100g": {"kcal": 168, "protein": 4.4, "carbs": 24.0, "fat": 6.0, "fiber": 1.8, "sugar": 0.5, "sodium": 300, "satFat": 3.4},
+      "portions": [{"label": "1 katori (150 ml)", "grams": 160, "default": true}]
+    },
+    {
+      "id": "in-poha", "name": "Poha, flattened rice",
+      "aliases": ["poha", "aval", "avalakki"], "veg": true, "gi": 70,
+      "per100g": {"kcal": 148, "protein": 2.8, "carbs": 26.0, "fat": 4.2, "fiber": 1.4, "sugar": 1.6, "sodium": 300, "satFat": 0.7},
+      "portions": [{"label": "1 katori (150 ml)", "grams": 140, "default": true}]
+    },
+    {
+      "id": "in-rice-cooked-white", "name": "Rice, white, cooked",
+      "aliases": ["rice", "white rice", "cooked rice", "steamed rice", "sadam", "anna"], "veg": true, "gi": 72,
+      "per100g": {"kcal": 130, "protein": 2.7, "carbs": 28.2, "fat": 0.3, "fiber": 0.4, "sugar": 0.1, "sodium": 1, "satFat": 0.1},
+      "portions": [
+        {"label": "1 katori (150 ml), level", "grams": 130, "default": true},
+        {"label": "1 katori, heaped", "grams": 175},
+        {"label": "1 plate serving", "grams": 250}
+      ]
+    },
+    {
+      "id": "in-rice-cooked-brown", "name": "Rice, brown, cooked",
+      "aliases": ["brown rice", "red rice", "hand pounded rice"], "veg": true, "gi": 65,
+      "per100g": {"kcal": 123, "protein": 2.7, "carbs": 25.6, "fat": 1.0, "fiber": 1.6, "sugar": 0.2, "sodium": 4, "satFat": 0.2},
+      "portions": [{"label": "1 katori (150 ml), level", "grams": 130, "default": true}]
+    },
+    {
+      "id": "in-lemon-rice", "name": "Lemon rice",
+      "aliases": ["lemon rice", "chitranna", "elumichai sadam"], "veg": true, "gi": 68,
+      "per100g": {"kcal": 172, "protein": 3.2, "carbs": 27.0, "fat": 6.0, "fiber": 1.2, "sugar": 0.4, "sodium": 340, "satFat": 1.0},
+      "portions": [{"label": "1 katori (150 ml)", "grams": 150, "default": true}]
+    },
+    {
+      "id": "in-curd-rice", "name": "Curd rice",
+      "aliases": ["curd rice", "thayir sadam", "mosaranna"], "veg": true, "gi": 55,
+      "per100g": {"kcal": 118, "protein": 3.4, "carbs": 19.0, "fat": 2.8, "fiber": 0.4, "sugar": 1.8, "sodium": 260, "satFat": 1.6},
+      "portions": [{"label": "1 katori (150 ml)", "grams": 160, "default": true}]
+    },
+    {
+      "id": "in-biryani-veg", "name": "Vegetable biryani",
+      "aliases": ["biryani", "biriyani", "veg biryani", "pulao", "pulav"], "veg": true, "gi": 60,
+      "per100g": {"kcal": 174, "protein": 3.8, "carbs": 26.0, "fat": 6.2, "fiber": 1.8, "sugar": 1.4, "sodium": 380, "satFat": 2.6},
+      "portions": [{"label": "1 plate serving", "grams": 300, "default": true}]
+    },
+    {
+      "id": "in-chapati", "name": "Chapati / roti, whole wheat",
+      "aliases": ["chapati", "chapathi", "roti", "phulka"], "veg": true, "gi": 62,
+      "per100g": {"kcal": 278, "protein": 9.2, "carbs": 46.0, "fat": 6.4, "fiber": 6.4, "sugar": 1.2, "sodium": 280, "satFat": 1.4},
+      "portions": [
+        {"label": "1 chapati, 6 inch", "grams": 40},
+        {"label": "1 chapati, 7 inch", "grams": 55, "default": true},
+        {"label": "1 chapati, 8 inch", "grams": 75}
+      ]
+    },
+    {
+      "id": "in-paratha", "name": "Paratha, plain",
+      "aliases": ["paratha", "parata", "parotta"], "veg": true, "gi": 62,
+      "per100g": {"kcal": 326, "protein": 7.4, "carbs": 44.0, "fat": 13.6, "fiber": 4.6, "sugar": 1.0, "sodium": 350, "satFat": 5.4},
+      "portions": [{"label": "1 paratha", "grams": 70, "default": true}]
+    },
+    {
+      "id": "in-puri", "name": "Puri, deep-fried wheat bread",
+      "aliases": ["puri", "poori"], "veg": true, "gi": 70,
+      "per100g": {"kcal": 372, "protein": 7.0, "carbs": 42.0, "fat": 19.6, "fiber": 3.8, "sugar": 0.8, "sodium": 230, "satFat": 8.0},
+      "portions": [{"label": "1 puri", "grams": 30, "default": true}]
+    },
+    {
+      "id": "in-dal-toor", "name": "Toor dal, cooked",
+      "aliases": ["dal", "daal", "toor dal", "tur dal", "arhar", "paruppu"], "veg": true, "gi": 29,
+      "per100g": {"kcal": 121, "protein": 7.2, "carbs": 18.0, "fat": 1.4, "fiber": 4.6, "sugar": 1.0, "sodium": 240, "satFat": 0.3},
+      "portions": [{"label": "1 katori (150 ml)", "grams": 155, "default": true}]
+    },
+    {
+      "id": "in-dal-moong", "name": "Moong dal, cooked",
+      "aliases": ["moong dal", "mung dal", "green gram dal", "pesarapappu"], "veg": true, "gi": 30,
+      "per100g": {"kcal": 105, "protein": 7.0, "carbs": 16.4, "fat": 0.9, "fiber": 4.4, "sugar": 1.2, "sodium": 230, "satFat": 0.2},
+      "portions": [{"label": "1 katori (150 ml)", "grams": 155, "default": true}]
+    },
+    {
+      "id": "in-rajma", "name": "Rajma, kidney beans curry",
+      "aliases": ["rajma", "kidney beans curry"], "veg": true, "gi": 29,
+      "per100g": {"kcal": 128, "protein": 6.4, "carbs": 17.6, "fat": 3.6, "fiber": 5.6, "sugar": 1.6, "sodium": 330, "satFat": 0.8},
+      "portions": [{"label": "1 katori (150 ml)", "grams": 160, "default": true}]
+    },
+    {
+      "id": "in-chana-masala", "name": "Chana masala, chickpea curry",
+      "aliases": ["chana", "chole", "chickpea curry", "chana masala"], "veg": true, "gi": 33,
+      "per100g": {"kcal": 142, "protein": 6.0, "carbs": 19.0, "fat": 4.8, "fiber": 5.4, "sugar": 2.4, "sodium": 360, "satFat": 0.9},
+      "portions": [{"label": "1 katori (150 ml)", "grams": 160, "default": true}]
+    },
+    {
+      "id": "in-sambar-rice", "name": "Sambar rice",
+      "aliases": ["sambar rice", "sambar sadam", "bisi bele bath"], "veg": true, "gi": 60,
+      "per100g": {"kcal": 138, "protein": 4.2, "carbs": 22.0, "fat": 3.6, "fiber": 2.4, "sugar": 1.2, "sodium": 340, "satFat": 1.2},
+      "portions": [{"label": "1 plate serving", "grams": 300, "default": true}]
+    },
+    {
+      "id": "in-paneer", "name": "Paneer, Indian cottage cheese",
+      "aliases": ["paneer", "cottage cheese indian"], "veg": true, "gi": 0,
+      "per100g": {"kcal": 265, "protein": 18.3, "carbs": 1.2, "fat": 20.8, "fiber": 0.0, "sugar": 1.2, "sodium": 22, "satFat": 13.0, "cholesterol": 62},
+      "portions": [{"label": "1 serving (cubes)", "grams": 50, "default": true}]
+    },
+    {
+      "id": "in-paneer-butter-masala", "name": "Paneer butter masala",
+      "aliases": ["paneer butter masala", "paneer makhani", "shahi paneer"], "veg": true, "gi": 25,
+      "per100g": {"kcal": 218, "protein": 8.4, "carbs": 8.6, "fat": 17.2, "fiber": 1.6, "sugar": 4.2, "sodium": 420, "satFat": 9.4, "cholesterol": 42},
+      "portions": [{"label": "1 katori (150 ml)", "grams": 160, "default": true}]
+    },
+    {
+      "id": "in-curd", "name": "Curd / dahi, whole milk",
+      "aliases": ["curd", "dahi", "yogurt", "thayir", "perugu"], "veg": true, "gi": 36,
+      "per100g": {"kcal": 61, "protein": 3.5, "carbs": 4.7, "fat": 3.3, "fiber": 0.0, "sugar": 4.7, "sodium": 46, "satFat": 2.1, "cholesterol": 13},
+      "portions": [{"label": "1 katori (150 ml)", "grams": 140, "default": true}]
+    },
+    {
+      "id": "in-buttermilk", "name": "Buttermilk / chaas",
+      "aliases": ["buttermilk", "chaas", "majjige", "neer mor"], "veg": true, "gi": 30,
+      "per100g": {"kcal": 33, "protein": 1.8, "carbs": 3.4, "fat": 1.2, "fiber": 0.0, "sugar": 3.2, "sodium": 130, "satFat": 0.7},
+      "portions": [{"label": "1 glass (200 ml)", "grams": 205, "default": true}]
+    },
+    {
+      "id": "in-milk-whole", "name": "Milk, whole, buffalo/cow blend",
+      "aliases": ["milk", "paal", "doodh"], "veg": true, "gi": 39,
+      "per100g": {"kcal": 68, "protein": 3.3, "carbs": 4.9, "fat": 3.9, "fiber": 0.0, "sugar": 4.9, "sodium": 44, "satFat": 2.4, "cholesterol": 14},
+      "portions": [{"label": "1 glass (200 ml)", "grams": 206, "default": true}]
+    },
+    {
+      "id": "in-ghee", "name": "Ghee, clarified butter",
+      "aliases": ["ghee", "clarified butter", "neyyi"], "veg": true, "gi": 0,
+      "per100g": {"kcal": 900, "protein": 0.0, "carbs": 0.0, "fat": 100.0, "fiber": 0.0, "sugar": 0.0, "sodium": 2, "satFat": 62.0, "cholesterol": 256},
+      "portions": [{"label": "1 tsp", "grams": 5, "default": true}, {"label": "1 tbsp", "grams": 14}]
+    },
+    {
+      "id": "in-oil-cooking", "name": "Cooking oil, groundnut/sunflower",
+      "aliases": ["oil", "cooking oil", "groundnut oil", "sunflower oil", "vegetable oil", "tempering oil"], "veg": true, "gi": 0,
+      "per100g": {"kcal": 884, "protein": 0.0, "carbs": 0.0, "fat": 100.0, "fiber": 0.0, "sugar": 0.0, "sodium": 0, "satFat": 12.0},
+      "portions": [{"label": "1 tsp", "grams": 5, "default": true}, {"label": "1 tbsp", "grams": 14}]
+    },
+    {
+      "id": "in-coconut-oil", "name": "Coconut oil",
+      "aliases": ["coconut oil"], "veg": true, "gi": 0,
+      "per100g": {"kcal": 892, "protein": 0.0, "carbs": 0.0, "fat": 100.0, "fiber": 0.0, "sugar": 0.0, "sodium": 0, "satFat": 82.5},
+      "portions": [{"label": "1 tsp", "grams": 5, "default": true}]
+    },
+    {
+      "id": "in-salt", "name": "Salt, table",
+      "aliases": ["salt", "table salt", "uppu"], "veg": true, "gi": 0,
+      "per100g": {"kcal": 0, "protein": 0.0, "carbs": 0.0, "fat": 0.0, "fiber": 0.0, "sugar": 0.0, "sodium": 38758, "satFat": 0.0},
+      "portions": [{"label": "1 pinch", "grams": 0.4}, {"label": "1 tsp", "grams": 6, "default": true}]
+    },
+    {
+      "id": "in-sugar", "name": "Sugar, white granulated",
+      "aliases": ["sugar", "chini", "sakkarai"], "veg": true, "gi": 65,
+      "per100g": {"kcal": 387, "protein": 0.0, "carbs": 100.0, "fat": 0.0, "fiber": 0.0, "sugar": 100.0, "sodium": 1, "satFat": 0.0},
+      "portions": [{"label": "1 tsp", "grams": 4, "default": true}]
+    },
+    {
+      "id": "in-jaggery", "name": "Jaggery",
+      "aliases": ["jaggery", "gud", "vellam", "bellam"], "veg": true, "gi": 63,
+      "per100g": {"kcal": 383, "protein": 0.4, "carbs": 97.0, "fat": 0.1, "fiber": 0.0, "sugar": 90.0, "sodium": 30, "satFat": 0.0},
+      "portions": [{"label": "1 small piece", "grams": 10, "default": true}]
+    },
+    {
+      "id": "in-coconut-fresh", "name": "Coconut, fresh grated",
+      "aliases": ["coconut", "grated coconut", "thengai", "kobbari"], "veg": true, "gi": 45,
+      "per100g": {"kcal": 354, "protein": 3.3, "carbs": 15.2, "fat": 33.5, "fiber": 9.0, "sugar": 6.2, "sodium": 20, "satFat": 29.7},
+      "portions": [{"label": "2 tbsp grated", "grams": 15, "default": true}]
+    },
+    {
+      "id": "in-peanuts", "name": "Peanuts, roasted",
+      "aliases": ["peanuts", "groundnuts", "kadalai", "palli"], "veg": true, "gi": 14,
+      "per100g": {"kcal": 567, "protein": 25.8, "carbs": 16.1, "fat": 49.2, "fiber": 8.5, "sugar": 4.7, "sodium": 6, "satFat": 6.3},
+      "portions": [{"label": "small handful", "grams": 20, "default": true}]
+    },
+    {
+      "id": "in-sambar-powder", "name": "Sambar powder / masala blend",
+      "aliases": ["sambar powder", "masala", "spice mix", "curry powder", "tempering"], "veg": true, "gi": 0,
+      "per100g": {"kcal": 320, "protein": 13.0, "carbs": 45.0, "fat": 9.0, "fiber": 25.0, "sugar": 3.0, "sodium": 120, "satFat": 1.2},
+      "portions": [{"label": "1 tsp", "grams": 3, "default": true}]
+    },
+    {
+      "id": "in-onion-raw", "name": "Onion, raw",
+      "aliases": ["onion", "vengayam", "ulli"], "veg": true, "gi": 15,
+      "per100g": {"kcal": 40, "protein": 1.1, "carbs": 9.3, "fat": 0.1, "fiber": 1.7, "sugar": 4.2, "sodium": 4, "satFat": 0.0},
+      "portions": [{"label": "1 medium", "grams": 110, "default": true}]
+    },
+    {
+      "id": "in-tomato-raw", "name": "Tomato, raw",
+      "aliases": ["tomato", "thakkali"], "veg": true, "gi": 15,
+      "per100g": {"kcal": 18, "protein": 0.9, "carbs": 3.9, "fat": 0.2, "fiber": 1.2, "sugar": 2.6, "sodium": 5, "satFat": 0.0},
+      "portions": [{"label": "1 medium", "grams": 120, "default": true}]
+    },
+    {
+      "id": "in-potato-curry", "name": "Potato curry / masala",
+      "aliases": ["potato curry", "aloo masala", "potato masala", "urulai"], "veg": true, "gi": 72,
+      "per100g": {"kcal": 118, "protein": 2.2, "carbs": 17.4, "fat": 4.4, "fiber": 2.2, "sugar": 1.4, "sodium": 320, "satFat": 0.7},
+      "portions": [{"label": "1 katori (150 ml)", "grams": 150, "default": true}]
+    },
+    {
+      "id": "in-mixed-veg-curry", "name": "Mixed vegetable curry, South Indian style",
+      "aliases": ["vegetable curry", "poriyal", "kootu", "aviyal", "sabzi", "veg curry"], "veg": true, "gi": 30,
+      "per100g": {"kcal": 96, "protein": 2.8, "carbs": 9.6, "fat": 5.2, "fiber": 3.4, "sugar": 3.0, "sodium": 300, "satFat": 2.6},
+      "portions": [{"label": "1 katori (150 ml)", "grams": 150, "default": true}]
+    },
+    {
+      "id": "in-banana", "name": "Banana, ripe",
+      "aliases": ["banana", "kela", "vazhaipazham", "arati"], "veg": true, "gi": 51,
+      "per100g": {"kcal": 89, "protein": 1.1, "carbs": 22.8, "fat": 0.3, "fiber": 2.6, "sugar": 12.2, "sodium": 1, "satFat": 0.1},
+      "portions": [
+        {"label": "1 small", "grams": 90},
+        {"label": "1 medium", "grams": 120, "default": true},
+        {"label": "1 large", "grams": 150}
+      ]
+    },
+    {
+      "id": "in-filter-coffee", "name": "Filter coffee with milk and sugar",
+      "aliases": ["filter coffee", "coffee", "kaapi", "degree coffee"], "veg": true, "gi": 40,
+      "per100g": {"kcal": 62, "protein": 1.8, "carbs": 8.4, "fat": 2.2, "fiber": 0.0, "sugar": 7.8, "sodium": 28, "satFat": 1.3},
+      "portions": [{"label": "1 tumbler (120 ml)", "grams": 125, "default": true}]
+    },
+    {
+      "id": "in-masala-chai", "name": "Masala chai with milk and sugar",
+      "aliases": ["chai", "tea", "masala tea", "milk tea"], "veg": true, "gi": 45,
+      "per100g": {"kcal": 58, "protein": 1.6, "carbs": 8.8, "fat": 1.9, "fiber": 0.0, "sugar": 8.0, "sodium": 24, "satFat": 1.1},
+      "portions": [{"label": "1 cup (150 ml)", "grams": 155, "default": true}]
+    },
+    {
+      "id": "in-uttapam", "name": "Uttapam, thick rice pancake",
+      "aliases": ["uttapam", "uthappam", "oothappam"], "veg": true, "gi": 70,
+      "per100g": {"kcal": 148, "protein": 3.8, "carbs": 24.0, "fat": 4.0, "fiber": 1.6, "sugar": 1.2, "sodium": 280, "satFat": 1.4},
+      "portions": [{"label": "1 uttapam", "grams": 130, "default": true}]
+    },
+    {
+      "id": "in-appam", "name": "Appam, fermented rice hopper",
+      "aliases": ["appam", "aappam", "palappam"], "veg": true, "gi": 68,
+      "per100g": {"kcal": 152, "protein": 2.6, "carbs": 28.0, "fat": 3.4, "fiber": 1.0, "sugar": 2.4, "sodium": 180, "satFat": 2.6},
+      "portions": [{"label": "1 appam", "grams": 80, "default": true}]
+    },
+    {
+      "id": "in-idiyappam", "name": "Idiyappam, string hoppers",
+      "aliases": ["idiyappam", "string hopper", "nool puttu", "sevai"], "veg": true, "gi": 70,
+      "per100g": {"kcal": 138, "protein": 2.4, "carbs": 30.0, "fat": 0.6, "fiber": 0.8, "sugar": 0.2, "sodium": 160, "satFat": 0.3},
+      "portions": [{"label": "1 idiyappam", "grams": 50, "default": true}]
+    },
+    {
+      "id": "in-egg-boiled", "name": "Egg, whole, boiled",
+      "aliases": ["egg", "boiled egg", "muttai", "anda"], "veg": false, "gi": 0,
+      "per100g": {"kcal": 155, "protein": 12.6, "carbs": 1.1, "fat": 10.6, "fiber": 0.0, "sugar": 1.1, "sodium": 124, "satFat": 3.3, "cholesterol": 373},
+      "portions": [{"label": "1 large egg", "grams": 50, "default": true}]
+    },
+    {
+      "id": "in-whey-protein", "name": "Whey protein powder",
+      "aliases": ["whey", "protein powder", "whey protein"], "veg": true, "gi": 0,
+      "per100g": {"kcal": 380, "protein": 76.0, "carbs": 8.0, "fat": 5.0, "fiber": 1.0, "sugar": 4.0, "sodium": 300, "satFat": 2.0},
+      "portions": [{"label": "1 scoop", "grams": 30, "default": true}]
+    },
+    {
+      "id": "in-almonds", "name": "Almonds",
+      "aliases": ["almonds", "badam"], "veg": true, "gi": 15,
+      "per100g": {"kcal": 579, "protein": 21.2, "carbs": 21.6, "fat": 49.9, "fiber": 12.5, "sugar": 4.4, "sodium": 1, "satFat": 3.8},
+      "portions": [{"label": "10 almonds", "grams": 12, "default": true}]
+    }
+  ]
+}

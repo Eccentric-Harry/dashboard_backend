@@ -179,6 +179,14 @@ public class GeminiAnalysisResult {
 
         @JsonProperty("clinical_item_flags")
         private List<String> clinicalItemFlags;
+
+        /** How well the extracted name matched a composition-table row (0–1). */
+        @JsonProperty("match_score")
+        private Double matchScore;
+
+        /** The vision stage's own confidence in this item (0–1). Drives the correction UI. */
+        @JsonProperty("extraction_confidence")
+        private Double extractionConfidence;
     }
 
     @Data

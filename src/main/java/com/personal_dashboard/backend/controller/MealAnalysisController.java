@@ -217,7 +217,18 @@ public class MealAnalysisController {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("name", item.getCommonName() != null ? item.getCommonName() : item.getName());
             m.put("serving_size", item.getEstimatedWeightG() + "g");
-            m.put("confidence", "high");  // New schema uses item_math_check instead
+            // Real confidence, not a hardcoded "high". Combines how sure the vision stage
+            // was about the item with how well it matched a composition-table row — a
+            // confident identification against a poor match is still a shaky number.
+            m.put("confidence", describeConfidence(item));
+            if (item.getExtractionConfidence() != null) {
+                m.put("confidence_score", item.getExtractionConfidence());
+            }
+            if (item.getMatchScore() != null) {
+                m.put("match_score", item.getMatchScore());
+            }
+            m.put("matched_food", item.getName());
+            m.put("nutrition_source", item.getNutritionPer100gSource());
             if (item.getNutrients() != null) {
                 m.put("calories", item.getNutrients().getCaloriesKcal());
                 m.put("protein", item.getNutrients().getProteinG());
@@ -375,6 +386,21 @@ public class MealAnalysisController {
         }
 
         return m;
+    }
+
+    /**
+     * Collapses extraction confidence and table-match quality into one low/medium/high
+     * label for the UI. The weaker of the two governs — a perfect match on a
+     * misidentified food is not a confident result.
+     */
+    private String describeConfidence(GeminiAnalysisResult.IngredientBreakdown item) {
+        double extraction = item.getExtractionConfidence() != null
+                ? item.getExtractionConfidence() : 0.7;
+        double match = item.getMatchScore() != null ? item.getMatchScore() : 0.7;
+        double weakest = Math.min(extraction, match);
+        if (weakest >= 0.80) return "high";
+        if (weakest >= 0.55) return "medium";
+        return "low";
     }
 
     private int severityRank(String severity) {

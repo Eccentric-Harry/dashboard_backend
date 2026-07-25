@@ -89,6 +89,7 @@ public class GeminiVisionProvider implements VisionProvider {
             }
 
             log.info("[GeminiVisionProvider] Received response in {}ms", elapsedMs);
+            logUsage(response.getBody());
             return extractAndCleanJson(response.getBody());
         } catch (RuntimeException e) {
             throw e;
@@ -101,6 +102,36 @@ public class GeminiVisionProvider implements VisionProvider {
     @Override
     public String getProviderName() {
         return "Gemini";
+    }
+
+    @Override
+    public boolean isConfigured() {
+        return apiKey != null && !apiKey.isBlank() && !"GEMINI_KEY_NOT_SET".equals(apiKey);
+    }
+
+    /**
+     * Logs the token breakdown, including implicit-cache hits.
+     *
+     * <p>{@code cachedContentTokenCount} is the only way to tell whether Gemini's implicit
+     * caching actually fired. It only does when the request shares a long, byte-identical
+     * prefix with a recent one — which is why the pipeline's prompts are assembled as a
+     * constant static block followed by all volatile content. If this stays at 0 across
+     * repeated scans, something is varying inside the prefix.
+     */
+    private void logUsage(String rawResponse) {
+        try {
+            JsonNode usage = objectMapper.readTree(rawResponse).path("usageMetadata");
+            if (usage.isMissingNode()) return;
+            int cached = usage.path("cachedContentTokenCount").asInt(0);
+            int prompt = usage.path("promptTokenCount").asInt(0);
+            log.info("[GeminiVisionProvider] tokens: prompt={} (cached={}, {}%), output={}, total={}",
+                    prompt, cached,
+                    prompt > 0 ? Math.round(100.0 * cached / prompt) : 0,
+                    usage.path("candidatesTokenCount").asInt(0),
+                    usage.path("totalTokenCount").asInt(0));
+        } catch (Exception e) {
+            log.debug("[GeminiVisionProvider] could not read usageMetadata: {}", e.getMessage());
+        }
     }
 
     private String extractAndCleanJson(String rawResponse) throws Exception {

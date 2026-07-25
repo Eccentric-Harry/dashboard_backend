@@ -1,0 +1,4 @@
+# Nutrition5k overhead images (~24 MB for 60 dishes) are NOT committed.
+# manifest.json carries the ground truth; regenerate the images with:
+#   python3 build_fixture.py
+images/

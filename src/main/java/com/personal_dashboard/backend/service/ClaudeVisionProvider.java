@@ -38,11 +38,26 @@ public class ClaudeVisionProvider implements VisionProvider {
 
     @PostConstruct
     private void init() {
+        if (!isConfigured()) {
+            // Gemini-only is a supported deployment. Building a client around a blank key
+            // would only produce 401s later, disguised as a provider outage.
+            log.info("[ClaudeVisionProvider] No API key configured — Claude fallback is disabled.");
+            return;
+        }
         this.client = AnthropicOkHttpClient.builder().apiKey(apiKey).build();
     }
 
     @Override
+    public boolean isConfigured() {
+        return apiKey != null && !apiKey.isBlank() && !"ANTHROPIC_KEY_NOT_SET".equals(apiKey);
+    }
+
+    @Override
     public String analyzeFoodImage(List<byte[]> images, String prompt) {
+        if (client == null) {
+            throw new IllegalStateException(
+                    "Claude provider is not configured (ANTHROPIC_API_KEY is unset or blank)");
+        }
         try {
             List<ContentBlockParam> content = new ArrayList<>();
             int imageCount = 0;

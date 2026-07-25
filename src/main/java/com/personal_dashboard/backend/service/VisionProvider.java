@@ -23,4 +23,16 @@ public interface VisionProvider {
      * @return Provider name
      */
     String getProviderName();
+
+    /**
+     * Whether this provider has a usable API key and can actually be called.
+     *
+     * <p>Exists so the pipeline can skip a fallback that would only fail with an
+     * authentication error, which would otherwise mask the primary provider's real
+     * failure. A deployment running Gemini-only is a supported configuration, not a
+     * misconfiguration.
+     *
+     * @return true if a call could plausibly succeed
+     */
+    boolean isConfigured();
 }

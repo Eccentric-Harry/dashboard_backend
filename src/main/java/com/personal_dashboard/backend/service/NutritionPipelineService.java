@@ -1,42 +1,49 @@
 package com.personal_dashboard.backend.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.personal_dashboard.backend.dto.GeminiAnalysisResult;
 import com.personal_dashboard.backend.model.UserAccount;
+import com.personal_dashboard.backend.service.NutrientResolver.ExtractedItem;
+import com.personal_dashboard.backend.service.NutrientResolver.ResolvedItem;
+import com.personal_dashboard.backend.service.NutrientResolver.ResolvedMeal;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import jakarta.annotation.PostConstruct;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * NutritionPipelineService
+ * NutritionPipelineService — three-step meal analysis.
  *
- * Orchestrates the two-stage LLM meal-analysis pipeline:
+ * <pre>
+ *   STAGE 1  vision      identify foods, portion them as count x size band
+ *      |     (LLM)       -> {name, grams, confidence}. Emits NO nutrient numbers.
+ *      v
+ *   RESOLVE  Java        NutrientResolver against the bundled composition table.
+ *      |     (no LLM)    Deterministic. Same extraction -> same macros, always.
+ *      v
+ *   STAGE 2  judgement   scoring, clinical flags, recommendations. Receives the
+ *            (LLM)       final numbers as fact; is forbidden from recomputing them.
+ * </pre>
  *
- *   Stage 1 — Vision/Extraction  (multimodal model: Gemini / Claude fallback)
- *             Analyses up to 3 food images and/or a text description, maps every visible
- *             and HIDDEN ingredient to USDA FoodData Central nomenclature, and emits a
- *             raw ingredient JSON array with per-item gram weights.
+ * <p><b>Why this shape.</b> Stage 2 previously recalled "USDA per-100 g values" from model
+ * memory and did the arithmetic itself, which made every macro in the app an unverifiable
+ * guess. Moving the arithmetic into {@link NutrientResolver} removes that error source and
+ * pays for itself twice: Stage 2 no longer emits a chain-of-thought scratchpad or a
+ * per-ingredient nutrient breakdown, which were the bulk of its output tokens.
  *
- *   Stage 2 — Clinical Reasoning (text-only model: Gemini / Claude fallback)
- *             Consumes the Stage-1 JSON plus the fully-populated UserAccount profile,
- *             runs strict macro math (1g P=4 kcal, 1g C=4 kcal, 1g F=9 kcal),
- *             applies WHO / AHA / ADA clinical guidelines, and returns a deep
- *             assessment JSON including glycaemic impact, medical-condition flags,
- *             and actionable recommendations.
- *
- * Hallucination defences embedded in every prompt:
- *   • Hidden-ingredient forcing (oil, salt, batter, ghee, coconut milk, etc.)
- *   • USDA FoodData Central nomenclature anchoring (Stage 1)
- *   • WHO/AHA/ADA guideline anchoring (Stage 2)
- *   • Glycaemic-reality clause (white rice / refined carbs = insulin spike)
- *   • Strict macro-to-calorie math verification gate
- *   • Chain-of-Thought scratchpad emitted BEFORE numeric fields
- *   • Explicit null-is-forbidden and no-hallucination contracts
+ * <p><b>Prompt layout is load-bearing for cost.</b> Gemini's implicit caching is a prefix
+ * match, so each prompt is assembled strictly as {@code STATIC_BLOCK + volatile tail}. The
+ * static halves are compile-time constants and never interpolate anything; the user's
+ * description, profile, and resolved facts all go last. Interpolating a value early — as
+ * the previous implementation did with the user profile — makes every token after it
+ * uncacheable.
  */
 @Service
 @Slf4j
@@ -44,13 +51,19 @@ public class NutritionPipelineService {
 
     private final VisionProvider primaryProvider;
     private final VisionProvider fallbackProvider;
+    private final FoodReferenceService foodReference;
+    private final NutrientResolver nutrientResolver;
     private ObjectMapper objectMapper;
 
     public NutritionPipelineService(
             @Qualifier("geminiVisionProvider") VisionProvider primaryProvider,
-            @Qualifier("claudeVisionProvider") VisionProvider fallbackProvider) {
+            @Qualifier("claudeVisionProvider") VisionProvider fallbackProvider,
+            FoodReferenceService foodReference,
+            NutrientResolver nutrientResolver) {
         this.primaryProvider = primaryProvider;
         this.fallbackProvider = fallbackProvider;
+        this.foodReference = foodReference;
+        this.nutrientResolver = nutrientResolver;
     }
 
     @PostConstruct
@@ -61,994 +74,563 @@ public class NutritionPipelineService {
     }
 
     /**
-     * Runs the full two-stage pipeline.
+     * Runs the full pipeline.
      *
-     * @param imageFiles      Optional uploaded image files (up to 3)
-     * @param textDescription Optional text description of the meal
-     * @param userProfile     User profile for personalised nutrition targets and medical context
-     * @return Full GeminiAnalysisResult from Stage 2
+     * @param imageFiles      up to 3 images of the same meal (multiple angles preferred)
+     * @param textDescription optional free text from the user
+     * @param userProfile     may be null; Stage 2 then runs neutral clinical defaults
      */
     public GeminiAnalysisResult analyzeWithTwoStage(
             List<MultipartFile> imageFiles,
             String textDescription,
             UserAccount userProfile) throws Exception {
 
-        log.info("[NutritionPipeline] Starting Stage 1 — food identification");
         List<byte[]> images = new ArrayList<>();
         if (imageFiles != null) {
             for (MultipartFile file : imageFiles) {
-                if (file != null && !file.isEmpty()) {
-                    images.add(file.getBytes());
-                }
+                if (file != null && !file.isEmpty()) images.add(file.getBytes());
             }
         }
-        log.info("[NutritionPipeline] Stage 1 received {} image(s)", images.size());
 
-        String textInstruction = buildStage1Prompt(textDescription);
-        String stage1Json = processMealAnalysis(images, textInstruction);
-        stage1Json = cleanJsonResponse(stage1Json);
-        log.info("[NutritionPipeline] Stage 1 complete. Items: {}", stage1Json);
+        // ── Stage 1: vision extraction ───────────────────────────────────────
+        log.info("[NutritionPipeline] Stage 1 — extraction ({} image(s))", images.size());
+        String stage1Json = cleanJsonResponse(
+                processMealAnalysis(images, buildStage1Prompt(textDescription)));
+        List<ExtractedItem> extracted = parseExtraction(stage1Json);
+        log.info("[NutritionPipeline] Stage 1 extracted {} item(s)", extracted.size());
 
-        log.info("[NutritionPipeline] Starting Stage 2 — clinical nutrition analysis");
-        String stage2Prompt = buildStage2Prompt(stage1Json, userProfile);
-        String stage2Json = processMealAnalysis(null, stage2Prompt);
-        stage2Json = cleanJsonResponse(stage2Json);
-        log.info("[NutritionPipeline] Stage 2 complete.");
+        // ── Resolve: deterministic, no model involved ────────────────────────
+        ResolvedMeal resolved = nutrientResolver.resolve(extracted);
+        log.info("[NutritionPipeline] Resolved {}/{} items ({}% coverage), {} kcal, GL {}",
+                resolved.getItems().size(), extracted.size(),
+                Math.round(resolved.coverage() * 100),
+                Math.round(resolved.total("kcal")), resolved.getGlycemicLoad());
+        if (!resolved.getUnresolved().isEmpty()) {
+            log.warn("[NutritionPipeline] No table entry for: {}", resolved.getUnresolved());
+        }
+        if (!resolved.isAtwaterConsistent()) {
+            log.warn("[NutritionPipeline] Atwater check off by {} kcal — suspect table row or match",
+                    resolved.getAtwaterDeltaKcal());
+        }
 
-        return objectMapper.readValue(stage2Json, GeminiAnalysisResult.class);
+        // ── Stage 2: judgement only ──────────────────────────────────────────
+        log.info("[NutritionPipeline] Stage 2 — assessment");
+        String stage2Json = cleanJsonResponse(
+                processMealAnalysis(null, buildStage2Prompt(stage1Json, resolved, userProfile)));
+
+        // Java owns the numbers; the model only contributed judgement.
+        return mergeResult(stage2Json, stage1Json, resolved);
     }
 
-    /**
-     * Executes the primary provider (Gemini) with fallback to Claude on any failure.
-     * Uses a default Stage 1 prompt for meal analysis.
-     *
-     * @param images Optional raw image byte arrays
-     * @return Extracted JSON response string
-     */
     public String processMealAnalysis(List<byte[]> images) {
-        String defaultPrompt = buildStage1Prompt(null);
-        return processMealAnalysis(images, defaultPrompt);
+        return processMealAnalysis(images, buildStage1Prompt(null));
     }
 
     /**
-     * Executes the primary provider (Gemini) and, if it errors or is unavailable,
-     * transparently retries once with the fallback provider (Claude).
+     * Calls the primary provider, falling back only if a usable fallback is configured.
      *
-     * @param images Optional raw image byte arrays (null/empty for text-only calls)
-     * @param prompt Structured prompt/instructions
-     * @return Extracted JSON response string
+     * <p>An unconfigured fallback used to be attempted anyway, so a primary failure became
+     * a confusing authentication error from the secondary instead of the real cause.
      */
     public String processMealAnalysis(List<byte[]> images, String prompt) {
         try {
-            log.info("[NutritionPipeline] Invoking primary provider ({})", primaryProvider.getProviderName());
             return primaryProvider.analyzeFoodImage(images, prompt);
         } catch (Exception primaryError) {
-            log.warn("[MealAnalysis] Primary provider ({}) failed: {}. Switching to fallback provider ({}).",
-                    primaryProvider.getProviderName(), primaryError.getMessage(), fallbackProvider.getProviderName());
-            try {
-                return fallbackProvider.analyzeFoodImage(images, prompt);
-            } catch (Exception fallbackError) {
-                log.error("[MealAnalysis] Fallback provider ({}) also failed: {}",
-                        fallbackProvider.getProviderName(), fallbackError.getMessage());
-                throw fallbackError;
+            if (!fallbackProvider.isConfigured()) {
+                log.error("[MealAnalysis] Primary ({}) failed and fallback ({}) is not configured: {}",
+                        primaryProvider.getProviderName(), fallbackProvider.getProviderName(),
+                        primaryError.getMessage());
+                throw primaryError instanceof RuntimeException re
+                        ? re : new RuntimeException(primaryError);
+            }
+            log.warn("[MealAnalysis] Primary ({}) failed: {}. Trying fallback ({}).",
+                    primaryProvider.getProviderName(), primaryError.getMessage(),
+                    fallbackProvider.getProviderName());
+            return fallbackProvider.analyzeFoodImage(images, prompt);
+        }
+    }
+
+    // =========================================================================
+    //  STAGE 1 — extraction
+    // =========================================================================
+
+    /**
+     * Static half of the Stage-1 prompt. A compile-time constant with no interpolation, so
+     * it is byte-identical on every request and can serve as a cacheable prefix.
+     *
+     * <p>The portion ladder is the substantive change from free-form gram estimates.
+     * Choosing "standard" from three labelled options is a far better-calibrated model
+     * operation than producing "168", and it mirrors how food is actually served.
+     */
+    private static final String STAGE1_STATIC = """
+            You are a dietitian's extraction assistant. Identify what is on the plate and
+            how much of it there is. You do NOT calculate calories or macros — a database
+            does that downstream. Emit food names and gram weights only.
+
+            ## STEP 1 — SCALE REFERENCE (do this first)
+            Name a reference object before estimating any portion: dinner plate (26 cm),
+            katori/small bowl (7.5 cm rim, 150 ml), teaspoon (12 cm), tablespoon,
+            fork, hand, or phone. Record it in `scale_reference`.
+            If nothing usable is visible, set `scale_reference` to "none" and widen every
+            confidence range by 50%. Do not pretend to a precision the image cannot support.
+
+            ## STEP 2 — IDENTIFY EVERY COMPONENT
+            Name each component using COMMON food names ("sambar", "idli", "white rice",
+            "coconut chutney"). Prefer the name of the composed dish over its ingredients:
+            emit "sambar", not "toor dal + tamarind + oil". The lookup table has dish-level
+            entries and decomposing them produces worse matches, not better ones.
+
+            Be exhaustive about what is ON the plate. A missed component is a missed meal
+            — it contributes nothing downstream. Garnishes, sauces, dressings, pickles,
+            papad, a side of curd, a spoon of chutney: each is its own item. Work across
+            the plate systematically rather than naming only the dominant food. State
+            the preparation where it changes the food materially (cooked, fried, boiled,
+            grilled, roasted, raw) — a raw and a cooked vegetable differ by a third or
+            more in energy density once water is driven off.
+
+            ## STEP 2b — HIDDEN COMPONENTS (required)
+            Home and restaurant cooking always contains things the camera cannot see.
+            Include them, marked `"hidden": true`:
+              - SOUTH INDIAN (dosa, idli, vada, sambar, rasam, upma, pongal): tempering oil
+                (5-15 ml), salt in the batter and the dish, mustard seeds and curry leaves.
+              - STIR-FRIES AND SAUTES, any cuisine: cooking oil (1-3 tsp per serving), salt.
+              - CURRIES AND GRAVIES: oil or ghee for the masala base (10-20 ml), salt, and
+                the onion/tomato/ginger-garlic base if a gravy is implied. Thai curries:
+                coconut milk (100-150 ml).
+              - RICE DISHES: ghee or oil in biryani and pulao (10-20 ml), whole spices.
+              - BREADS: oil or ghee on paratha and roti (3-8 g per piece).
+              - SALADS: dressing oil if dressed (1-2 tbsp), salt.
+              - EGGS: the butter or oil they were cooked in (5-10 g).
+            Floors when you have no better estimate: salt at least 0.5 g per savoury dish,
+            cooking fat at least 5 g per cooked or sauteed dish. Zero-fat, zero-sodium
+            cooking is physiologically implausible and produces badly wrong totals.
+
+            Do not invent components you have no evidence for. An over-long list is as
+            wrong as a short one — the test is whether a cook making this dish would have
+            used it, not whether it is conceivable.
+
+            ## STEP 3 — PORTION (count x size band, not free-form grams)
+            For countable items give a count and a size band. Reference sizes:
+              idli      small 40 g  | standard 55 g  | large 70 g
+              dosa      small 90 g  | standard 120 g | large 160 g
+              chapati   6in 40 g    | 7in 55 g       | 8in 75 g
+              vada      standard 45 g
+              banana    small 90 g  | medium 120 g   | large 150 g
+              egg       large 50 g
+            For volume items give vessel count and fill level:
+              cooked rice  1 katori level 130 g | 1 katori heaped 175 g | plate 250 g
+              sambar/dal   1 ladle 80 g | 1 katori 160 g
+              curd         1 katori 140 g
+              chutney      1 tbsp 18 g | 2 tbsp 36 g
+              oil/ghee     1 tsp 5 g | 1 tbsp 14 g
+            For anything NOT on that ladder, fall back to volumetric estimation against
+            your scale reference:
+              - standard dinner plate 26 cm; katori/small bowl 150 ml; rice bowl 350 ml;
+                teaspoon 5 ml; tablespoon 15 ml; standard glass 200 ml
+              - estimate what fraction of the plate or bowl the item fills, convert that
+                to volume, then to grams using the food's density: watery stews ~1.0 g/ml,
+                cooked grains ~0.8 g/ml, leafy salads ~0.3 g/ml, oils ~0.9 g/ml
+              - for meat and fish, thickness matters as much as area; a palm-sized fillet
+                is roughly 100-120 g
+
+            Always convert to total grams in `grams` — 3 standard idlis is 165, not 3.
+            Put the reasoning in `portion_basis` ("3 idlis x 55 g standard", or
+            "fills ~40% of a 26 cm plate, ~1.5 cm deep, cooked grain ~ 180 g").
+            Give `grams_low` and `grams_high` as a genuine bracket, at least +/-15%.
+
+            ## STEP 4 — CONFIDENCE
+            `confidence` is 0.0-1.0 and must be honest. Below 0.7 signals the UI to ask the
+            user. A confident wrong answer is worse than an admitted uncertain one.
+
+            ## OUTPUT — raw JSON only, no markdown fence, no text outside the object
+            {
+              "meal_label": "<short dish name, 2-5 words>",
+              "cuisine_type": "<e.g. South Indian, North Indian, Continental, Unknown>",
+              "meal_type_guess": "<Breakfast|Lunch|Dinner|Snack|Unknown>",
+              "image_quality": "<Clear|Partially Occluded|Blurry|No Image>",
+              "scale_reference": "<object used, or 'none'>",
+              "extraction_notes": "<ambiguities, conflicts with the description, quality issues>",
+              "items": [
+                {
+                  "name": "<common food name>",
+                  "grams": <number: total grams for this component>,
+                  "portion_basis": "<how you got there>",
+                  "grams_low": <number: lower bound>,
+                  "grams_high": <number: upper bound>,
+                  "confidence": <number 0.0-1.0>,
+                  "hidden": <boolean>
+                }
+              ]
+            }
+            """;
+
+    private String buildStage1Prompt(String textDescription) {
+        // Volatile content goes strictly after the static block so the prefix stays stable.
+        if (textDescription == null || textDescription.isBlank()) {
+            return STAGE1_STATIC + "\n## USER DESCRIPTION\nNone — rely on the image.\n";
+        }
+        return STAGE1_STATIC + """
+
+                ## USER DESCRIPTION
+                The user describes this meal as:
+                "%s"
+                Treat this as strong evidence for identity and preparation, and let it
+                override the image where the image is ambiguous. If it contradicts
+                something clearly visible, follow the image and note the conflict in
+                extraction_notes.
+                """.formatted(textDescription);
+    }
+
+    // =========================================================================
+    //  STAGE 2 — judgement
+    // =========================================================================
+
+    /**
+     * Static half of the Stage-2 prompt. Note what is absent versus the previous version:
+     * no Atwater contract, no sodium law, no seven-step scratchpad, no per-ingredient
+     * nutrient schema. All of that moved into {@link NutrientResolver}, which is both
+     * exact and free.
+     */
+    private static final String STAGE2_STATIC = """
+            You are a clinical dietitian writing a short assessment of one meal.
+
+            The nutrition facts below were computed from a food composition database, not
+            estimated. They are correct. Do NOT recalculate them, second-guess them, or
+            restate the arithmetic. Your job is judgement: what this meal does for this
+            person, and what to do next.
+
+            ## SCORING (0-100)
+            First decide meal_context:
+              "main"  -> Breakfast, Lunch, Dinner, Post Workout, OR >=25% of daily calories
+              "light" -> everything else (Snack, Mid-Morning, Midnight)
+            A snack is not a failed dinner. Judge each meal by its own job: protein is the
+            backbone of a main meal but only a bonus in a light one.
+
+            MAIN (per-meal protein target ~= daily protein / 4):
+              1. Protein (30):   >=35 g->30 | 25-34->22 | 15-24->14 | 10-14->8 | 5-9->4 | <5->1
+              2. Glycaemic (25): GL<10->23-25 | 10-14->17-20 | 15-19->10-14 | 20-29->4-8 | >=30->1-3
+              3. Macro balance (20): protein >=25% kcal, fat 20-35%, carbs 35-55%:
+                 all in->20 | 1 out->14 | 2 out->8 | 3 out->3
+              4. Fibre & micros (15): >=6 g->12-15 | 4-5.9->9-11 | 2-3.9->6-8 | 1-1.9->3-5 | <1->1-2
+                 (+<=3 bonus for micronutrient diversity, anti-inflammatory spices, fermented foods)
+              5. Sodium & sat fat (10): <400 mg AND <3 g->10 | one of the two->7 |
+                 400-700 AND 3-5 g->4 | >700 OR >5 g->1-2
+
+            LIGHT:
+              1. Food quality (30): all whole/minimally processed->26-30 | mostly whole->18-25 |
+                 mixed->10-17 | mostly ultra-processed->1-9
+              2. Glycaemic (25): same bands as MAIN
+              3. Fibre & micros (20): >=5 g->17-20 | 3-4.9->12-16 | 1.5-2.9->7-11 | <1.5->1-6
+              4. Protein contribution (15): >=15 g->15 | 8-14.9->11 | 4-7.9->7 | 1-3.9->4 | <1->1
+              5. Sodium & sat fat (10): same as MAIN
+
+            WHOLE-FOOD FLOOR — compute the banded score, then take the HIGHER of it and any
+            floor that applies:
+              - Entirely whole/minimally processed, free sugar <=5 g, sodium <400 mg,
+                sat fat <3 g -> at least 85 if light, at least 70 if main.
+                A single whole fruit is an A-grade snack.
+              - >=75% whole food by calories, free sugar <=12 g, sodium <500 mg,
+                sat fat <5 g -> at least 60. Whole food is never graded "poor".
+              - Floors NEVER apply to ultra-processed, deep-fried, added-sugar, or
+                refined-grain-dominant meals.
+
+            Grades: A 85-100 excellent | B 70-84 good | C 55-69 fair | D 40-54 poor | F <40 very poor.
+
+            ## GLYCAEMIC FRAMING
+            Scrutinise refined carbs and FREE sugar (added sugar, honey, jaggery, syrup,
+            fruit juice): rapid glucose -> insulin spike -> downstream effects. Say so plainly.
+            Protect whole foods equally firmly: fruit, vegetables, legumes, nuts and intact
+            whole grains carry sugar inside a fibre matrix. Never call a whole apple or a
+            bowl of dal an insulin spike, and never stack glycaemic + sugar + empty-calorie
+            penalties on the same whole food.
+
+            ## RULES
+            1. Raw JSON only. Nothing before the opening brace or after the closing one.
+            2. Never output a calorie or macro number that contradicts the given totals.
+            3. Recommendations are specific and quantified: "add 150 g curd for +5 g protein",
+               never "eat more protein".
+            4. Findings cite a mechanism, not a verdict.
+            5. Respect the dietary restriction stated in the profile without exception.
+            6. Strengths must be genuine. Never fabricate one, never omit a real one.
+            7. score_rationale must name the context ("As a snack, ..." / "As a main meal, ...").
+
+            ## OUTPUT SCHEMA
+            {
+              "meal_type": "<Breakfast|Lunch|Dinner|Snack>",
+              "meal_score": {
+                "meal_context": "<main|light>",
+                "overall_score": <int 0-100>,
+                "letter_grade": "<A|B|C|D|F>",
+                "score_rationale": "<2-3 sentences naming the context>",
+                "macro_balance_score": <int 0-100>,
+                "glycaemic_score": <int 0-100>,
+                "micronutrient_density_score": <int 0-100>,
+                "condition_safety_score": <int 0-100>
+              },
+              "insulin_impact_summary": "<1-2 sentences on the post-prandial response>",
+              "clinical_flags": [
+                {
+                  "flag_id": "FLAG_001",
+                  "severity": "<LOW|MODERATE|HIGH|CRITICAL>",
+                  "category": "<GLYCAEMIC|CARDIOVASCULAR|RENAL|INFLAMMATORY|HORMONAL|DIGESTIVE|MACRO_IMBALANCE|MICRONUTRIENT|GENERAL>",
+                  "condition_link": "<condition from the profile, or 'General Population'>",
+                  "title": "<short title>",
+                  "evidence_basis": "<guideline or mechanism>",
+                  "mechanistic_pathway": "<why this matters physiologically>",
+                  "affected_ingredients": ["<name>"],
+                  "quantified_risk": "<e.g. '820 mg sodium is 36% of the 2300 mg daily limit'>",
+                  "urgency": "<Monitor|Reduce|Avoid|Consult Physician>"
+                }
+              ],
+              "positive_highlights": [
+                {"highlight_id": "POS_001", "ingredient_or_aspect": "<string>",
+                 "benefit": "<specific benefit>", "evidence": "<mechanism>"}
+              ],
+              "recommendations": [
+                {"rec_id": "REC_001", "priority": "<Critical|High|Medium|Low>",
+                 "type": "<Substitute|Reduce_Portion|Add_Ingredient|Remove_Ingredient|Timing|Hydration|Next_Meal_Guidance>",
+                 "title": "<short>", "action": "<quantified action>",
+                 "rationale": "<why>", "example": "<concrete swap>",
+                 "condition_targeted": "<condition or 'General Wellness'>"}
+              ],
+              "next_meal_guidance": {
+                "suggested_calorie_range_kcal": "<e.g. '400-500 kcal'>",
+                "priority_nutrients_to_target": ["<e.g. 'Protein: 25-30 g'>"],
+                "foods_to_favour": ["<specific>"],
+                "foods_to_limit": ["<specific>"],
+                "timing_recommendation": "<string>",
+                "hydration_note": "<string>"
+              }
+            }
+            """;
+
+    private String buildStage2Prompt(String stage1Json, ResolvedMeal resolved, UserAccount user) {
+        return STAGE2_STATIC
+                + "\n## THIS MEAL — computed facts, treat as ground truth\n"
+                + resolved.toPromptBlock()
+                + coverageCaveat(resolved)
+                + "\n## THIS PERSON\n"
+                + buildProfileBlock(user)
+                + "\n## CONTEXT FROM THE PHOTO\n"
+                + extractContextLine(stage1Json)
+                + "\nWrite the assessment now.\n";
+    }
+
+    /** Tells the model when the totals under-count, so it does not over-claim precision. */
+    private String coverageCaveat(ResolvedMeal resolved) {
+        if (resolved.getUnresolved().isEmpty()) return "";
+        return String.format(
+                "NOTE: %d component(s) had no database entry and are EXCLUDED from the totals "
+                        + "above (%s). The true totals are therefore somewhat higher. Say so if it "
+                        + "is material; do not silently treat the totals as complete.%n",
+                resolved.getUnresolved().size(), String.join(", ", resolved.getUnresolved()));
+    }
+
+    private String buildProfileBlock(UserAccount user) {
+        if (user == null) {
+            return "No profile on file. Use general-population guidance: no assumed conditions, "
+                    + "no condition-specific fear framing, proportionate and practical concerns. "
+                    + "Daily reference targets: 2000 kcal, 50 g protein, 2300 mg sodium, 25 g fibre.\n";
+        }
+        StringBuilder sb = new StringBuilder();
+        appendIfPresent(sb, "Name", user.getDisplayName());
+        Integer age = user.getPhysicalMetrics() != null && user.getPhysicalMetrics().getAge() != null
+                ? user.getPhysicalMetrics().getAge() : user.getAge();
+        appendIfPresent(sb, "Age", age == null ? null : age + " years");
+        if (user.getPhysicalMetrics() != null) {
+            appendIfPresent(sb, "Sex", user.getPhysicalMetrics().getGender());
+        }
+        Double weight = user.getPhysicalMetrics() != null && user.getPhysicalMetrics().getWeight() != null
+                ? user.getPhysicalMetrics().getWeight() : user.getWeight();
+        appendIfPresent(sb, "Weight", weight == null ? null : String.format("%.1f kg", weight));
+        appendIfPresent(sb, "Goal", user.getFitnessGoal() == null ? null : user.getFitnessGoal().name());
+        appendIfPresent(sb, "Activity", user.getActivityLevel() == null ? null : user.getActivityLevel().name());
+
+        sb.append("Daily targets: ")
+                .append(String.format("%.0f kcal", resolveTarget(user, "calories")))
+                .append(String.format(", %.0f g protein", resolveTarget(user, "protein")))
+                .append(", 2300 mg sodium, 25 g fibre\n");
+
+        if (user.getMedicalConditions() != null && !user.getMedicalConditions().isEmpty()) {
+            sb.append("Active conditions: ").append(String.join(", ", user.getMedicalConditions()))
+                    .append("\nTailor findings and recommendations to THESE conditions only. ")
+                    .append("Do not introduce conditions the user did not report.\n");
+        } else {
+            sb.append("No conditions reported. Do not assume any. Include a clinical flag only "
+                    + "where the food genuinely warrants it.\n");
+        }
+        return sb.toString();
+    }
+
+    private double resolveTarget(UserAccount user, String which) {
+        if ("calories".equals(which)) {
+            if (user.getDynamicTargets() != null && user.getDynamicTargets().getCalculatedCalories() != null) {
+                return user.getDynamicTargets().getCalculatedCalories();
+            }
+            if (user.getTargetCalories() != null) return user.getTargetCalories();
+            return user.getTdee() != null ? user.getTdee() : 2000.0;
+        }
+        if (user.getDynamicTargets() != null && user.getDynamicTargets().getCalculatedProtein() != null) {
+            return user.getDynamicTargets().getCalculatedProtein();
+        }
+        return user.getTargetProtein() != null ? user.getTargetProtein() : 50.0;
+    }
+
+    private static void appendIfPresent(StringBuilder sb, String label, String value) {
+        if (value != null && !value.isBlank()) sb.append(label).append(": ").append(value).append('\n');
+    }
+
+    /** Pulls just the descriptive fields from Stage 1 — Stage 2 has no use for the rest. */
+    private String extractContextLine(String stage1Json) {
+        try {
+            JsonNode n = objectMapper.readTree(stage1Json);
+            return String.format("Dish: %s | Cuisine: %s | Likely meal: %s | Image: %s | Scale ref: %s%n%s%n",
+                    n.path("meal_label").asText("Unknown"),
+                    n.path("cuisine_type").asText("Unknown"),
+                    n.path("meal_type_guess").asText("Unknown"),
+                    n.path("image_quality").asText("Unknown"),
+                    n.path("scale_reference").asText("none"),
+                    n.path("extraction_notes").asText(""));
+        } catch (Exception e) {
+            return "Dish context unavailable.\n";
+        }
+    }
+
+    // =========================================================================
+    //  Parsing and merging
+    // =========================================================================
+
+    private List<ExtractedItem> parseExtraction(String stage1Json) {
+        List<ExtractedItem> items = new ArrayList<>();
+        try {
+            JsonNode root = objectMapper.readTree(stage1Json);
+            // Accept the legacy "ingredients" key too, so a provider echoing the old
+            // schema still produces a usable meal rather than an empty one.
+            JsonNode array = root.has("items") ? root.path("items") : root.path("ingredients");
+            for (JsonNode n : array) {
+                String name = n.hasNonNull("name") ? n.path("name").asText()
+                        : n.path("common_name").asText(n.path("usda_food_description").asText(""));
+                double grams = n.has("grams") ? n.path("grams").asDouble()
+                        : n.path("estimated_weight_g").asDouble(0);
+                if (name.isBlank() || grams <= 0) continue;
+                items.add(new ExtractedItem(
+                        name, grams,
+                        n.path("hidden").asBoolean(n.path("is_hidden").asBoolean(false)),
+                        n.has("confidence") ? n.path("confidence").asDouble()
+                                : n.has("confidence_score") ? n.path("confidence_score").asDouble() : null));
+            }
+        } catch (Exception e) {
+            log.error("[NutritionPipeline] Stage 1 JSON unparseable: {}", e.getMessage());
+        }
+        return items;
+    }
+
+    /**
+     * Combines the model's judgement with Java's numbers into the response contract the
+     * controller and frontend already expect. Numbers always come from the resolver — if
+     * Stage 2 emitted anything numeric, it is discarded here.
+     */
+    private GeminiAnalysisResult mergeResult(String stage2Json, String stage1Json, ResolvedMeal resolved)
+            throws Exception {
+        ObjectNode out;
+        try {
+            out = (ObjectNode) objectMapper.readTree(stage2Json);
+        } catch (Exception e) {
+            // Judgement is a nice-to-have; the resolved numbers are the product. Losing
+            // Stage 2 should degrade the response, not fail the whole scan.
+            log.error("[NutritionPipeline] Stage 2 JSON unparseable ({}); returning numbers only",
+                    e.getMessage());
+            out = objectMapper.createObjectNode();
+        }
+
+        JsonNode stage1 = objectMapper.readTree(stage1Json);
+        out.put("pipeline_stage", "STAGE_2_CLINICAL_ASSESSMENT");
+        out.put("meal_label", stage1.path("meal_label").asText("Meal"));
+        out.put("cuisine_type", stage1.path("cuisine_type").asText("Unknown"));
+        out.put("analysis_timestamp_utc", java.time.Instant.now().toString());
+
+        // ── Totals: authoritative, from the resolver ─────────────────────────
+        ObjectNode totals = out.putObject("macro_totals");
+        totals.put("calories_kcal", resolved.total("kcal"));
+        totals.put("protein_g", resolved.total("protein"));
+        totals.put("carbohydrates_g", resolved.total("carbs"));
+        totals.put("fat_g", resolved.total("fat"));
+        totals.put("saturated_fat_g", resolved.total("satFat"));
+        totals.put("dietary_fiber_g", resolved.total("fiber"));
+        totals.put("sugar_g", resolved.total("sugar"));
+        totals.put("sodium_mg", resolved.total("sodium"));
+        totals.put("potassium_mg", resolved.total("potassium"));
+        totals.put("cholesterol_mg", resolved.total("cholesterol"));
+        totals.put("trans_fat_g", 0.0);
+        totals.put("unsaturated_fat_g",
+                Math.max(0, resolved.total("fat") - resolved.total("satFat")));
+        totals.put("added_sugar_g", 0.0);
+
+        ObjectNode verification = totals.putObject("math_verification");
+        verification.put("expected_calories_from_macros", resolved.getAtwaterKcal());
+        verification.put("stated_calories", resolved.total("kcal"));
+        verification.put("delta_kcal", resolved.getAtwaterDeltaKcal());
+        verification.put("gate_passed", resolved.isAtwaterConsistent());
+
+        // ── Per-item breakdown: also from the resolver ───────────────────────
+        ArrayNode breakdown = out.putArray("ingredients_breakdown");
+        int itemId = 1;
+        for (ResolvedItem item : resolved.getItems()) {
+            ObjectNode node = breakdown.addObject();
+            node.put("item_id", itemId++);
+            node.put("name", item.getMatchedName());
+            node.put("common_name", item.getExtractedName());
+            node.put("estimated_weight_g", item.getGrams());
+            node.put("is_hidden", item.isHidden());
+            node.put("nutrition_per_100g_source", item.getSource());
+            node.put("match_score", item.getMatchScore());
+            if (item.getExtractionConfidence() != null) {
+                node.put("extraction_confidence", item.getExtractionConfidence());
+            }
+            ObjectNode n = node.putObject("nutrients");
+            n.put("calories_kcal", item.getNutrients().get("kcal"));
+            n.put("protein_g", item.getNutrients().get("protein"));
+            n.put("carbohydrates_g", item.getNutrients().get("carbs"));
+            n.put("fat_g", item.getNutrients().get("fat"));
+            n.put("saturated_fat_g", item.getNutrients().get("satFat"));
+            n.put("dietary_fiber_g", item.getNutrients().get("fiber"));
+            n.put("sugar_g", item.getNutrients().get("sugar"));
+            n.put("sodium_mg", item.getNutrients().get("sodium"));
+            if (item.getGlycemicIndex() != null) {
+                node.put("glycaemic_index_estimate", item.getGlycemicIndex());
+                node.put("glycaemic_load_contribution", item.getGlycemicLoad());
             }
         }
-    }
 
-    // =========================================================================
-    //  STAGE 1 — VISION / EXTRACTION PROMPT
-    // =========================================================================
+        // ── Glycaemic block: numbers from Java, prose from the model ─────────
+        ObjectNode glycaemic = out.putObject("glycaemic_assessment");
+        glycaemic.put("total_meal_glycaemic_load", resolved.getGlycemicLoad());
+        glycaemic.put("gl_classification", resolved.getGlycemicClassification());
+        glycaemic.put("insulin_impact_summary",
+                out.path("insulin_impact_summary").asText(
+                        "Glycaemic load " + resolved.getGlycemicLoad() + "."));
+        out.remove("insulin_impact_summary");
 
-    /**
-     * Builds the Stage-1 system + user prompt block sent to the multimodal model.
-     *
-     * @param textDescription  Optional free-text meal description supplied by the user
-     *                         (e.g., "chicken biryani with raita"). Pass an empty string
-     *                         if the input is image-only.
-     * @return A single prompt string that combines the system persona, extraction
-     *         rules, hallucination-prevention clauses, and the required JSON schema.
-     */
-    private String buildStage1Prompt(String textDescription) {
-
-        String userDescriptionBlock = (textDescription != null && !textDescription.isBlank())
-                ? """
-                  ## Additional Context Provided by the User
-                  The user has described this meal as:
-                  > "%s"
-                  Use this text as a strong signal to resolve ambiguities in the image
-                  (e.g., protein type, regional cuisine style, cooking method).
-                  If the text contradicts what is visually impossible (e.g., "grilled fish"
-                  but the image shows a clear vegetable stir-fry), flag the conflict in
-                  the `extraction_notes` field rather than silently overriding the image.
-                  """.formatted(textDescription)
-                : "## User Description\nNo additional text description was provided. Rely solely on the image.";
-
-        return """
-                ################################################################################
-                ##  SYSTEM PERSONA & MISSION
-                ################################################################################
-                You are a board-certified Clinical Dietitian and a USDA FoodData Central
-                taxonomy expert embedded inside a medical-grade nutrition tracking system.
-                Your ONLY job in this stage is INGREDIENT EXTRACTION and WEIGHT ESTIMATION.
-                You do NOT calculate calories or macros here — that is done downstream.
-
-                You must be ruthlessly accurate. A real patient's clinical health outcomes
-                depend on the precision of your extraction. Overconfidence, invented data,
-                or omissions are patient-safety violations.
-
-                ################################################################################
-                ##  INPUT MODALITIES
-                ################################################################################
-                You will receive ONE or BOTH of:
-                  (A) A food photograph attached to this message.
-                  (B) A text description of the meal (see below).
-
-                Analyse BOTH inputs together. The image is primary evidence; the text
-                resolves ambiguities.
-
-                %s
-
-                ################################################################################
-                ##  MANDATORY EXTRACTION RULES
-                ################################################################################
-
-                RULE 1 — USDA NOMENCLATURE ANCHOR
-                Every ingredient MUST be mapped to its closest USDA FoodData Central (FDC)
-                food description string. Use the FDC "food_description" field format:
-                e.g., "Rice, white, short-grain, cooked" NOT "white rice" or "cooked rice".
-                Append the FDC ID as `fdc_id` if you are ≥90%% confident (set to null otherwise).
-
-                RULE 2 — HIDDEN INGREDIENT MANDATE (ANTI-HALLUCINATION CONTRACT)
-                Traditional and home-cooked dishes ALWAYS contain ingredients not visible
-                to the camera. You are REQUIRED to infer and include every hidden ingredient.
-                The following are NON-NEGOTIABLE additions — failure to include them when
-                applicable is a critical extraction error:
-
-                  • SOUTH INDIAN DISHES (dosa, idli, vada, sambar, rasam, upma, pongal):
-                    - Fermented batter ALWAYS contains salt (≥1g per 100g batter).
-                    - Tempering oil (coconut/sesame/groundnut, ~5–15 mL per serving).
-                    - Mustard seeds, curry leaves, dried red chillies (tempering).
-                    - Sambar: tamarind paste, sambar powder, ghee/oil, salt.
-                    - Chutneys: coconut chutney has coconut oil or fresh coconut fat; add it.
-
-                  • STIR-FRIES & SAUTÉED DISHES (any cuisine):
-                    - Cooking oil (1–3 tbsp per standard serving). Estimate type from context.
-                    - Salt (at minimum 0.5g per serving, typically 1–2g).
-
-                  • CURRIES & GRAVIES (Indian, Thai, Chinese):
-                    - Oil used for frying base masala (ghee/oil, 10–20 mL per serving).
-                    - Salt (1–2g per serving).
-                    - Onion, tomato, ginger-garlic paste if a curry base is implied.
-                    - Thai curries: coconut milk (100–150 mL per serving).
-
-                  • RICE & GRAIN DISHES:
-                    - Biryani / pulao: ghee or oil (10–20 mL), whole spices, salt.
-                    - Plain cooked rice still absorbs salt from cooking water if salted.
-
-                  • BREAD & BAKED GOODS:
-                    - Commercial bread: ~400–500 mg sodium per 2-slice serving.
-                    - Paratha / roti: oil/ghee for cooking (3–8g per piece).
-
-                  • SALADS:
-                    - Dressing oil (if dressed): 1–2 tbsp olive/vegetable oil.
-                    - Salt added during tossing.
-
-                  • EGGS (any preparation):
-                    - Butter or oil used in cooking (5–10g).
-                    - Salt added during preparation.
-
-                  General floor values (apply when you have no better estimate):
-                    - Salt: minimum 0.5g per distinct dish.
-                    - Cooking fat: minimum 5g per cooked/sautéed dish.
-                  These floors exist because zero-sodium, zero-fat home cooking is
-                  physiologically implausible.
-
-                RULE 3 — WEIGHT ESTIMATION PROTOCOL
-                Estimate gram weights using standard visual volumetric cues:
-                  • Use standard serving vessel sizes as reference (katori = ~150 mL,
-                    standard dinner plate = ~26 cm diameter, rice bowl = ~350 mL).
-                  • For plated meals, estimate total plate fill %% and decompose.
-                  • Provide a confidence_range_g [low, high] bracket (±15%% minimum width).
-                  • For invisible/hidden ingredients, use recipe-standard quantities and
-                    set `is_hidden: true` on that item.
-
-                RULE 4 — UNCERTAINTY DISCIPLINE
-                  • If you CANNOT identify an ingredient with ≥60%% confidence, still include
-                    it with `confidence_score` set appropriately and a note in `item_notes`.
-                  • Never set `estimated_weight_g` to 0 for a dish that contains fat or sodium
-                    from cooking. Zero is almost always wrong.
-                  • If the image is blurry, occluded, or ambiguous, document this in
-                    `extraction_notes` and widen your confidence_range_g bracket.
-
-                RULE 5 — NO DOWNSTREAM COMPUTATION
-                Do NOT include calorie or macro numbers. Do NOT calculate totals.
-                The downstream clinical model performs all calculations.
-                Your job ends at: ingredient name, weight, and metadata.
-
-                ################################################################################
-                ##  REQUIRED OUTPUT — STRICT JSON SCHEMA
-                ################################################################################
-                Output ONLY the following JSON object. No markdown fences, no preamble,
-                no apologies, no explanations outside the JSON fields.
-
-                {
-                  "meal_label": "<short human-readable meal name, e.g., 'South Indian Breakfast Thali'>",
-                  "cuisine_type": "<e.g., 'South Indian', 'North Indian', 'Chinese', 'Mediterranean', 'Unknown'>",
-                  "meal_type_guess": "<'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Unknown'>",
-                  "image_quality": "<'Clear' | 'Partially Occluded' | 'Blurry' | 'No Image'>",
-                  "extraction_confidence": "<'High' | 'Medium' | 'Low'>",
-                  "extraction_notes": "<string: document any ambiguities, conflicts between image and text, or quality issues>",
-                  "ingredients": [
-                    {
-                      "item_id": "<sequential integer starting at 1>",
-                      "usda_food_description": "<USDA FoodData Central food_description string>",
-                      "fdc_id": "<integer FDC ID or null>",
-                      "common_name": "<colloquial name, e.g., 'Masoor Dal'>",
-                      "estimated_weight_g": <number: single best-estimate gram weight>,
-                      "confidence_range_g": {
-                        "low": <number>,
-                        "high": <number>
-                      },
-                      "confidence_score": <number between 0.0 and 1.0>,
-                      "is_hidden": <boolean: true if inferred, not visually confirmed>,
-                      "cooking_method": "<'Raw' | 'Boiled' | 'Fried' | 'Grilled' | 'Baked' | 'Steamed' | 'Sautéed' | 'Unknown'>",
-                      "item_notes": "<string: any relevant notes about this item, or null>"
-                    }
-                  ],
-                  "total_estimated_meal_weight_g": <number: sum of all estimated_weight_g values>,
-                  "hidden_ingredient_count": <integer: count of items where is_hidden is true>,
-                  "pipeline_stage": "STAGE_1_EXTRACTION"
-                }
-
-                Begin extraction now.
-                """.formatted(userDescriptionBlock);
-    }
-
-
-    // =========================================================================
-    //  STAGE 2 — CLINICAL REASONING PROMPT
-    // =========================================================================
-
-    /**
-     * Builds the Stage-2 system + user prompt block sent to the text-only
-     * clinical reasoning model.
-     *
-     * @param stage1Json  The raw JSON string output from the Stage-1 model.
-     * @param user        The fully-populated {@link UserAccount} entity containing
-     *                    the user's physical profile, medical conditions, and goals.
-     * @return A single prompt string that injects the user profile, the Stage-1
-     *         JSON, all clinical rules, the math verification contract, and the
-     *         required deep-assessment JSON schema.
-     */
-    private String buildStage2Prompt(String stage1Json, UserAccount user) {
-
-        // Null-safe: an unauthenticated/unknown user still gets a general analysis
-        // (dynamic targets fall back to clinical defaults below).
-        if (user == null) {
-            user = new UserAccount();
+        ArrayNode quality = out.putArray("data_quality_flags");
+        for (String name : resolved.getUnresolved()) {
+            quality.add("No composition-table entry for '" + name + "' — excluded from totals.");
+        }
+        if (!resolved.isAtwaterConsistent()) {
+            quality.add(String.format("Energy and macros differ by %.0f kcal — check the matched rows.",
+                    resolved.getAtwaterDeltaKcal()));
+        }
+        if (resolved.coverage() < 1.0) {
+            quality.add(String.format("Table coverage %.0f%% of identified items.",
+                    resolved.coverage() * 100));
         }
 
-        // ── 1. Resolve medical condition flags ────────────────────────────────
-        boolean hasAcne          = user.getMedicalConditions() != null &&
-                                   user.getMedicalConditions().stream()
-                                       .anyMatch(c -> c.toLowerCase().contains("acne"));
-        boolean hasDiabetes      = user.getMedicalConditions() != null &&
-                                   user.getMedicalConditions().stream()
-                                       .anyMatch(c -> c.toLowerCase().contains("diabet"));
-        boolean hasHypertension  = user.getMedicalConditions() != null &&
-                                   user.getMedicalConditions().stream()
-                                       .anyMatch(c -> c.toLowerCase().contains("hypertens")
-                                                   || c.toLowerCase().contains("blood pressure"));
-        boolean hasPCOS          = user.getMedicalConditions() != null &&
-                                   user.getMedicalConditions().stream()
-                                       .anyMatch(c -> c.toLowerCase().contains("pcos")
-                                                   || c.toLowerCase().contains("polycystic"));
-        boolean hasIBS           = user.getMedicalConditions() != null &&
-                                   user.getMedicalConditions().stream()
-                                       .anyMatch(c -> c.toLowerCase().contains("ibs")
-                                                   || c.toLowerCase().contains("irritable bowel"));
-        boolean hasKidneyDisease = user.getMedicalConditions() != null &&
-                                   user.getMedicalConditions().stream()
-                                       .anyMatch(c -> c.toLowerCase().contains("kidney")
-                                                   || c.toLowerCase().contains("renal")
-                                                   || c.toLowerCase().contains("ckd"));
-
-        // ── 2. Resolve user profile fields (null-safe, mapped to available model) ──
-        String fullName = user.getDisplayName() != null ? user.getDisplayName() : "User";
-
-        int age = 0;
-        if (user.getPhysicalMetrics() != null && user.getPhysicalMetrics().getAge() != null) {
-            age = user.getPhysicalMetrics().getAge();
-        } else if (user.getAge() != null) {
-            age = user.getAge();
-        }
-
-        String biologicalSex = "Not specified";
-        if (user.getPhysicalMetrics() != null && user.getPhysicalMetrics().getGender() != null) {
-            biologicalSex = user.getPhysicalMetrics().getGender();
-        }
-
-        double heightCm = 0.0;
-        if (user.getPhysicalMetrics() != null && user.getPhysicalMetrics().getHeight() != null) {
-            heightCm = user.getPhysicalMetrics().getHeight();
-        } else if (user.getHeight() != null) {
-            heightCm = user.getHeight();
-        }
-
-        double weightKg = 0.0;
-        if (user.getPhysicalMetrics() != null && user.getPhysicalMetrics().getWeight() != null) {
-            weightKg = user.getPhysicalMetrics().getWeight();
-        } else if (user.getWeight() != null) {
-            weightKg = user.getWeight();
-        }
-
-        double bmi            = user.getBmi() != null ? user.getBmi() : 0.0;
-        String bmiCategory    = "Unknown";  // Not available in current model
-        String bodyFatPct     = "Not measured";  // Not available in current model
-        String activityLevel  = user.getActivityLevel() != null ? user.getActivityLevel().name() : "Unknown";
-
-        // ── 3. Compute remaining budget (with null-safe defaults) ─────────────
-        double tdee              = user.getTdee() != null ? user.getTdee() : 2000.0;
-        String primaryGoal       = user.getFitnessGoal() != null ? user.getFitnessGoal().name() : "Not specified";
-
-        double goalCalories = tdee;
-        if (user.getDynamicTargets() != null && user.getDynamicTargets().getCalculatedCalories() != null) {
-            goalCalories = user.getDynamicTargets().getCalculatedCalories();
-        } else if (user.getTargetCalories() != null) {
-            goalCalories = user.getTargetCalories();
-        }
-
-        double goalProteinG = 50.0;
-        if (user.getDynamicTargets() != null && user.getDynamicTargets().getCalculatedProtein() != null) {
-            goalProteinG = user.getDynamicTargets().getCalculatedProtein();
-        } else if (user.getTargetProtein() != null) {
-            goalProteinG = user.getTargetProtein();
-        }
-
-        double goalCarbsG = 250.0;
-        if (user.getDynamicTargets() != null && user.getDynamicTargets().getCalculatedCarbs() != null) {
-            goalCarbsG = user.getDynamicTargets().getCalculatedCarbs();
-        }
-
-        double goalFatG = 65.0;
-        if (user.getDynamicTargets() != null && user.getDynamicTargets().getCalculatedFat() != null) {
-            goalFatG = user.getDynamicTargets().getCalculatedFat();
-        }
-
-        // Fields not available in current model — use clinical defaults
-        double goalSodiumMg      = 2300.0;
-        double goalFiberG        = 25.0;
-        double goalSugarMaxG     = 50.0;
-
-        // Daily consumed — not tracked in current model, default to 0
-        double consumedCalories  = 0.0;
-        double consumedProteinG  = 0.0;
-        double consumedCarbsG    = 0.0;
-        double consumedFatG      = 0.0;
-        double consumedSodiumMg  = 0.0;
-        double consumedFiberG    = 0.0;
-
-        // ── 4. Build medical condition context block ──────────────────────────
-        boolean hasAnyCondition = user.getMedicalConditions() != null && !user.getMedicalConditions().isEmpty();
-        String medicalConditionList = hasAnyCondition
-                ? String.join(", ", user.getMedicalConditions())
-                : "None reported";
-
-        // Health analysis is driven by the user's OWN profile. With no conditions on
-        // file we run a gentle, general-population analysis instead of assuming acne/
-        // diabetes/etc. — the profile is the single source of truth here.
-        String healthProfileClause = hasAnyCondition
-                ? ("""
-                  HEALTH PROFILE — tailor the analysis to the user's OWN conditions.
-                  Active conditions from the user's profile: %s.
-                  Base every clinical finding and recommendation on THESE conditions.
-                  For any listed condition that has no specific protocol below, apply
-                  standard evidence-based dietary guidance for it. Do NOT introduce
-                  conditions the user did not report.
-                """).formatted(medicalConditionList)
-                : """
-                  HEALTH PROFILE — no specific conditions on file.
-                  The user has NOT reported any medical conditions, so run a balanced,
-                  general-population analysis:
-                    • Do NOT assume or invent conditions (no presumed acne, diabetes,
-                      PCOS, hypertension, etc.) and do NOT apply condition-specific fear
-                      framing. The health_analysis should contain only conditions with a
-                      genuine, food-driven finding — otherwise return an empty analysis.
-                    • Judge the meal on general nutrition quality. Highlight genuine
-                      strengths; keep concerns proportionate, practical and non-alarmist.
-                    • Still compute glycaemic load and flag only genuinely significant
-                      issues (very high free sugar, very high sodium, trans fat). Do not
-                      manufacture clinical risk the food does not warrant.
-                """;
-
-        String acneClause = hasAcne ? """
-
-                  ⚠ ACTIVE CONDITION — ACNE / HORMONAL SKIN CONDITION DETECTED:
-                  Apply the following evidence-based rules (derived from Journal of the
-                  Academy of Nutrition and Dietetics, 2016; Adebamowo et al., 2005):
-                    • High-glycaemic load foods (white rice, white bread, sugary drinks,
-                      refined flour products): FLAG as HIGH_RISK. These foods spike insulin
-                      and IGF-1, which upregulate sebum production and comedone formation.
-                      Do NOT soften this finding. State the mechanistic pathway explicitly
-                      in the clinical_flags array.
-                    • Full-fat dairy (milk, paneer, whey): FLAG as MODERATE_RISK due to
-                      IGF-1 and androgen precursor content.
-                    • Omega-6 dominant oils (sunflower, corn, soybean): FLAG as MODERATE_RISK
-                      (pro-inflammatory pathway via arachidonic acid).
-                    • Omega-3 rich foods: FLAG as PROTECTIVE. Note the anti-inflammatory benefit.
-                    • Whole, low-GI fruits and vegetables with intact fibre (apple,
-                      berries, citrus, leafy greens): treat as PROTECTIVE / NEUTRAL,
-                      NOT an acne trigger. Their fibre blunts the glucose→insulin→IGF-1
-                      pathway. Never flag the intrinsic sugar of whole fruit as high-risk.
-                    • Calculate and report the meal's estimated Glycaemic Load (GL).
-                """ : "";
-
-        String diabetesClause = hasDiabetes ? """
-
-                  ⚠ ACTIVE CONDITION — DIABETES / INSULIN RESISTANCE DETECTED:
-                  Apply ADA (American Diabetes Association) 2024 Standards of Care:
-                    • Calculate estimated Glycaemic Load (GL) for the full meal.
-                    • Any meal with GL > 20 must be flagged HIGH_RISK for post-prandial
-                      glucose excursion.
-                    • White rice, refined bread, sugary beverages, fruit juice: HIGH_RISK.
-                    • Recommend specific lower-GI substitutes in recommendations array.
-                    • Evaluate carbohydrate distribution: >60g net carbs per meal is
-                      flagged as exceeding ADA single-meal carb guidance (45–60g target).
-                """ : "";
-
-        String hypertensionClause = hasHypertension ? """
-
-                  ⚠ ACTIVE CONDITION — HYPERTENSION DETECTED:
-                  Apply AHA (American Heart Association) dietary sodium guidelines:
-                    • Target: <1500 mg sodium/day (AHA ideal) or <2300 mg (AHA acceptable).
-                    • If this meal alone contributes >600 mg sodium, flag as HIGH_RISK.
-                    • Identify the top sodium-contributing ingredients explicitly.
-                    • Evaluate saturated fat content against AHA <7%% of daily calorie target.
-                    • Recommend DASH-diet-aligned modifications in the recommendations array.
-                """ : "";
-
-        String pcosClause = hasPCOS ? """
-
-                  ⚠ ACTIVE CONDITION — PCOS DETECTED:
-                  Apply ESHRE/ASRM PCOS evidence guidelines:
-                    • Insulin sensitivity is impaired. Flag all high-GI / high-GL foods
-                      as HIGH_RISK (same mechanism as acne + diabetes combined).
-                    • Evaluate dairy and saturated fat load (androgen upregulation risk).
-                    • Flag any trans-fat-containing processed foods as HIGH_RISK.
-                    • Recommend anti-inflammatory and low-GL food swaps.
-                """ : "";
-
-        String ibsClause = hasIBS ? """
-
-                  ⚠ ACTIVE CONDITION — IBS DETECTED:
-                  Apply NICE IBS dietary guidelines (2017) and Monash University FODMAP data:
-                    • Identify HIGH-FODMAP ingredients (onion, garlic, wheat, lactose,
-                      excess fructose, legumes) and flag each as MODERATE_RISK or HIGH_RISK.
-                    • Flag high-fat meals (>20g fat) as potential IBS trigger.
-                    • Evaluate fibre type: soluble fibre (oats, psyllium) = PROTECTIVE;
-                      insoluble excess = potential MODERATE_RISK.
-                """ : "";
-
-        String kidneyClause = hasKidneyDisease ? """
-
-                  ⚠ ACTIVE CONDITION — CHRONIC KIDNEY DISEASE DETECTED:
-                  Apply KDOQI / NKF dietary guidelines:
-                    • Protein: Flag if this meal provides >0.6g protein per kg body weight
-                      in a single sitting (risk of excess BUN load).
-                    • Potassium: Flag high-potassium foods (banana, potato, tomato, spinach,
-                      orange) as HIGH_RISK if meal potassium estimate exceeds 500 mg.
-                    • Phosphorus: Flag dairy, nuts, seeds, cola, and processed meats as
-                      MODERATE_RISK to HIGH_RISK.
-                    • Sodium: Apply strict <1500 mg/day ceiling; flag any excess.
-                """ : "";
-
-        // ── 5. Build glycaemic reality clause (always present) ────────────────
-        String glycaemicRealityClause = """
-                  GLYCAEMIC REALITY MANDATE (physiological accuracy, NOT moralisation):
-
-                  A) REFINED / FREE-SUGAR carbohydrates — apply full scrutiny. These
-                     drive a rapid glucose and insulin response and MUST be called out:
-                    • White rice (GI 64–72): a 200g serving is ~52g net carbohydrate,
-                      glycaemic load ~33 — a significant insulin response.
-                    • White bread, maida (all-purpose flour) products: GI 70–85.
-                    • Refined / sugar-added breakfast cereals and instant oats: GI 70+.
-                    • Sugar, honey, jaggery, syrups, and sugar-sweetened drinks.
-                    • Fruit JUICE (even 100%% natural): fibre is removed, so its sugar
-                      behaves like free sugar — score it as free sugar.
-                    For these, state the mechanistic pathway: rapid glucose absorption →
-                    insulin spike → downstream hormonal and metabolic consequences.
-
-                  B) WHOLE-FOOD CARVE-OUT — equally mandatory; do NOT over-flag:
-                    Whole fruits and vegetables, legumes, nuts/seeds and intact whole
-                    grains carry their sugar INSIDE an intact fibre matrix, which blunts
-                    the glycaemic response. Their intrinsic sugar is NOT free sugar.
-                    • Do NOT flag whole fruit/veg as HIGH_SUGAR. Use INTRINSIC_SUGAR
-                      (informational) and let fibre + true GL reflect the real impact.
-                    • Do NOT describe a whole apple, banana or bowl of dal as an
-                      "insulin spike" — their glycaemic load is modest and their fibre,
-                      vitamins and polyphenols are protective.
-                    • `added_sugar_g` counts FREE sugar ONLY (added/refined sugar plus
-                      juice sugar). It must NEVER include the intrinsic sugar of whole
-                      fruit, vegetables or plain dairy.
-                    • Never stack glycaemic + sugar + "empty calorie" penalties on a
-                      whole food. Scrutinise refined carbs and free sugar; protect
-                      genuine whole foods. This applies to ALL users.
-                """;
-
-        // ── 5b. Build context-aware scoring rubric (always present) ───────────
-        // Plain-text block (not run through String.format) so raw % signs are fine.
-        String scoringRubricClause = """
-                  Compute meal_score.overall_score (0–100) and letter_grade with the
-                  CONTEXT-AWARE rubric below. FIRST decide meal_context:
-
-                    • "main"  → meal_type ∈ {Breakfast, Lunch, Dinner, Post Workout}
-                                OR this meal is ≥ 25% of the daily calorie target.
-                    • "light" → everything else (Snack, Mid-Morning, Midnight).
-
-                  A snack is not a failed dinner. Judge every meal by its own job:
-                  protein is the BACKBONE of a main meal but only a BONUS for a light
-                  snack. Never penalise a food for a role it was never meant to play.
-
-                  WHOLE-FOOD GRADE FLOORS (compute the raw banded score, then take the
-                  HIGHER of the raw score and any floor that applies):
-                    • A meal made ENTIRELY of whole / minimally-processed foods (NOVA 1)
-                      — fresh fruit, veg, legumes, plain nuts, plain dairy, intact whole
-                      grains — with free sugar ≤ 5g, sodium < 400mg and saturated fat
-                      < 3g scores AT LEAST 85 (grade A) if light, or AT LEAST 70
-                      (grade B) if main. A single whole fruit is an A-grade snack.
-                    • A meal that is ≥ 75% whole-food by calories, with free sugar ≤ 12g,
-                      sodium < 500mg and saturated fat < 5g scores AT LEAST 60 (grade C).
-                      Whole food is never graded "poor".
-                    • Floors NEVER apply to ultra-processed foods, deep-fried foods,
-                      added-sugar products, or refined-grain-dominant meals.
-
-                  MAIN meals (per-meal protein target ≈ daily protein target ÷ 4):
-                   1. Protein (30): ≥35g→30 · 25–34→22 · 15–24→14 · 10–14→8 · 5–9→4 · <5→1
-                   2. Glycaemic (25): meal GL<10→23–25 · 10–14→17–20 · 15–19→10–14 ·
-                      20–29→4–8 · ≥30→1–3. Score glycaemic load from FREE sugar /
-                      refined carbs harshly; whole-fruit GL is treated gently.
-                   3. Macro balance (20): protein ≥25% kcal, fat 20–35%, carbs 35–55%:
-                      all in→20 · 1 out→14 · 2 out→8 · 3 out→3
-                   4. Fibre & micros (15): ≥6g→12–15 · 4–5.9→9–11 · 2–3.9→6–8 ·
-                      1–1.9→3–5 · <1→1–2 (+≤3 bonus for micronutrient diversity /
-                      anti-inflammatory spices / fermented foods; cap 15)
-                   5. Sodium & sat fat (10): <400mg AND <3g→10 · one of the two→7 ·
-                      400–700 AND 3–5g→4 · >700 OR >5g→1–2
-
-                  LIGHT meals (snacks judged as snacks — protein is a bonus, not backbone):
-                   1. Food quality (30): all whole / minimally processed→26–30 ·
-                      mostly whole→18–25 · mixed→10–17 · mostly ultra-processed→1–9
-                   2. Glycaemic (25): same bands as MAIN
-                   3. Fibre & micros (20): ≥5g→17–20 · 3–4.9→12–16 · 1.5–2.9→7–11 ·
-                      <1.5→1–6 (+bonus as above; cap 20)
-                   4. Protein contribution (15): ≥15g→15 · 8–14.9→11 · 4–7.9→7 ·
-                      1–3.9→4 · <1→1
-                   5. Sodium & sat fat (10): same as MAIN
-
-                  Grades: A 85–100 (excellent) · B 70–84 (good) · C 55–69 (fair) ·
-                  D 40–54 (poor) · F <40 (very poor). Clamp 0–100. letter_grade MUST
-                  match overall_score to these bands. meal_score.score_rationale MUST
-                  name the context ("As a snack, …" / "As a main meal, …") and MUST
-                  cite genuine strengths, not only faults.
-
-                  CALIBRATION ANCHORS (do not output):
-                    • "1 apple, Snack" → light, entirely whole food, free sugar 0 →
-                      whole-food floor → ~90, grade A. Fruit is a good snack.
-                    • "Apple + 240ml apple juice, Snack" → light; the juice is free
-                      sugar (fibre removed) so the 75%-whole floor is NOT met, but the
-                      whole apple keeps it out of "poor": land ~C (fair), with the juice
-                      named as the single lever to improve.
-                    • "Lemon rice, Lunch" (200g white rice, 20g peanuts) → main;
-                      protein ~10g, GL high, no floor → ~35, grade F. A protein-free
-                      high-GL lunch is not a good recomposition meal.
-                """;
-
-        return """
-                ################################################################################
-                ##  SYSTEM PERSONA & MISSION
-                ################################################################################
-                You are a board-certified Clinical Dietitian, Endocrinology Nutrition
-                Specialist, and Epidemiologist with 20 years of evidence-based dietary
-                counselling experience. You are operating as a real-time clinical decision
-                support engine inside a medical-grade Life OS.
-
-                Your output will be read by:
-                  (a) The patient themselves, to understand what they just ate and what to do next.
-                  (b) Potentially, their physician or registered dietitian as supporting data.
-
-                This means:
-                  • Your math MUST be correct. Errors in calorie/macro totals are
-                    patient-safety violations.
-                  • Your clinical flags MUST be grounded in WHO, AHA, and ADA guidelines.
-                    Do not invent warnings. Do not suppress real warnings.
-                  • Your recommendations MUST be specific, actionable, and evidence-cited.
-                    "Eat healthier" is not a recommendation. "Replace 150g white rice with
-                    150g cooked quinoa to reduce glycaemic load from 33 to 14" IS.
-                  • You MUST NOT hallucinate nutritional values. Use your training knowledge
-                    of standard USDA FoodData Central nutritional profiles per 100g for
-                    every ingredient. If you are uncertain about a value, use a conservative
-                    estimate and document it in the _reasoning_scratchpad.
-
-                ################################################################################
-                ##  USER HEALTH PROFILE  (Ground Truth — Do NOT alter or ignore)
-                ################################################################################
-                These values are authoritative. Do not override them. Do not fabricate goals.
-
-                  Personal:
-                    Name             : %s
-                    Age              : %d years
-                    Biological Sex   : %s
-                    Height           : %.1f cm
-                    Weight           : %.1f kg
-                    BMI              : %.1f  (%s)
-                    Body Fat %%       : %s
-                    Activity Level   : %s
-
-                  Metabolic:
-                    TDEE             : %.0f kcal/day  (Total Daily Energy Expenditure)
-                    Goal             : %s
-
-                  Daily Nutrition Targets (system-calculated, user-specific):
-                    Calories         : %.0f kcal/day
-                    Protein          : %.1f g/day
-                    Carbohydrates    : %.1f g/day
-                    Fat              : %.1f g/day
-                    Sodium           : %.0f mg/day
-                    Dietary Fibre    : %.1f g/day
-                    Max Added Sugar  : %.1f g/day
-
-                  Already Consumed Today (BEFORE this meal — from daily log):
-                    Calories         : %.0f kcal
-                    Protein          : %.1f g
-                    Carbohydrates    : %.1f g
-                    Fat              : %.1f g
-                    Sodium           : %.0f mg
-                    Dietary Fibre    : %.1f g
-
-                  Remaining Budget AFTER today's prior meals (calculated for you):
-                    Calories         : %.0f kcal
-                    Protein          : %.1f g
-                    Carbohydrates    : %.1f g
-                    Fat              : %.1f g
-                    Sodium           : %.0f mg
-
-                  Active Medical Conditions : %s
-                  Current Medications       : %s
-                  Dietary Restrictions      : %s
-                  Primary Nutrition Goal    : %s
-
-                ################################################################################
-                ##  HEALTH PROFILE & CONDITION PROTOCOLS  (tailored to the user's profile)
-                ################################################################################
-                %s
-                %s
-                %s
-                %s
-                %s
-                %s
-                %s
-
-                ################################################################################
-                ##  GLYCAEMIC REALITY MANDATE  (Always Active)
-                ################################################################################
-                %s
-
-                ################################################################################
-                ##  MEAL SCORING RUBRIC  (Always Active — governs meal_score)
-                ################################################################################
-                %s
-
-                ################################################################################
-                ##  STAGE-1 EXTRACTION INPUT
-                ################################################################################
-                The following JSON was produced by the multimodal Vision stage.
-                It contains the identified ingredients with estimated gram weights.
-                Use USDA FoodData Central nutritional profiles (per 100g) to compute
-                macros for each ingredient based on its estimated_weight_g.
-
-                --- BEGIN STAGE-1 JSON ---
-                %s
-                --- END STAGE-1 JSON ---
-
-                ################################################################################
-                ##  MANDATORY COMPUTATION RULES
-                ################################################################################
-
-                MATH CONTRACT — STRICT ENFORCEMENT:
-                  The following calorie conversion factors are absolute law in this system.
-                  You MUST use ONLY these values. Do not approximate differently.
-
-                    1 gram of Protein      = 4.0 kcal  (Atwater factor)
-                    1 gram of Carbohydrate = 4.0 kcal  (Atwater factor)
-                    1 gram of Fat          = 9.0 kcal  (Atwater factor)
-                    1 gram of Alcohol      = 7.0 kcal  (if applicable)
-                    1 gram of Dietary Fibre = 2.0 kcal (FDA soluble average; use only
-                                                        if your nutrient source subtracts
-                                                        fibre from total carbs)
-
-                  SODIUM CALCULATION LAW:
-                    If you identify 'Salt' (or 'table salt', or any variations of salt used as a seasoning)
-                    as an ingredient in the Stage-1 JSON or infer it as a hidden ingredient, you MUST calculate
-                    its sodium content using the clinical standard:
-                      1 gram of table salt = approximately 400 mg of sodium (400 mg/g).
-                    Never list the sodium content of raw salt as 0 mg.
-
-                  VERIFICATION GATE — YOU MUST PASS THIS CHECK:
-                    total_calories MUST equal:
-                    (total_protein_g × 4.0) + (total_carbs_g × 4.0) + (total_fat_g × 9.0)
-                    Tolerance: ±2 kcal (rounding only).
-                    If your computed total does not pass this gate, recompute before output.
-
-                  ITEM-LEVEL MATH:
-                    For each ingredient, the per-item calories_kcal MUST equal:
-                    (protein_g × 4.0) + (carbs_g × 4.0) + (fat_g × 9.0)
-                    The sum of all per-item calories_kcal MUST equal total_calories_kcal.
-
-                  NEVER set any macro or calorie field to a value that fails the above.
-
-                CHAIN-OF-THOUGHT REQUIREMENT:
-                  Before populating any numeric fields, you MUST write out your full
-                  clinical reasoning in the `_reasoning_scratchpad` field (see schema).
-                  This scratchpad must contain, IN ORDER:
-                    [Step 1 — Ingredient Nutrient Lookup]
-                      For each ingredient: state the USDA per-100g values you are using
-                      (protein, carbs, fat, sodium, fibre) and show the scaled calculation
-                      for the estimated_weight_g. Example:
-                      "White rice, cooked: per 100g → P:2.7g, C:28.6g, F:0.3g, Na:1mg.
-                       At 200g → P:5.4g, C:57.2g, F:0.6g, Na:2mg, Cals: 5.4×4 + 57.2×4 + 0.6×9 = 254 kcal"
-                      *Sodium Law check*: If the ingredient is 'Salt', use 400mg sodium per 1g of salt.
-                      Example: "Salt: 2g → Na: 2 × 400 = 800mg. Calories: 0 kcal"
-
-                    [Step 2 — Totals Aggregation]
-                      Sum all per-item values. Show the running total.
-
-                    [Step 3 — Math Verification Gate]
-                      Verify: (P×4) + (C×4) + (F×9) = stated total calories.
-                      If it fails, show the correction. State: "GATE: PASSED" or "GATE: FAILED → corrected to X".
-
-                    [Step 4 — Budget Analysis]
-                      Compare meal totals to remaining daily budget.
-                      Flag over-budget macros.
-
-                    [Step 5 — Clinical Flag Reasoning]
-                      For each active medical condition, walk through why specific
-                      ingredients trigger the flags you are about to set.
-
-                    [Step 6 — Glycaemic Load Calculation]
-                      For each high-GI ingredient: GL = (GI × net_carbs_g) / 100.
-                      Sum for total meal GL. Classify: Low (<10), Medium (10–19), High (≥20).
-                      Separate FREE-sugar / refined-carb GL from whole-fruit GL.
-
-                    [Step 7 — Contextual Scoring]
-                      State meal_context (main vs light) and WHY. Walk the MEAL SCORING
-                      RUBRIC band by band, show each component score, sum them, then apply
-                      any whole-food floor (take the higher value). State the final
-                      overall_score and the matching letter_grade band.
-
-                ################################################################################
-                ##  REQUIRED OUTPUT — STRICT JSON SCHEMA
-                ################################################################################
-                Output ONLY the following JSON object.
-                No markdown fences. No preamble. No text before the opening brace.
-                The `_reasoning_scratchpad` MUST be the very first key in the object.
-
-                {
-                  "_reasoning_scratchpad": "<REQUIRED FIRST FIELD. Write your full Step 1–6 chain-of-thought here as a single string. This is your working memory and will be stored for clinical audit. Be thorough. Do not truncate.>",
-
-                  "pipeline_stage": "STAGE_2_CLINICAL_ASSESSMENT",
-                  "meal_label": "<from Stage-1 output>",
-                  "cuisine_type": "<from Stage-1 output>",
-                  "meal_type": "<Breakfast | Lunch | Dinner | Snack>",
-                  "analysis_timestamp_utc": "<ISO-8601 UTC timestamp string — use the current time>",
-
-                  "macro_totals": {
-                    "calories_kcal": <number: total meal calories — MUST pass math gate>,
-                    "protein_g": <number>,
-                    "carbohydrates_g": <number>,
-                    "fat_g": <number>,
-                    "saturated_fat_g": <number>,
-                    "unsaturated_fat_g": <number>,
-                    "trans_fat_g": <number: 0.0 if none detected>,
-                    "dietary_fiber_g": <number>,
-                    "sugar_g": <number: total sugars including naturally occurring>,
-                    "added_sugar_g": <number: estimated added/refined sugar only>,
-                    "sodium_mg": <number>,
-                    "potassium_mg": <number: estimate from USDA data>,
-                    "cholesterol_mg": <number: estimate from USDA data>,
-                    "math_verification": {
-                      "expected_calories_from_macros": <number: (protein_g×4) + (carbs_g×4) + (fat_g×9)>,
-                      "stated_calories": <number: same as calories_kcal above>,
-                      "delta_kcal": <number: stated_calories minus expected_calories_from_macros>,
-                      "gate_passed": <boolean: true if |delta_kcal| ≤ 2>
-                    }
-                  },
-
-                  "ingredients_breakdown": [
-                    {
-                      "item_id": <integer: matching Stage-1 item_id>,
-                      "name": "<from Stage-1 usda_food_description>",
-                      "common_name": "<from Stage-1 common_name>",
-                      "estimated_weight_g": <number: from Stage-1>,
-                      "is_hidden": <boolean: from Stage-1>,
-                      "nutrition_per_100g_source": "<e.g., 'USDA FDC SR Legacy' or 'USDA FDC Foundation'>",
-                      "nutrients": {
-                        "calories_kcal": <number: for this item at estimated_weight_g>,
-                        "protein_g": <number>,
-                        "carbohydrates_g": <number>,
-                        "fat_g": <number>,
-                        "saturated_fat_g": <number>,
-                        "dietary_fiber_g": <number>,
-                        "sugar_g": <number>,
-                        "sodium_mg": <number>
-                      },
-                      "item_math_check": {
-                        "expected_kcal": <number: (protein_g×4)+(carbs_g×4)+(fat_g×9)>,
-                        "stated_kcal": <number: same as nutrients.calories_kcal>,
-                        "passed": <boolean>
-                      },
-                      "glycaemic_index_estimate": <number or null: GI value from established tables>,
-                      "glycaemic_load_contribution": <number or null: (GI × net_carbs_g) / 100>,
-                      "clinical_item_flags": ["<SHORT_CODE: reason string>"]
-                    }
-                  ],
-
-                  "glycaemic_assessment": {
-                    "total_meal_glycaemic_load": <number>,
-                    "gl_classification": "<'Low (GL<10)' | 'Medium (GL 10-19)' | 'High (GL≥20)'>",
-                    "insulin_impact_summary": "<string: mechanistic explanation of post-prandial glucose and insulin response for this specific meal>",
-                    "highest_gi_offenders": [
-                      {
-                        "ingredient_name": "<string>",
-                        "gi_estimate": <number>,
-                        "gl_contribution": <number>,
-                        "clinical_note": "<string: specific impact for this user>"
-                      }
-                    ]
-                  },
-
-                  "daily_budget_analysis": {
-                    "remaining_budget_before_this_meal": {
-                      "calories_kcal": %.0f,
-                      "protein_g": %.1f,
-                      "carbs_g": %.1f,
-                      "fat_g": %.1f,
-                      "sodium_mg": %.0f
-                    },
-                    "remaining_budget_after_this_meal": {
-                      "calories_kcal": <number: remaining_before minus meal calories>,
-                      "protein_g": <number>,
-                      "carbs_g": <number>,
-                      "fat_g": <number>,
-                      "sodium_mg": <number>
-                    },
-                    "budget_status": {
-                      "calories": "<'Under Budget' | 'Near Limit (>80%%)' | 'Over Budget'>",
-                      "protein": "<'Under Budget' | 'Near Limit (>80%%)' | 'Over Budget'>",
-                      "carbs": "<'Under Budget' | 'Near Limit (>80%%)' | 'Over Budget'>",
-                      "fat": "<'Under Budget' | 'Near Limit (>80%%)' | 'Over Budget'>",
-                      "sodium": "<'Under Budget' | 'Near Limit (>80%%)' | 'Over Budget'>"
-                    },
-                    "percentage_of_daily_goals_this_meal": {
-                      "calories_pct": <number: (meal_calories / goal_calories) × 100>,
-                      "protein_pct": <number>,
-                      "carbs_pct": <number>,
-                      "fat_pct": <number>,
-                      "sodium_pct": <number>
-                    }
-                  },
-
-                  "clinical_flags": [
-                    {
-                      "flag_id": "<sequential e.g., 'FLAG_001'>",
-                      "severity": "<'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL'>",
-                      "category": "<'GLYCAEMIC' | 'CARDIOVASCULAR' | 'RENAL' | 'INFLAMMATORY' | 'HORMONAL' | 'DIGESTIVE' | 'MACRO_IMBALANCE' | 'MICRONUTRIENT' | 'ALLERGEN' | 'GENERAL'>",
-                      "condition_link": "<medical condition this flag relates to, or 'General Population'>",
-                      "title": "<short flag title, e.g., 'High Glycaemic Load — Insulin Spike Risk'>",
-                      "evidence_basis": "<e.g., 'ADA Standards of Care 2024, Section 5' or 'WHO Global Action Plan on NCDs'>",
-                      "mechanistic_pathway": "<string: explain WHY this is a problem physiologically — do not omit this field>",
-                      "affected_ingredients": ["<ingredient common_name>"],
-                      "quantified_risk": "<string: e.g., 'This meal contributes 43g added sugar, which is 86%% of the AHA daily limit of 50g'>",
-                      "urgency": "<'Monitor' | 'Reduce' | 'Avoid' | 'Consult Physician'>"
-                    }
-                  ],
-
-                  "meal_score": {
-                    "meal_context": "<'main' | 'light' — per the MEAL SCORING RUBRIC>",
-                    "overall_score": <integer 0–100: from the context-aware rubric, AFTER applying whole-food floors>,
-                    "score_rationale": "<string: MUST name the context ('As a snack, …' / 'As a main meal, …'), cite genuine strengths, and explain what raised and lowered the score>",
-                    "macro_balance_score": <integer 0–100>,
-                    "glycaemic_score": <integer 0–100: 100=low GL, 0=very high GL. Whole-fruit GL is scored gently — do not tank this for intrinsic fruit sugar>,
-                    "micronutrient_density_score": <integer 0–100>,
-                    "condition_safety_score": <integer 0–100: 100=no condition flags, decreases per active flag>,
-                    "letter_grade": "<'A' | 'B' | 'C' | 'D' | 'F' — MUST match overall_score to the rubric bands>"
-                  },
-
-                  "recommendations": [
-                    {
-                      "rec_id": "<sequential e.g., 'REC_001'>",
-                      "priority": "<'Critical' | 'High' | 'Medium' | 'Low'>",
-                      "type": "<'Substitute' | 'Reduce_Portion' | 'Add_Ingredient' | 'Remove_Ingredient' | 'Timing' | 'Hydration' | 'Next_Meal_Guidance'>",
-                      "title": "<short title>",
-                      "action": "<specific, quantified action — never generic>",
-                      "rationale": "<WHY — cite guideline or mechanism>",
-                      "example": "<concrete example: e.g., 'Replace 150g white rice with 150g cooked red rice to reduce GL from 33 to 19'>",
-                      "condition_targeted": "<medical condition this addresses, or 'General Wellness'>"
-                    }
-                  ],
-
-                  "positive_highlights": [
-                    {
-                      "highlight_id": "<sequential e.g., 'POS_001'>",
-                      "ingredient_or_aspect": "<string>",
-                      "benefit": "<string: specific nutritional or clinical benefit>",
-                      "evidence": "<brief citation or mechanism>"
-                    }
-                  ],
-
-                  "next_meal_guidance": {
-                    "suggested_calorie_range_kcal": "<string: e.g., '400–500 kcal'>",
-                    "priority_nutrients_to_target": ["<e.g., 'Protein: aim for 25–30g'>", "<e.g., 'Fibre: aim for 8g'>"],
-                    "foods_to_favour": ["<specific food suggestions>"],
-                    "foods_to_limit": ["<specific foods to avoid or reduce at next meal, given today's log so far>"],
-                    "timing_recommendation": "<string: e.g., 'Given the high GL of this meal, allow 3–4 hours before next meal to avoid compounding insulin response'>",
-                    "hydration_note": "<string: e.g., 'High sodium intake in this meal — aim for 500 mL water in the next hour'>"
-                  },
-
-                  "data_quality_flags": [
-                    "<string: any concerns about Stage-1 data quality that may affect accuracy of this analysis>"
-                  ],
-
-                  "disclaimer": "This analysis is generated by an AI system trained on nutritional science literature and USDA data. It is intended as a decision-support tool and does not constitute personalised medical advice. Consult a Registered Dietitian or your physician before making significant dietary changes, especially with active medical conditions."
-                }
-
-                Begin clinical analysis now. Remember: `_reasoning_scratchpad` is the FIRST key. Math gate must PASS before you write numeric fields.
-                """.formatted(
-                        // User profile block
-                        fullName,
-                        age,
-                        biologicalSex,
-                        heightCm,
-                        weightKg,
-                        bmi,
-                        bmiCategory,
-                        bodyFatPct,
-                        activityLevel,
-                        tdee,
-                        primaryGoal,
-                        goalCalories, goalProteinG, goalCarbsG, goalFatG, goalSodiumMg, goalFiberG, goalSugarMaxG,
-                        consumedCalories, consumedProteinG, consumedCarbsG, consumedFatG, consumedSodiumMg, consumedFiberG,
-                        // Remaining budgets (computed inline)
-                        goalCalories  - consumedCalories,
-                        goalProteinG  - consumedProteinG,
-                        goalCarbsG    - consumedCarbsG,
-                        goalFatG      - consumedFatG,
-                        goalSodiumMg  - consumedSodiumMg,
-                        // Medical context
-                        medicalConditionList,
-                        "None reported",  // currentMedications — not available in current model
-                        "None reported",  // dietaryRestrictions — not available in current model
-                        primaryGoal,
-                        // Health profile (dynamic) + condition-specific clauses
-                        healthProfileClause,
-                        acneClause,
-                        diabetesClause,
-                        hypertensionClause,
-                        pcosClause,
-                        ibsClause,
-                        kidneyClause,
-                        // Glycaemic reality clause (always present)
-                        glycaemicRealityClause,
-                        // Context-aware scoring rubric (always present)
-                        scoringRubricClause,
-                        // Stage-1 JSON
-                        stage1Json,
-                        // Budget echo into JSON schema (pre-filled for model convenience)
-                        goalCalories  - consumedCalories,
-                        goalProteinG  - consumedProteinG,
-                        goalCarbsG    - consumedCarbsG,
-                        goalFatG      - consumedFatG,
-                        goalSodiumMg  - consumedSodiumMg
-                );
+        out.put("disclaimer",
+                "Nutrition values are computed from a food composition database (USDA FoodData "
+                        + "Central plus curated regional entries) using AI-estimated portion sizes. "
+                        + "Portion estimation from a photograph carries meaningful error. This is a "
+                        + "decision-support tool, not medical advice.");
+
+        return objectMapper.treeToValue(out, GeminiAnalysisResult.class);
     }
 
     private String cleanJsonResponse(String rawResponse) {
