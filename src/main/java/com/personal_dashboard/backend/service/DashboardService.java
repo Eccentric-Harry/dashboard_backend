@@ -338,7 +338,9 @@ public class DashboardService {
                 log.debug("Building nutrition summary for {} with 7-day trend", targetDate);
                 LocalDate sevenDaysAgo = targetDate.minusDays(6);
 
-                List<DailyFoodLog> dailyLogs = dailyFoodLogService.getDailyLogsForRange(sevenDaysAgo, targetDate);
+                // Only dailyTotals + today's per-meal calories are read below, so the projected
+                // read is enough — no need to drag a week of AI clinical payloads out of Atlas.
+                List<DailyFoodLog> dailyLogs = dailyFoodLogService.getLightDailyLogsForRange(sevenDaysAgo, targetDate);
 
                 // Build daily totals maps
                 Map<String, Integer> dailyCalories = new LinkedHashMap<>();

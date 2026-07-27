@@ -24,6 +24,7 @@ public class DailyFoodLogService {
 
     private final DailyFoodLogRepository dailyFoodLogRepository;
     private final UserAccountRepository userAccountRepository;
+    private final org.springframework.data.mongodb.core.MongoTemplate mongoTemplate;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
 
@@ -275,6 +276,86 @@ public class DailyFoodLogService {
         String startMealId = startDate.format(DATE_FORMATTER);
         String endMealId = endDate.format(DATE_FORMATTER);
         return dailyFoodLogRepository.findByUserIdAndDateStringRange(userId, startMealId, endMealId);
+    }
+
+    /**
+     * Same range as {@link #getDailyLogsForRange} but server-side projected down to the fields
+     * list/trend/analytics views actually render. The AI clinical payload on a single MealEntry
+     * (mealItems, healthAnalysis, acneImpactAssessment, recompositionAssessment, dailyContext, …)
+     * runs to several KB, so a year of meals is megabytes pulled out of Atlas on every page load.
+     * This strips it inside MongoDB, before it ever crosses the wire.
+     *
+     * <p>Because {@code meals} is a Map keyed by meal type, the heavy fields can't be dropped with
+     * a plain field projection — the pipeline rebuilds the map with $objectToArray/$arrayToObject.
+     *
+     * <p><b>The returned documents are partial — never save() them.</b> recalculateTotals() reads
+     * mealItems, so persisting one would zero out the day's macro totals. Reads only.
+     */
+    public List<DailyFoodLog> getLightDailyLogsForRange(LocalDate startDate, LocalDate endDate) {
+        String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        String startDateString = startDate.format(DATE_FORMATTER);
+        String endDateString = endDate.format(DATE_FORMATTER);
+
+        org.bson.Document match = new org.bson.Document("$match", new org.bson.Document()
+                .append("userId", userId)
+                .append("dateString", new org.bson.Document("$gte", startDateString).append("$lte", endDateString)));
+
+        // Per-meal whitelist. total_summary/recomposition_assessment are kept but themselves
+        // narrowed to the handful of keys the cards read (macros + letter grade).
+        //
+        // imageUrl is deliberately NOT here. Meals logged while AI dish-image generation was
+        // enabled stored the thumbnail as an inline base64 data: URI, and those few records
+        // dwarf everything else — measured at ~9.8 MB across 9 of 533 meals, 88% of the whole
+        // collection's JSON. List views fall back to the bundled keyword-matched asset when
+        // imageUrl is absent (see getMealImage), so dropping it here costs nothing; view=full
+        // still carries it for the single-meal detail sheet.
+        org.bson.Document lightMeal = new org.bson.Document()
+                .append("id", "$$m.id")
+                .append("description", "$$m.description")
+                .append("calories", "$$m.calories")
+                .append("proteinGrams", "$$m.proteinGrams")
+                .append("mealQuality", "$$m.mealQuality")
+                .append("recipeCategory", "$$m.recipeCategory")
+                .append("serving", "$$m.serving")
+                .append("timestamp", "$$m.timestamp")
+                .append("totalSummary", new org.bson.Document()
+                        .append("calories_kcal", "$$m.totalSummary.calories_kcal")
+                        .append("protein_g", "$$m.totalSummary.protein_g")
+                        .append("carbs_g", "$$m.totalSummary.carbs_g")
+                        .append("carbohydrates_g", "$$m.totalSummary.carbohydrates_g")
+                        .append("fat_g", "$$m.totalSummary.fat_g"))
+                .append("recompositionAssessment", new org.bson.Document()
+                        .append("letter_grade", "$$m.recompositionAssessment.letter_grade")
+                        .append("meal_quality", "$$m.recompositionAssessment.meal_quality"));
+
+        org.bson.Document lightMeals = new org.bson.Document("$arrayToObject",
+                new org.bson.Document("$map", new org.bson.Document()
+                        .append("input", new org.bson.Document("$objectToArray",
+                                new org.bson.Document("$ifNull", List.of("$meals", new org.bson.Document()))))
+                        .append("as", "g")
+                        .append("in", new org.bson.Document()
+                                .append("k", "$$g.k")
+                                .append("v", new org.bson.Document("$map", new org.bson.Document()
+                                        .append("input", new org.bson.Document("$ifNull", List.of("$$g.v", List.of())))
+                                        .append("as", "m")
+                                        .append("in", lightMeal))))));
+
+        org.bson.Document project = new org.bson.Document("$project", new org.bson.Document()
+                .append("userId", 1)
+                .append("dateString", 1)
+                .append("mealId", 1)
+                .append("date", 1)
+                .append("dailyTotals", 1)
+                .append("calorieGoal", 1)
+                .append("proteinGoal", 1)
+                .append("hydration", 1)
+                .append("meals", lightMeals));
+
+        List<DailyFoodLog> results = new ArrayList<>();
+        mongoTemplate.getCollection("daily_food_logs")
+                .aggregate(List.of(match, project))
+                .forEach(doc -> results.add(mongoTemplate.getConverter().read(DailyFoodLog.class, doc)));
+        return results;
     }
 
     /**

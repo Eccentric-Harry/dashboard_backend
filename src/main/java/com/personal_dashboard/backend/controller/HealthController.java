@@ -191,13 +191,19 @@ public class HealthController {
         /**
          * Get food entries as a flat list (backward compatibility).
          * Supports filtering by date range, days, and meal type.
+         *
+         * <p>Defaults to the <b>summary</b> view: identifiers, macros, meal quality and the
+         * two nested keys the list/analytics cards read. The full AI clinical payload runs to
+         * several KB per meal, so a multi-month range in full view is megabytes — pass
+         * {@code view=full} only when rendering a single meal's detail sheet.
          */
         @GetMapping("/food")
         public ResponseEntity<ApiResponse<List<FoodEntryDTO>>> getFoodEntries(
                         @RequestParam(value = "days", required = false) Integer days,
                         @RequestParam(value = "startDate", required = false) String startDateStr,
                         @RequestParam(value = "endDate", required = false) String endDateStr,
-                        @RequestParam(value = "mealType", required = false) String mealType) {
+                        @RequestParam(value = "mealType", required = false) String mealType,
+                        @RequestParam(value = "view", required = false) String view) {
 
                 LocalDate endDate = LocalDate.now();
                 LocalDate startDate;
@@ -212,7 +218,10 @@ public class HealthController {
                         startDate = endDate.minusDays(daysToSubtract);
                 }
 
-                List<DailyFoodLog> dailyLogs = dailyFoodLogService.getDailyLogsForRange(startDate, endDate);
+                boolean fullView = "full".equalsIgnoreCase(view);
+                List<DailyFoodLog> dailyLogs = fullView
+                                ? dailyFoodLogService.getDailyLogsForRange(startDate, endDate)
+                                : dailyFoodLogService.getLightDailyLogsForRange(startDate, endDate);
 
                 // Flatten daily logs into individual FoodEntryDTOs
                 List<FoodEntryDTO> dtos = dailyLogs.stream()
@@ -306,7 +315,8 @@ public class HealthController {
                         startDate = endDate.minusDays(daysToSubtract);
                 }
 
-                List<DailyFoodLog> dailyLogs = dailyFoodLogService.getDailyLogsForRange(startDate, endDate);
+                // Hydration lives outside `meals`, so the projected read is enough here.
+                List<DailyFoodLog> dailyLogs = dailyFoodLogService.getLightDailyLogsForRange(startDate, endDate);
 
                 List<HydrationRecordDTO> dtos = dailyLogs.stream()
                                 .map(dailyLog -> dailyFoodLogService.toHydrationDto(dailyLog.getDateString(), dailyLog.getHydration()))

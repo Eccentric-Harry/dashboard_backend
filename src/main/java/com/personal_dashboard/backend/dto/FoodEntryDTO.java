@@ -1,5 +1,6 @@
 package com.personal_dashboard.backend.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,6 +10,12 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Nulls are omitted: the summary view of /health/food leaves the AI clinical fields unset, and
+ * shipping ~15 explicit nulls per meal across a year of entries is pure payload for no signal.
+ * Consumers already treat missing and null identically ({@code entry.calories ?? …}).
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 @Data
 @Builder
 @NoArgsConstructor
