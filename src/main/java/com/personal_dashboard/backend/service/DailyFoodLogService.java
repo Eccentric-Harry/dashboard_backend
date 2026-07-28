@@ -318,12 +318,17 @@ public class DailyFoodLogService {
                 .append("recipeCategory", "$$m.recipeCategory")
                 .append("serving", "$$m.serving")
                 .append("timestamp", "$$m.timestamp")
+                // Both spellings of each macro: the stored payload is whatever the analysis
+                // pipeline of the day wrote, and fat in particular is split between `fat_g`
+                // and `fats_g` across existing records. Dropping a variant here would make
+                // the insights engine read null and treat the meal as un-analyzed.
                 .append("totalSummary", new org.bson.Document()
                         .append("calories_kcal", "$$m.totalSummary.calories_kcal")
                         .append("protein_g", "$$m.totalSummary.protein_g")
                         .append("carbs_g", "$$m.totalSummary.carbs_g")
                         .append("carbohydrates_g", "$$m.totalSummary.carbohydrates_g")
-                        .append("fat_g", "$$m.totalSummary.fat_g"))
+                        .append("fat_g", "$$m.totalSummary.fat_g")
+                        .append("fats_g", "$$m.totalSummary.fats_g"))
                 .append("recompositionAssessment", new org.bson.Document()
                         .append("letter_grade", "$$m.recompositionAssessment.letter_grade")
                         .append("meal_quality", "$$m.recompositionAssessment.meal_quality"));
