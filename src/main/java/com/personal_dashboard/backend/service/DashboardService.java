@@ -131,14 +131,14 @@ public class DashboardService {
                                 monthStart.format(DateTimeFormatter.ISO_LOCAL_DATE),
                                 monthEnd.format(DateTimeFormatter.ISO_LOCAL_DATE));
 
-                // Separate expenses and income
+                // Separate expenses and income (see isExpense: untyped rows are spend, not income)
                 BigDecimal totalExpenses = transactions.stream()
-                                .filter(t -> "Expense".equals(t.getType()))
+                                .filter(DashboardService::isExpense)
                                 .map(t -> BigDecimal.valueOf(t.getAmount()))
                                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
                 BigDecimal totalIncome = transactions.stream()
-                                .filter(t -> "Income".equals(t.getType()))
+                                .filter(t -> "Income".equalsIgnoreCase(t.getType()))
                                 .map(t -> BigDecimal.valueOf(t.getAmount()))
                                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -255,7 +255,7 @@ public class DashboardService {
                 Map<String, BigDecimal> categorySpend = new HashMap<>();
 
                 transactions.stream()
-                                .filter(t -> "Expense".equals(t.getType()))
+                                .filter(DashboardService::isExpense)
                                 .forEach(t -> categorySpend.merge(t.getCategory(),
                                                 BigDecimal.valueOf(t.getAmount()), BigDecimal::add));
 
@@ -400,6 +400,19 @@ public class DashboardService {
         }
 
         /**
+         * A transaction counts as spend unless it is explicitly Income.
+         *
+         * <p>Must stay identical to {@code FinanceService.applyToTotals}, which is what writes
+         * {@code dailyTotals} and therefore what the /finance route renders. Testing
+         * {@code "Expense".equals(type)} instead silently drops every row with a null {@code type}
+         * — 140 of 301 transactions in production, ₹1.22L — so /home under-reported the same month
+         * that /finance reported correctly. Categories, not this flag, decide the breakdown.
+         */
+        private static boolean isExpense(TransactionDTO t) {
+                return !"Income".equalsIgnoreCase(t.getType());
+        }
+
+        /**
          * Get spending summary for a specific month
          */
         public Map<String, Object> getSpendingSummary(YearMonth month) {
@@ -413,13 +426,13 @@ public class DashboardService {
 
                 // Calculate total spent
                 BigDecimal totalExpenses = transactions.stream()
-                                .filter(t -> "Expense".equals(t.getType()))
+                                .filter(DashboardService::isExpense)
                                 .map(t -> BigDecimal.valueOf(t.getAmount()))
                                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
                 // Group by category
                 Map<String, BigDecimal> categorySpend = transactions.stream()
-                                .filter(t -> "Expense".equals(t.getType()))
+                                .filter(DashboardService::isExpense)
                                 .collect(Collectors.groupingBy(
                                                 TransactionDTO::getCategory,
                                                 Collectors.reducing(BigDecimal.ZERO,
