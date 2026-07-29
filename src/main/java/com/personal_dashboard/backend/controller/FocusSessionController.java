@@ -52,6 +52,60 @@ public class FocusSessionController {
                 .build());
     }
 
+    @PostMapping("/log")
+    @Operation(summary = "Log past focus", description = "Record focus work done away from the app (source=MANUAL)")
+    public ResponseEntity<ApiResponse<FocusSession>> logPastSession(
+            @jakarta.validation.Valid @RequestBody com.personal_dashboard.backend.dto.request.FocusLogRequest request) {
+        String activeUserId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        log.info("REST request to log past focus: date={}, minutes={}", request.getDate(), request.getMinutes());
+        FocusSession session = service.logPastSession(request, activeUserId);
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
+                .body(ApiResponse.<FocusSession>builder()
+                        .data(session)
+                        .meta(buildMeta("log"))
+                        .build());
+    }
+
+    @DeleteMapping("/sessions/{id}")
+    @Operation(summary = "Delete a focus session", description = "Undo a mistaken manual log or calendar import")
+    public ResponseEntity<ApiResponse<Void>> deleteSession(@PathVariable String id) {
+        String activeUserId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        service.deleteSession(id, activeUserId);
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
+                .data(null)
+                .meta(buildMeta("delete"))
+                .build());
+    }
+
+    @GetMapping("/calendar-suggestions")
+    @Operation(summary = "Calendar focus suggestions",
+            description = "Timed calendar blocks (native + Google-synced) that look like focus work and are not yet imported")
+    public ResponseEntity<ApiResponse<java.util.List<com.personal_dashboard.backend.dto.FocusSuggestion>>> getCalendarSuggestions(
+            @RequestParam(name = "startDate") String startDate,
+            @RequestParam(name = "endDate") String endDate) {
+        String activeUserId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        var suggestions = service.getCalendarSuggestions(
+                java.time.LocalDate.parse(startDate), java.time.LocalDate.parse(endDate), activeUserId);
+        return ResponseEntity.ok(ApiResponse.<java.util.List<com.personal_dashboard.backend.dto.FocusSuggestion>>builder()
+                .data(suggestions)
+                .meta(buildMeta("calendar-suggestions"))
+                .build());
+    }
+
+    @PostMapping("/import")
+    @Operation(summary = "Import calendar blocks as focus",
+            description = "Accept confirmed suggestions; durations are re-derived server-side and re-imports are ignored")
+    public ResponseEntity<ApiResponse<java.util.List<FocusSession>>> importCalendarBlocks(
+            @jakarta.validation.Valid @RequestBody com.personal_dashboard.backend.dto.request.FocusImportRequest request) {
+        String activeUserId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
+        var imported = service.importCalendarBlocks(request, activeUserId);
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
+                .body(ApiResponse.<java.util.List<FocusSession>>builder()
+                        .data(imported)
+                        .meta(buildMeta("import"))
+                        .build());
+    }
+
     @PostMapping("/start")
     @Operation(summary = "Start a focus session", description = "Start a new focus session with pursuit and duration")
     public ResponseEntity<ApiResponse<FocusSession>> startSession(

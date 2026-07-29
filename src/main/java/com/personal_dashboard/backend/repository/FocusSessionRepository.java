@@ -17,4 +17,9 @@ public interface FocusSessionRepository extends MongoRepository<FocusSession, St
     Optional<FocusSession> findTopByStatusNotOrderByStartTimeDesc(com.personal_dashboard.backend.model.FocusSessionStatus status);
 
     List<FocusSession> findByUserIdAndStatusAndStartTimeBetween(String userId, FocusSessionStatus status, Instant start, Instant end);
+
+    /** Calendar occurrences already imported — the import dedupe key. */
+    List<FocusSession> findByUserIdAndSourceRefIdIn(String userId, java.util.Collection<String> sourceRefIds);
+
+    Optional<FocusSession> findByIdAndUserId(String id, String userId);
 }

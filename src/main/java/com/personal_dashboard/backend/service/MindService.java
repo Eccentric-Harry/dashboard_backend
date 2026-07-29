@@ -36,6 +36,7 @@ public class MindService {
     private static final ZoneId ZONE = ZoneId.of("Asia/Kolkata");
     private static final int EVIDENCE_WINDOW_DAYS = 7;
     private static final int MAX_TASK_TITLE_LENGTH = 140;
+    private static final int STREAK_LOOKBACK_DAYS = 400;
 
     private final MindEntryRepository mindEntryRepository;
     private final DailyTaskService dailyTaskService;
@@ -259,14 +260,22 @@ public class MindService {
 
     /**
      * Consecutive days (looking back from today, or from yesterday if today is still empty)
-     * on which the user showed up here — captured at least one entry.
+     * on which the user showed up here. "Showing up" is any act of conscious self-check-in —
+     * a breathing session, capturing a thought, or a mood check-in — not just the breathing tool.
      */
     private long computeStreak(String userId, LocalDate today) {
         java.util.Set<LocalDate> activeDays = mindEntryRepository.findByUserId(userId).stream()
-                .filter(e -> "BREATH".equalsIgnoreCase(e.getType()))
+                .filter(e -> "BREATH".equalsIgnoreCase(e.getType()) || "THOUGHT".equalsIgnoreCase(e.getType()))
                 .map(MindEntry::getDate)
                 .filter(java.util.Objects::nonNull)
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(java.util.stream.Collectors.toCollection(java.util.HashSet::new));
+
+        dailyLogService.getRange(today.minusDays(STREAK_LOOKBACK_DAYS), today).stream()
+                .filter(l -> l.getMoodScore() != null)
+                .map(DailyLog::getDate)
+                .filter(java.util.Objects::nonNull)
+                .forEach(activeDays::add);
+
         if (activeDays.isEmpty()) {
             return 0;
         }

@@ -30,6 +30,24 @@ public class FocusSession implements UserOwnedDocument {
     @Builder.Default
     private FocusSessionStatus status = FocusSessionStatus.IDLE;
 
+    /**
+     * Provenance of these minutes. Defaults to TIMER so the rows written before
+     * this field existed — all of which came from the live timer — read correctly.
+     */
+    @Builder.Default
+    private FocusSource source = FocusSource.TIMER;
+
+    /** Free-text context, used by manual and calendar-imported sessions. */
+    private String note;
+
+    /**
+     * For CALENDAR sessions, the calendar occurrenceId this was imported from.
+     * Makes the import idempotent: an occurrence already present here is never
+     * offered as a suggestion again, so re-running an import cannot double-count
+     * a block. Null for TIMER and MANUAL.
+     */
+    private String sourceRefId;
+
     private Instant startTime;
 
     private Instant endTime;

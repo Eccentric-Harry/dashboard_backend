@@ -21,4 +21,13 @@ public class FocusDaySummary {
     private long totalMinutes;
 
     private int sessions;
+
+    /** Minutes measured live by the in-app timer. */
+    private long timerMinutes;
+
+    /** Minutes entered after the fact by the user. */
+    private long manualMinutes;
+
+    /** Minutes imported from calendar blocks the user confirmed. */
+    private long calendarMinutes;
 }
