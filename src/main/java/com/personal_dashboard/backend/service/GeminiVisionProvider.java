@@ -50,6 +50,14 @@ public class GeminiVisionProvider implements VisionProvider {
 
     @Override
     public String analyzeFoodImage(List<byte[]> images, String prompt) {
+        return analyzeFoodImage(images, prompt, "", GenerationOptions.builder().build());
+    }
+
+    @Override
+    public String analyzeFoodImage(List<byte[]> images, String staticPrefix,
+                                   String volatileSuffix, GenerationOptions options) {
+        GenerationOptions opts = options != null ? options : GenerationOptions.builder().build();
+        String prompt = staticPrefix + volatileSuffix;
         try {
             List<Map<String, Object>> parts = new ArrayList<>();
             parts.add(Map.of("text", prompt));
@@ -78,22 +86,40 @@ public class GeminiVisionProvider implements VisionProvider {
             // The cap is a cost guardrail, not a target: the trimmed Stage-2 schema lands
             // well under 8k output tokens, so anything approaching this ceiling is a runaway
             // generation we would rather truncate than pay for in full.
+            Map<String, Object> generationConfig = new LinkedHashMap<>();
+            // Gemini 3.x is tuned for temperature 1.0. Google's own guidance warns that
+            // values below 1.0 can cause looping or degraded performance on mathematical
+            // and reasoning tasks, so lowering it in pursuit of determinism works against
+            // the model. Determinism now comes from doing the arithmetic in Java instead.
+            generationConfig.put("temperature", opts.getTemperature());
+            generationConfig.put("maxOutputTokens", Math.min(opts.getMaxOutputTokens(), MAX_OUTPUT_TOKENS));
+            generationConfig.put("responseMimeType", "application/json");
+            generationConfig.put("thinkingConfig", Map.of("thinkingLevel", opts.getThinkingLevel()));
+
+            if (imageCount > 0 && opts.getMediaResolution() != null) {
+                // Roughly 280/560/1120 tokens per image for low/medium/high. Food
+                // photographs do not need the fine-text tier, and at up to 3 images per
+                // scan the difference between medium and high is ~1700 input tokens.
+                generationConfig.put("mediaResolution", opts.getMediaResolution());
+            }
+            if (opts.getResponseSchema() != null) {
+                // Constrains decoding to the schema: removes the prose schema from the
+                // prompt, and makes markdown fences and truncated objects impossible.
+                generationConfig.put("responseSchema", opts.getResponseSchema());
+            }
+
             Map<String, Object> body = Map.of(
                     "contents", List.of(Map.of("parts", parts)),
-                    "generationConfig", Map.of(
-                            "temperature", 0.1,
-                            "maxOutputTokens", MAX_OUTPUT_TOKENS,
-                            "responseMimeType", "application/json",
-                            "thinkingConfig", Map.of(
-                                    "thinkingLevel", "minimal"
-                            )));
+                    "generationConfig", generationConfig);
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
 
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
-            log.info("[GeminiVisionProvider] Sending request to Gemini API (model: {}, images: {})", model, imageCount);
+            log.info("[GeminiVisionProvider] stage={} model={} images={} thinking={} mediaRes={} schema={}",
+                    opts.getStageLabel(), model, imageCount, opts.getThinkingLevel(),
+                    imageCount > 0 ? opts.getMediaResolution() : "n/a", opts.getResponseSchema() != null);
             long startedAt = System.currentTimeMillis();
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
             long elapsedMs = System.currentTimeMillis() - startedAt;

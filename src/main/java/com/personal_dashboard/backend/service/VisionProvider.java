@@ -32,6 +32,25 @@ public interface VisionProvider {
      * @return Extracted JSON response string
      */
     default String analyzeFoodImage(List<byte[]> images, String staticPrefix, String volatileSuffix) {
+        return analyzeFoodImage(images, staticPrefix, volatileSuffix, GenerationOptions.builder().build());
+    }
+
+    /**
+     * Cache-aware variant with explicit generation settings.
+     *
+     * <p>The two pipeline stages want different things — the vision stage needs image detail
+     * and shallow reasoning, the narrative stage needs no image at all and a hard output
+     * ceiling — so reasoning depth, image resolution and response schema are per-call rather
+     * than shared constants. Providers that cannot honour a setting ignore it.
+     *
+     * @param images         Optional raw image byte arrays
+     * @param staticPrefix   Stable instructions — identical across requests
+     * @param volatileSuffix Per-request content, appended after the prefix
+     * @param options        Reasoning depth, image resolution, and output schema
+     * @return Extracted JSON response string
+     */
+    default String analyzeFoodImage(List<byte[]> images, String staticPrefix,
+                                    String volatileSuffix, GenerationOptions options) {
         return analyzeFoodImage(images, staticPrefix + volatileSuffix);
     }
 

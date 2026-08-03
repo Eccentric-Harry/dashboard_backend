@@ -8,6 +8,9 @@ import com.personal_dashboard.backend.model.UserAccount;
 import com.personal_dashboard.backend.repository.MealAnalysisJobRepository;
 import com.personal_dashboard.backend.repository.UserAccountRepository;
 import com.personal_dashboard.backend.security.UserContext;
+import com.personal_dashboard.backend.model.DailyFoodLog;
+import com.personal_dashboard.backend.service.nutrition.NutritionContext;
+import com.personal_dashboard.backend.service.nutrition.NutritionContextFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -36,6 +39,7 @@ public class MealAnalysisJobService {
     private final DailyFoodLogService dailyFoodLogService;
     private final UserAccountRepository userAccountRepository;
     private final MealAnalysisJobRepository jobRepository;
+    private final NutritionContextFactory nutritionContextFactory;
 
     /**
      * Create a PENDING job for the given user and return it. Image bytes are read
@@ -84,13 +88,24 @@ public class MealAnalysisJobService {
 
             UserAccount userProfile = userAccountRepository.findById(userId).orElse(null);
 
-            // ── Run Two-Stage Gemini Pipeline ────────────────────────────────
+            // Budget analysis is only meaningful against what has actually been eaten
+            // today, so read the real log rather than assuming an untouched day.
+            DailyFoodLog todayLog = null;
+            try {
+                todayLog = dailyFoodLogService.getDailyLog(date);
+            } catch (Exception e) {
+                log.warn("[MealAnalysisJob {}] Could not load today's log for user={}; "
+                        + "budget will be computed against a full day: {}", jobId, userId, e.getMessage());
+            }
+            NutritionContext context = nutritionContextFactory.build(userProfile, todayLog);
+
+            // ── Run the analysis pipeline ────────────────────────────────────
             GeminiAnalysisResult analysis;
             try {
-                analysis = nutritionPipelineService.analyzeWithTwoStageFromBytes(
+                analysis = nutritionPipelineService.analyzeFromBytes(
                         images.isEmpty() ? null : images,
                         (description != null && !description.isBlank()) ? description : null,
-                        userProfile);
+                        context);
             } catch (Exception e) {
                 log.error("[MealAnalysisJob {}] Gemini pipeline failed for user={}: {}", jobId, userId, e.getMessage(), e);
                 updateStatus(jobId, MealAnalysisJob.Status.FAILED, "gemini-error", null);

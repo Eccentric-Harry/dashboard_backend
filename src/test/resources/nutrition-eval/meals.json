@@ -1,0 +1,473 @@
+{
+  "about": "Ground-truth fixtures for measuring nutrition accuracy. Each case states the ingredients and their TRUE weights (as if weighed on a kitchen scale), plus reference macros for the meal. The harness runs the ingredients through the real resolver and arithmetic and reports MAPE per nutrient.",
+  "whatThisMeasures": "Resolution and arithmetic, holding portion size constant. Reference totals are the sum of published per-100g composition at the stated weights, so a failure means the resolver matched the wrong record or the arithmetic drifted — the two regressions that would silently corrupt a health log. It does NOT measure portion estimation, which is the vision stage's job and the larger error source overall (~36% MAPE in published evaluations). For that, add cases with real photographs and scale-weighed reference values via photoPath; the harness reports those in the same table.",
+  "referenceSource": "Reference macros are the USDA FoodData Central composition of the stated ingredients at the stated weights, computed independently. For regional preparations absent from FDC, values follow IFCT 2017.",
+  "cases": [
+    {
+      "id": "plain-rice-dal",
+      "label": "Rice and masoor dal",
+      "photoPath": null,
+      "ingredients": [
+        {
+          "usda": "Rice, white, long-grain, regular, enriched, cooked",
+          "common": "White rice",
+          "grams": 200
+        },
+        {
+          "usda": "Lentils, mature seeds, cooked, boiled, without salt",
+          "common": "Masoor dal",
+          "grams": 150
+        },
+        {
+          "usda": "Oil, vegetable, sunflower",
+          "common": "Cooking oil",
+          "grams": 8
+        },
+        {
+          "usda": "Salt, table",
+          "common": "Salt",
+          "grams": 2
+        }
+      ],
+      "reference": {
+        "kcal": 504.7,
+        "protein": 18.9,
+        "carbs": 86.5,
+        "fat": 9.1,
+        "sodium": 780.2
+      },
+      "containsRegionalEstimate": false
+    },
+    {
+      "id": "roti-sabzi",
+      "label": "Two rotis with aloo sabzi",
+      "photoPath": null,
+      "ingredients": [
+        {
+          "usda": "Chapati or roti, whole wheat, plain, cooked",
+          "common": "Roti",
+          "grams": 90
+        },
+        {
+          "usda": "Potatoes, boiled, cooked without skin, flesh, without salt",
+          "common": "Aloo",
+          "grams": 150
+        },
+        {
+          "usda": "Onions, raw",
+          "common": "Onion",
+          "grams": 40
+        },
+        {
+          "usda": "Oil, vegetable, sunflower",
+          "common": "Cooking oil",
+          "grams": 10
+        },
+        {
+          "usda": "Salt, table",
+          "common": "Salt",
+          "grams": 2
+        }
+      ],
+      "reference": {
+        "kcal": 502.2,
+        "protein": 13.4,
+        "carbs": 85.1,
+        "fat": 13.5,
+        "sodium": 953.8
+      },
+      "containsRegionalEstimate": true
+    },
+    {
+      "id": "idli-sambar",
+      "label": "Three idlis with sambar",
+      "photoPath": null,
+      "ingredients": [
+        {
+          "usda": "Idli, steamed fermented rice and black gram cake",
+          "common": "Idli",
+          "grams": 210
+        },
+        {
+          "usda": "Pigeon peas (red gram), mature seeds, cooked, boiled, without salt",
+          "common": "Toor dal",
+          "grams": 100
+        },
+        {
+          "usda": "Tomatoes, red, ripe, raw, year round average",
+          "common": "Tomato",
+          "grams": 50
+        },
+        {
+          "usda": "Tamarind, raw",
+          "common": "Tamarind",
+          "grams": 8
+        },
+        {
+          "usda": "Oil, coconut",
+          "common": "Coconut oil",
+          "grams": 6
+        },
+        {
+          "usda": "Salt, table",
+          "common": "Salt",
+          "grams": 2
+        }
+      ],
+      "reference": {
+        "kcal": 479.8,
+        "protein": 14.6,
+        "carbs": 86.9,
+        "fat": 7.7,
+        "sodium": 1414.9
+      },
+      "containsRegionalEstimate": true
+    },
+    {
+      "id": "egg-toast",
+      "label": "Two eggs on white toast",
+      "photoPath": null,
+      "ingredients": [
+        {
+          "usda": "Egg, whole, raw, fresh",
+          "common": "Eggs",
+          "grams": 100
+        },
+        {
+          "usda": "Bread, white, commercially prepared",
+          "common": "White bread",
+          "grams": 60
+        },
+        {
+          "usda": "Butter, salted",
+          "common": "Butter",
+          "grams": 10
+        },
+        {
+          "usda": "Salt, table",
+          "common": "Salt",
+          "grams": 1
+        }
+      ],
+      "reference": {
+        "kcal": 374.3,
+        "protein": 17.2,
+        "carbs": 31.1,
+        "fat": 19.6,
+        "sodium": 887.9
+      },
+      "containsRegionalEstimate": false
+    },
+    {
+      "id": "chicken-rice",
+      "label": "Grilled chicken with rice",
+      "photoPath": null,
+      "ingredients": [
+        {
+          "usda": "Chicken, broilers or fryers, breast, meat only, cooked, roasted",
+          "common": "Chicken breast",
+          "grams": 150
+        },
+        {
+          "usda": "Rice, white, long-grain, regular, enriched, cooked",
+          "common": "White rice",
+          "grams": 180
+        },
+        {
+          "usda": "Oil, olive, salad or cooking",
+          "common": "Olive oil",
+          "grams": 8
+        },
+        {
+          "usda": "Salt, table",
+          "common": "Salt",
+          "grams": 2
+        }
+      ],
+      "reference": {
+        "kcal": 552.2,
+        "protein": 51.4,
+        "carbs": 50.7,
+        "fat": 13.9,
+        "sodium": 888.1
+      },
+      "containsRegionalEstimate": false
+    },
+    {
+      "id": "curd-rice",
+      "label": "Curd rice",
+      "photoPath": null,
+      "ingredients": [
+        {
+          "usda": "Rice, white, long-grain, regular, enriched, cooked",
+          "common": "White rice",
+          "grams": 200
+        },
+        {
+          "usda": "Yogurt, plain, whole milk",
+          "common": "Curd",
+          "grams": 150
+        },
+        {
+          "usda": "Oil, sesame, salad or cooking",
+          "common": "Sesame oil",
+          "grams": 5
+        },
+        {
+          "usda": "Salt, table",
+          "common": "Salt",
+          "grams": 2
+        }
+      ],
+      "reference": {
+        "kcal": 395.7,
+        "protein": 10.6,
+        "carbs": 63.3,
+        "fat": 10.4,
+        "sodium": 846.2
+      },
+      "containsRegionalEstimate": false
+    },
+    {
+      "id": "paneer-roti",
+      "label": "Paneer curry with roti",
+      "photoPath": null,
+      "ingredients": [
+        {
+          "usda": "Paneer (Indian pressed fresh cheese), whole milk",
+          "common": "Paneer",
+          "grams": 100
+        },
+        {
+          "usda": "Chapati or roti, whole wheat, plain, cooked",
+          "common": "Roti",
+          "grams": 90
+        },
+        {
+          "usda": "Onions, raw",
+          "common": "Onion",
+          "grams": 50
+        },
+        {
+          "usda": "Tomatoes, red, ripe, raw, year round average",
+          "common": "Tomato",
+          "grams": 60
+        },
+        {
+          "usda": "Butter oil, anhydrous (ghee)",
+          "common": "Ghee",
+          "grams": 12
+        },
+        {
+          "usda": "Salt, table",
+          "common": "Salt",
+          "grams": 2
+        }
+      ],
+      "reference": {
+        "kcal": 699.2,
+        "protein": 29.6,
+        "carbs": 61.9,
+        "fat": 38.2,
+        "sodium": 973.4
+      },
+      "containsRegionalEstimate": true
+    },
+    {
+      "id": "oats-banana-milk",
+      "label": "Oats with banana and milk",
+      "photoPath": null,
+      "ingredients": [
+        {
+          "usda": "Oats",
+          "common": "Oats",
+          "grams": 50
+        },
+        {
+          "usda": "Bananas, raw",
+          "common": "Banana",
+          "grams": 120
+        },
+        {
+          "usda": "Milk, whole, 3.25% milkfat, with added vitamin D",
+          "common": "Whole milk",
+          "grams": 200
+        }
+      ],
+      "reference": {
+        "kcal": 423.3,
+        "protein": 16.1,
+        "carbs": 70.1,
+        "fat": 10.3,
+        "sodium": 88.2
+      },
+      "containsRegionalEstimate": false
+    },
+    {
+      "id": "rajma-rice",
+      "label": "Rajma with rice",
+      "photoPath": null,
+      "ingredients": [
+        {
+          "usda": "Beans, kidney, red, mature seeds, cooked, boiled, without salt",
+          "common": "Rajma",
+          "grams": 180
+        },
+        {
+          "usda": "Rice, white, long-grain, regular, enriched, cooked",
+          "common": "White rice",
+          "grams": 200
+        },
+        {
+          "usda": "Onions, raw",
+          "common": "Onion",
+          "grams": 40
+        },
+        {
+          "usda": "Oil, vegetable, sunflower",
+          "common": "Cooking oil",
+          "grams": 10
+        },
+        {
+          "usda": "Salt, table",
+          "common": "Salt",
+          "grams": 2
+        }
+      ],
+      "reference": {
+        "kcal": 593.0,
+        "protein": 21.4,
+        "carbs": 101.1,
+        "fat": 11.5,
+        "sodium": 782.4
+      },
+      "containsRegionalEstimate": false
+    },
+    {
+      "id": "chickpea-salad",
+      "label": "Chickpea salad",
+      "photoPath": null,
+      "ingredients": [
+        {
+          "usda": "Chickpeas (garbanzo beans, bengal gram), mature seeds, cooked, boiled, without salt",
+          "common": "Chickpeas",
+          "grams": 160
+        },
+        {
+          "usda": "Cucumber, with peel, raw",
+          "common": "Cucumber",
+          "grams": 80
+        },
+        {
+          "usda": "Tomatoes, red, ripe, raw, year round average",
+          "common": "Tomato",
+          "grams": 60
+        },
+        {
+          "usda": "Onions, raw",
+          "common": "Onion",
+          "grams": 30
+        },
+        {
+          "usda": "Oil, olive, salad or cooking",
+          "common": "Olive oil",
+          "grams": 10
+        },
+        {
+          "usda": "Salt, table",
+          "common": "Salt",
+          "grams": 1
+        }
+      ],
+      "reference": {
+        "kcal": 385.6,
+        "protein": 15.6,
+        "carbs": 51.9,
+        "fat": 14.4,
+        "sodium": 404.8
+      },
+      "containsRegionalEstimate": false
+    },
+    {
+      "id": "dosa-chutney",
+      "label": "Dosa with coconut chutney",
+      "photoPath": null,
+      "ingredients": [
+        {
+          "usda": "Dosa, plain, fermented rice and black gram crepe, pan-fried",
+          "common": "Dosa",
+          "grams": 120
+        },
+        {
+          "usda": "Nuts, coconut meat, raw",
+          "common": "Coconut",
+          "grams": 40
+        },
+        {
+          "usda": "Oil, coconut",
+          "common": "Coconut oil",
+          "grams": 5
+        },
+        {
+          "usda": "Salt, table",
+          "common": "Salt",
+          "grams": 2
+        }
+      ],
+      "reference": {
+        "kcal": 387.8,
+        "protein": 6.0,
+        "carbs": 40.3,
+        "fat": 23.4,
+        "sodium": 1167.2
+      },
+      "containsRegionalEstimate": true
+    },
+    {
+      "id": "high-sodium-restaurant",
+      "label": "Restaurant fried rice, heavily salted",
+      "photoPath": null,
+      "ingredients": [
+        {
+          "usda": "Rice, white, long-grain, regular, enriched, cooked",
+          "common": "White rice",
+          "grams": 300
+        },
+        {
+          "usda": "Egg, whole, raw, fresh",
+          "common": "Egg",
+          "grams": 50
+        },
+        {
+          "usda": "Peas, green, raw",
+          "common": "Green peas",
+          "grams": 40
+        },
+        {
+          "usda": "Carrots, raw",
+          "common": "Carrot",
+          "grams": 40
+        },
+        {
+          "usda": "Oil, vegetable, sunflower",
+          "common": "Cooking oil",
+          "grams": 20
+        },
+        {
+          "usda": "Salt, table",
+          "common": "Salt",
+          "grams": 5
+        }
+      ],
+      "reference": {
+        "kcal": 687.1,
+        "protein": 16.9,
+        "carbs": 94.5,
+        "fat": 25.9,
+        "sodium": 2041.5
+      },
+      "containsRegionalEstimate": false
+    }
+  ],
+  "bucketing": "Cases are split by whether any ingredient resolves to a regional IFCT-derived entry (containsRegionalEstimate). Those entries are flagged estimated:true in the nutrient table and surfaced to users as reduced confidence, and they carry materially more error than the FDC-measured path. Reporting them separately keeps that honest instead of averaging it away."
+}
