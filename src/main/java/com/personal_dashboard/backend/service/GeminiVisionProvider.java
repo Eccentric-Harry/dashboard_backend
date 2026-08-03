@@ -44,19 +44,17 @@ public class GeminiVisionProvider implements VisionProvider {
     @Value("${ai.providers.gemini.price.cached-input-per-million:0.15}")
     private double priceCachedInputPerMillion;
 
-    private RestTemplate restTemplate;
     private ObjectMapper objectMapper;
+
+    /**
+     * One RestTemplate per distinct read timeout. A shared instance cannot carry per-stage
+     * timeouts, and mutating a shared factory between calls is not thread-safe — this runs
+     * on a pooled executor with concurrent analyses in flight.
+     */
+    private final Map<Integer, RestTemplate> templatesByTimeout = new java.util.concurrent.ConcurrentHashMap<>();
 
     @PostConstruct
     private void init() {
-        // Bound each Gemini call so a stuck upstream can never hang the request
-        // thread indefinitely (which would exhaust the pool and stall other users).
-        // Timeouts are generous — well above normal vision latency — so they only
-        // trip on genuine hangs, not slow-but-healthy responses.
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(15_000);   // 15s to establish the connection
-        factory.setReadTimeout(120_000);      // 120s ceiling per stage response
-        this.restTemplate = new RestTemplate(factory);
         this.objectMapper = new ObjectMapper();
     }
 
@@ -133,7 +131,8 @@ public class GeminiVisionProvider implements VisionProvider {
                     opts.getStageLabel(), model, imageCount, opts.getThinkingLevel(),
                     imageCount > 0 ? opts.getMediaResolution() : "n/a", opts.getResponseSchema() != null);
             long startedAt = System.currentTimeMillis();
-            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+            ResponseEntity<String> response =
+                    templateFor(opts.getReadTimeoutMs()).postForEntity(url, request, String.class);
             long elapsedMs = System.currentTimeMillis() - startedAt;
 
             if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
@@ -151,6 +150,20 @@ public class GeminiVisionProvider implements VisionProvider {
             log.error("[GeminiVisionProvider] Vision call failed: {}", e.getMessage());
             throw new RuntimeException("Error executing Gemini vision call", e);
         }
+    }
+
+    /**
+     * Bounds every call so a stuck upstream cannot hang a pooled thread indefinitely.
+     * The connect timeout stays short — failing to reach Google is not a slow response,
+     * it is an outage, and the fallback provider should get its turn quickly.
+     */
+    private RestTemplate templateFor(int readTimeoutMs) {
+        return templatesByTimeout.computeIfAbsent(readTimeoutMs, ms -> {
+            SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+            factory.setConnectTimeout(java.time.Duration.ofSeconds(10));
+            factory.setReadTimeout(java.time.Duration.ofMillis(ms));
+            return new RestTemplate(factory);
+        });
     }
 
     @Override

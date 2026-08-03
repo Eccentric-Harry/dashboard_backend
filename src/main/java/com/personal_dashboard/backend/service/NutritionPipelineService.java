@@ -63,6 +63,24 @@ public class NutritionPipelineService {
     private final MealAnalysisCacheService cache;
     private ObjectMapper objectMapper;
 
+    // Stage tuning, in config so a latency problem in production is an env change rather
+    // than a redeploy. The two read timeouts must sum to comfortably less than the client's
+    // polling deadline, with room for one fallback attempt.
+    @org.springframework.beans.factory.annotation.Value("${nutrition.stage.extraction.thinking-level:medium}")
+    private String extractionThinkingLevel;
+
+    @org.springframework.beans.factory.annotation.Value("${nutrition.stage.extraction.media-resolution:media_resolution_high}")
+    private String extractionMediaResolution;
+
+    @org.springframework.beans.factory.annotation.Value("${nutrition.stage.extraction.timeout-ms:75000}")
+    private int extractionTimeoutMs;
+
+    @org.springframework.beans.factory.annotation.Value("${nutrition.stage.narrative.thinking-level:low}")
+    private String narrativeThinkingLevel;
+
+    @org.springframework.beans.factory.annotation.Value("${nutrition.stage.narrative.timeout-ms:45000}")
+    private int narrativeTimeoutMs;
+
     /** USD→INR rate for the rupee figure shown in the UI. Config, because it drifts. */
     @org.springframework.beans.factory.annotation.Value("${ai.providers.usd-to-inr:95.3}")
     private double usdToInr;
@@ -141,17 +159,15 @@ public class NutritionPipelineService {
                     STAGE1_STATIC_PROMPT, buildStage1Context(textDescription),
                     GenerationOptions.builder()
                             .stageLabel("extraction")
-                            // Recognition and portion estimation are the binding constraint on
-                            // the accuracy of everything downstream, and "high" is the API
-                            // default for 3.x Flash. An earlier version cut this to "low" to
-                            // save output tokens, which economised on precisely the step whose
-                            // errors the rest of the pipeline cannot recover from.
-                            .thinkingLevel("high")
-                            // Likewise: ~1120 image tokens against ~560 costs about 0.08 rupees
-                            // per image, and fine detail is what distinguishes ingredients and
-                            // reveals the scale references portion estimates depend on.
-                            .mediaResolution("media_resolution_high")
+                            // "medium", not "high". Recognition and portion estimation are the
+                            // binding constraint on accuracy, so this stays well above the
+                            // "low" it once was — but "high" pushed a two-call pipeline past
+                            // the client's polling deadline, and an analysis that never
+                            // returns is worth less than a slightly less deliberate one.
+                            .thinkingLevel(extractionThinkingLevel)
+                            .mediaResolution(extractionMediaResolution)
                             .maxOutputTokens(4096)
+                            .readTimeoutMs(extractionTimeoutMs)
                             .responseSchema(GeminiSchemas.extraction())
                             .usageSink(usages::add)
                             .build()));
@@ -189,10 +205,12 @@ public class NutritionPipelineService {
                     STAGE2_STATIC_PROMPT, buildStage2Context(extraction, computed, ctx, flags, score),
                     GenerationOptions.builder()
                             .stageLabel("narrative")
-                            // Advice quality benefits from deliberation, and there is no
-                            // arithmetic left for it to get wrong.
-                            .thinkingLevel("medium")
+                            // Every number is already computed and handed over as fact, so
+                            // there is nothing here to reason toward — only prose to write.
+                            // Depth buys little and costs latency the budget cannot spare.
+                            .thinkingLevel(narrativeThinkingLevel)
                             .maxOutputTokens(2048)
+                            .readTimeoutMs(narrativeTimeoutMs)
                             .responseSchema(GeminiSchemas.narrative())
                             .usageSink(usages::add)
                             .build()));

@@ -46,6 +46,17 @@ public class GenerationOptions {
     private int maxOutputTokens = 8192;
 
     /**
+     * Read timeout for this specific call, in milliseconds.
+     *
+     * <p>Per-stage rather than global because the stages have very different latency
+     * profiles — a vision call with deep thinking is slow and variable, a short prose call
+     * is not — and the whole pipeline has to finish inside the client's polling deadline.
+     * One shared ceiling either strangles the slow stage or lets it eat the entire budget.
+     */
+    @Builder.Default
+    private int readTimeoutMs = 90_000;
+
+    /**
      * Optional OpenAPI-subset schema. When set, the API constrains decoding to it, which
      * removes the need to describe the JSON shape in prose and eliminates markdown-fence
      * and truncation parse failures.

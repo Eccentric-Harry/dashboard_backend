@@ -38,9 +38,21 @@ public class ClaudeVisionProvider implements VisionProvider {
 
     private AnthropicClient client;
 
+    /**
+     * Ceiling on a fallback call. Without it the SDK's default is effectively unbounded,
+     * so a stalled Anthropic response would pin a pooled analysis thread indefinitely —
+     * and this provider only runs when Gemini has <em>already</em> failed, which is exactly
+     * when the request has least time left before the client stops polling.
+     */
+    @Value("${ai.providers.claude.timeout-ms:45000}")
+    private long timeoutMs;
+
     @PostConstruct
     private void init() {
-        this.client = AnthropicOkHttpClient.builder().apiKey(apiKey).build();
+        this.client = AnthropicOkHttpClient.builder()
+                .apiKey(apiKey)
+                .timeout(java.time.Duration.ofMillis(timeoutMs))
+                .build();
     }
 
     @Override
