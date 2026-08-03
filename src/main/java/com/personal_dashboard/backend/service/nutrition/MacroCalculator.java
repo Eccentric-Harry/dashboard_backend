@@ -48,12 +48,16 @@ public class MacroCalculator {
         double kcalHigh = 0.0;
         double kcalResolved = 0.0;
 
-        for (Stage1Extraction.Item raw : safe(extraction)) {
+        List<Stage1Extraction.Item> rawItems = safe(extraction);
+        // Resolved as a batch so any network lookups overlap rather than queueing.
+        List<UsdaNutrientRepository.Resolution> resolutions = nutrients.resolveAll(rawItems);
+
+        for (int idx = 0; idx < rawItems.size(); idx++) {
+            Stage1Extraction.Item raw = rawItems.get(idx);
             double grams = Math.max(raw.getEstimatedWeightG(), 0.0);
             String label = raw.getCommonName() != null ? raw.getCommonName() : raw.getUsdaFoodDescription();
 
-            UsdaNutrientRepository.Resolution res =
-                    nutrients.resolve(raw.getUsdaFoodDescription(), raw.getCommonName(), raw.getFdcId());
+            UsdaNutrientRepository.Resolution res = resolutions.get(idx);
 
             if (!res.resolved()) {
                 // Keep the item visible rather than dropping it — an ingredient we cannot price

@@ -6,11 +6,8 @@ import com.personal_dashboard.backend.model.NutrientCacheEntry;
 import com.personal_dashboard.backend.repository.NutrientCacheRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.Instant;
 import java.util.*;
@@ -39,18 +36,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class UsdaNutrientRepository {
 
-    /** USDA nutrient numbers, stable across FDC dataset versions. */
-    private static final String N_ENERGY = "208";
-    private static final String N_PROTEIN = "203";
-    private static final String N_CARBS = "205";
-    private static final String N_FAT = "204";
-    private static final String N_SATFAT = "606";
-    private static final String N_FIBER = "291";
-    private static final String N_SUGAR = "269";
-    private static final String N_SODIUM = "307";
-    private static final String N_POTASSIUM = "306";
-    private static final String N_CHOLESTEROL = "601";
-
     /**
      * Preparation-state tokens. A mismatch between query and candidate on these is heavily
      * penalised: cooked white rice is 130 kcal/100 g while raw is 365, so silently matching
@@ -62,19 +47,21 @@ public class UsdaNutrientRepository {
     /** Minimum match score below which we decline to guess and escalate to the API. */
     private static final double FUZZY_ACCEPT_THRESHOLD = 0.55;
 
-    @Value("${nutrition.usda.api-key:}")
-    private String fdcApiKey;
+    /** Ceiling on how long any single ingredient may hold up the analysis. */
+    private static final long LOOKUP_BUDGET_SECONDS = 10;
 
-    @Value("${nutrition.usda.search-endpoint:https://api.nal.usda.gov/fdc/v1/foods/search}")
-    private String fdcSearchEndpoint;
-
-    @Value("${nutrition.usda.live-lookup-enabled:true}")
-    private boolean liveLookupEnabled;
+    /** Small pool: these are IO-bound calls, and the quota guard caps real concurrency anyway. */
+    private final java.util.concurrent.ExecutorService lookupExecutor =
+            java.util.concurrent.Executors.newFixedThreadPool(4, r -> {
+                Thread t = new Thread(r, "usda-lookup");
+                t.setDaemon(true);
+                return t;
+            });
 
     private final NutrientCacheRepository cacheRepository;
+    private final FdcClient fdcClient;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private RestTemplate restTemplate;
 
     /** Exact-key index over the embedded table: normalised description and every alias. */
     private final Map<String, UsdaFood> exactIndex = new ConcurrentHashMap<>();
@@ -83,13 +70,13 @@ public class UsdaNutrientRepository {
     /** Pre-tokenised embedded descriptions, index-aligned with {@link #embedded}. */
     private final List<Set<String>> embeddedTokens = new ArrayList<>();
 
-    public UsdaNutrientRepository(NutrientCacheRepository cacheRepository) {
+    public UsdaNutrientRepository(NutrientCacheRepository cacheRepository, FdcClient fdcClient) {
         this.cacheRepository = cacheRepository;
+        this.fdcClient = fdcClient;
     }
 
     @PostConstruct
     void load() {
-        this.restTemplate = new RestTemplate();
         try (var in = new ClassPathResource("nutrition/usda-core.json").getInputStream()) {
             JsonNode root = objectMapper.readTree(in);
             for (JsonNode node : root.path("foods")) {
@@ -164,6 +151,49 @@ public class UsdaNutrientRepository {
         return Resolution.miss("NO_MATCH");
     }
 
+    /**
+     * Resolves a whole ingredient list, overlapping any network lookups.
+     *
+     * <p>Most items are answered from memory instantly. The few that reach FoodData Central
+     * each cost up to the client's read timeout, so resolving a ten-ingredient meal serially
+     * could add double-digit seconds to a request the user is watching. Running them
+     * concurrently makes the worst case roughly one lookup deep instead of ten.</p>
+     *
+     * @return resolutions index-aligned with {@code items}
+     */
+    public List<Resolution> resolveAll(List<Stage1Extraction.Item> items) {
+        if (items == null || items.isEmpty()) return List.of();
+        if (items.size() == 1) {
+            Stage1Extraction.Item only = items.get(0);
+            return List.of(resolve(only.getUsdaFoodDescription(), only.getCommonName(), only.getFdcId()));
+        }
+
+        List<java.util.concurrent.CompletableFuture<Resolution>> futures = items.stream()
+                .map(i -> java.util.concurrent.CompletableFuture.supplyAsync(
+                        () -> resolve(i.getUsdaFoodDescription(), i.getCommonName(), i.getFdcId()),
+                        lookupExecutor))
+                .toList();
+
+        List<Resolution> out = new ArrayList<>(items.size());
+        for (int i = 0; i < futures.size(); i++) {
+            try {
+                out.add(futures.get(i).get(LOOKUP_BUDGET_SECONDS, java.util.concurrent.TimeUnit.SECONDS));
+            } catch (Exception e) {
+                // One slow or failed lookup must not sink the whole meal.
+                log.warn("[UsdaNutrientRepository] Lookup timed out or failed for '{}': {}",
+                        items.get(i).getCommonName(), e.getMessage());
+                out.add(Resolution.miss("LOOKUP_TIMEOUT"));
+            }
+        }
+        return out;
+    }
+
+    /** Number of foods loaded from the embedded table. */
+    public int getEmbeddedFoodCount() { return embedded.size(); }
+
+    /** Number of exact lookup keys, counting every alias. */
+    public int getLookupKeyCount() { return exactIndex.size(); }
+
     // ─── Fuzzy matching ────────────────────────────────────────────────────
 
     private record Scored(UsdaFood food, double score) {}
@@ -223,56 +253,21 @@ public class UsdaNutrientRepository {
 
     // ─── Live FoodData Central ─────────────────────────────────────────────
 
+    /**
+     * Delegates to {@link FdcClient}, which owns timeouts, quota guarding, and match
+     * validation. Prefers the USDA-style description over the colloquial name because
+     * FDC indexes its own nomenclature.
+     */
     private UsdaFood liveLookup(String description, String commonName) {
-        if (!liveLookupEnabled || fdcApiKey == null || fdcApiKey.isBlank()) {
-            return null;
-        }
         String query = (description != null && !description.isBlank()) ? description : commonName;
-        if (query == null || query.isBlank()) return null;
-
-        try {
-            String url = UriComponentsBuilder.fromUriString(fdcSearchEndpoint)
-                    .queryParam("query", query)
-                    .queryParam("dataType", "Foundation,SR Legacy")
-                    .queryParam("pageSize", 1)
-                    .queryParam("api_key", fdcApiKey)
-                    .toUriString();
-
-            JsonNode root = objectMapper.readTree(restTemplate.getForObject(url, String.class));
-            JsonNode food = root.path("foods").path(0);
-            if (food.isMissingNode()) return null;
-
-            Map<String, Double> byNumber = new HashMap<>();
-            for (JsonNode n : food.path("foodNutrients")) {
-                String number = n.path("nutrientNumber").asText(null);
-                if (number == null || number.isBlank()) continue;
-                byNumber.put(number, n.path("value").asDouble(0.0));
-            }
-            if (byNumber.isEmpty()) return null;
-
-            return UsdaFood.builder()
-                    .fdcId(food.path("fdcId").isMissingNode() ? null : food.path("fdcId").asInt())
-                    .description(food.path("description").asText(query))
-                    .aliases(List.of())
-                    .estimated(false)
-                    .per100g(NutrientProfile.builder()
-                            .kcal(byNumber.getOrDefault(N_ENERGY, 0.0))
-                            .protein(byNumber.getOrDefault(N_PROTEIN, 0.0))
-                            .carbs(byNumber.getOrDefault(N_CARBS, 0.0))
-                            .fat(byNumber.getOrDefault(N_FAT, 0.0))
-                            .satFat(byNumber.getOrDefault(N_SATFAT, 0.0))
-                            .fiber(byNumber.getOrDefault(N_FIBER, 0.0))
-                            .sugar(byNumber.getOrDefault(N_SUGAR, 0.0))
-                            .sodium(byNumber.getOrDefault(N_SODIUM, 0.0))
-                            .potassium(byNumber.getOrDefault(N_POTASSIUM, 0.0))
-                            .cholesterol(byNumber.getOrDefault(N_CHOLESTEROL, 0.0))
-                            .build())
-                    .build();
-        } catch (Exception e) {
-            // The pipeline must survive FDC being slow, rate-limited, or down.
-            log.warn("[UsdaNutrientRepository] Live FDC lookup failed for '{}': {}", query, e.getMessage());
-            return null;
+        Optional<UsdaFood> found = fdcClient.search(query);
+        if (found.isEmpty() && commonName != null && !commonName.isBlank()
+                && !commonName.equalsIgnoreCase(query)) {
+            // A colloquial second attempt is worth one extra call: the vision model's USDA
+            // phrasing is sometimes over-specific and matches nothing.
+            found = fdcClient.search(commonName);
         }
+        return found.orElse(null);
     }
 
     // ─── Cache plumbing ────────────────────────────────────────────────────

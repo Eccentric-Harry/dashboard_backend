@@ -3,7 +3,6 @@ package com.personal_dashboard.backend.service.nutrition;
 import com.personal_dashboard.backend.repository.NutrientCacheRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -30,10 +29,11 @@ class MacroCalculatorTest {
         when(cacheRepository.findByLookupKey(anyString())).thenReturn(Optional.empty());
         when(cacheRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        UsdaNutrientRepository repo = new UsdaNutrientRepository(cacheRepository);
         // Keep the test hermetic: embedded table only, no network.
-        ReflectionTestUtils.setField(repo, "liveLookupEnabled", false);
-        ReflectionTestUtils.setField(repo, "fdcApiKey", "");
+        FdcClient fdcClient = mock(FdcClient.class);
+        when(fdcClient.search(anyString())).thenReturn(Optional.empty());
+
+        UsdaNutrientRepository repo = new UsdaNutrientRepository(cacheRepository, fdcClient);
         repo.load();
 
         calculator = new MacroCalculator(repo);

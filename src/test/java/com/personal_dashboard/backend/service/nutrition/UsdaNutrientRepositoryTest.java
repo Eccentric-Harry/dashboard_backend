@@ -4,7 +4,6 @@ import com.personal_dashboard.backend.model.NutrientCacheEntry;
 import com.personal_dashboard.backend.repository.NutrientCacheRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -19,6 +18,7 @@ class UsdaNutrientRepositoryTest {
 
     private UsdaNutrientRepository repo;
     private NutrientCacheRepository cacheRepository;
+    private FdcClient fdcClient;
 
     @BeforeEach
     void setUp() {
@@ -26,9 +26,10 @@ class UsdaNutrientRepositoryTest {
         when(cacheRepository.findByLookupKey(anyString())).thenReturn(Optional.empty());
         when(cacheRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        repo = new UsdaNutrientRepository(cacheRepository);
-        ReflectionTestUtils.setField(repo, "liveLookupEnabled", false);
-        ReflectionTestUtils.setField(repo, "fdcApiKey", "");
+        fdcClient = mock(FdcClient.class);
+        when(fdcClient.search(anyString())).thenReturn(Optional.empty());
+
+        repo = new UsdaNutrientRepository(cacheRepository, fdcClient);
         repo.load();
     }
 
@@ -128,6 +129,68 @@ class UsdaNutrientRepositoryTest {
         var r = repo.resolve("Rice, white, long-grain, regular, enriched, cooked", null, null);
 
         assertTrue(r.resolved(), "an embedded hit must not depend on the cache being reachable");
+    }
+
+    @Test
+    void escalatesToFoodDataCentralWhenTheEmbeddedTableMisses() {
+        UsdaFood live = UsdaFood.builder()
+                .fdcId(174608)
+                .description("Seaweed, wakame, raw")
+                .aliases(List.of())
+                .per100g(NutrientProfile.builder().kcal(45).protein(3.0).carbs(9.14).fat(0.64).build())
+                .build();
+        when(fdcClient.search(anyString())).thenReturn(Optional.of(live));
+
+        var r = repo.resolve("Seaweed, wakame, raw", "Wakame", null);
+
+        assertTrue(r.resolved());
+        assertEquals("FDC_API", r.source());
+        assertEquals(45.0, r.food().getPer100g().getKcal(), 0.001);
+    }
+
+    @Test
+    void cachesALiveResultSoTheQuotaIsSpentOnlyOnce() {
+        UsdaFood live = UsdaFood.builder()
+                .fdcId(174608).description("Seaweed, wakame, raw").aliases(List.of())
+                .per100g(NutrientProfile.builder().kcal(45).protein(3.0).carbs(9.14).fat(0.64).build())
+                .build();
+        when(fdcClient.search(anyString())).thenReturn(Optional.of(live));
+
+        repo.resolve("Seaweed, wakame, raw", "Wakame", null);
+
+        verify(cacheRepository).save(argThat(e ->
+                "FDC_API".equals(e.getSource()) && !e.isUnresolved()
+                        && "seaweed wakame raw".equals(e.getLookupKey())));
+    }
+
+    @Test
+    void doesNotConsultTheApiForAnIngredientTheEmbeddedTableAlreadyKnows() {
+        repo.resolve("Rice, white, long-grain, regular, enriched, cooked", "White rice", null);
+
+        verifyNoInteractions(fdcClient);
+    }
+
+    @Test
+    void resolvesAWholeMealAndPreservesInputOrder() {
+        var items = List.of(
+                Stage1Extraction.Item.builder().itemId(1)
+                        .usdaFoodDescription("Rice, white, long-grain, regular, enriched, cooked")
+                        .commonName("White rice").estimatedWeightG(150).build(),
+                Stage1Extraction.Item.builder().itemId(2)
+                        .usdaFoodDescription("Salt, table").commonName("Salt")
+                        .estimatedWeightG(2).build(),
+                Stage1Extraction.Item.builder().itemId(3)
+                        .usdaFoodDescription("Zzzq unknown wibble").commonName("Mystery")
+                        .estimatedWeightG(10).build());
+
+        var results = repo.resolveAll(items);
+
+        assertEquals(3, results.size());
+        assertTrue(results.get(0).resolved());
+        assertEquals(130.0, results.get(0).food().getPer100g().getKcal(), 0.001);
+        assertTrue(results.get(1).resolved());
+        assertEquals(38758.0, results.get(1).food().getPer100g().getSodium(), 0.001);
+        assertFalse(results.get(2).resolved());
     }
 
     @Test
