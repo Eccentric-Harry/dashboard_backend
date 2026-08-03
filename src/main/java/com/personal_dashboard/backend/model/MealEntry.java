@@ -68,6 +68,14 @@ public class MealEntry {
     private Map<String, Object> nutritionalBalanceDiagnostic;
     private Map<String, Object> dailyContext;
 
+    /**
+     * What this analysis cost to produce: token counts and price, broken down by pipeline
+     * stage. Stored per meal so spend is attributable to the scan that incurred it, and so
+     * a month's API bill can be reconstructed from the log rather than estimated.
+     * Null for meals logged manually or before cost tracking existed.
+     */
+    private Map<String, Object> apiCost;
+
     @CreatedDate
     private Instant createdAt;
 

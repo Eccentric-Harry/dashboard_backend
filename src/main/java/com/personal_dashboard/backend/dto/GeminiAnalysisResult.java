@@ -89,9 +89,21 @@ public class GeminiAnalysisResult {
     @JsonProperty("nutrient_source")
     private String nutrientSource;
 
+    /**
+     * Share of meal mass that resolved to a nutrient record, 0.0-1.0. Diverges from
+     * {@code data_confidence} exactly where it matters: protein-dense foods carry little
+     * energy, so an unmatched one leaves energy confidence high while protein is understated.
+     */
+    @JsonProperty("mass_coverage")
+    private double massCoverage;
+
     /** True when this result was served from the repeat-meal cache with no model call. */
     @JsonProperty("served_from_cache")
     private boolean servedFromCache;
+
+    /** What this specific analysis cost to produce, broken down by pipeline stage. */
+    @JsonProperty("api_cost")
+    private com.personal_dashboard.backend.service.nutrition.TokenUsage.Summary apiCost;
 
     @JsonProperty("disclaimer")
     private String disclaimer;

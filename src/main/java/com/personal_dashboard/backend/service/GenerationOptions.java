@@ -55,4 +55,11 @@ public class GenerationOptions {
     /** Label used in cost/telemetry logging to attribute spend to a pipeline stage. */
     @Builder.Default
     private String stageLabel = "unspecified";
+
+    /**
+     * Optional sink for this call's token spend. Providers report through it so the pipeline
+     * can attach a per-analysis cost to the stored meal rather than leaving the figure to be
+     * reconstructed from logs.
+     */
+    private java.util.function.Consumer<com.personal_dashboard.backend.service.nutrition.TokenUsage> usageSink;
 }

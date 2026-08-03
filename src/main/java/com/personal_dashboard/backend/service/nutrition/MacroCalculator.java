@@ -47,6 +47,8 @@ public class MacroCalculator {
         double kcalLow = 0.0;
         double kcalHigh = 0.0;
         double kcalResolved = 0.0;
+        double gramsTotal = 0.0;
+        double gramsUnresolved = 0.0;
 
         List<Stage1Extraction.Item> rawItems = safe(extraction);
         // Resolved as a batch so any network lookups overlap rather than queueing.
@@ -55,6 +57,7 @@ public class MacroCalculator {
         for (int idx = 0; idx < rawItems.size(); idx++) {
             Stage1Extraction.Item raw = rawItems.get(idx);
             double grams = Math.max(raw.getEstimatedWeightG(), 0.0);
+            gramsTotal += grams;
             String label = raw.getCommonName() != null ? raw.getCommonName() : raw.getUsdaFoodDescription();
 
             UsdaNutrientRepository.Resolution res = resolutions.get(idx);
@@ -63,6 +66,7 @@ public class MacroCalculator {
                 // Keep the item visible rather than dropping it — an ingredient we cannot price
                 // is still an ingredient the user ate, and hiding it would understate the meal.
                 unresolved.add(label);
+                gramsUnresolved += grams;
                 items.add(ComputedNutrition.Item.builder()
                         .itemId(raw.getItemId())
                         .name(raw.getUsdaFoodDescription())
@@ -133,6 +137,8 @@ public class MacroCalculator {
                 .unresolvedIngredients(unresolved)
                 .estimatedIngredients(estimated)
                 .dataConfidence(round(confidence, 2))
+                .massCoverage(round(gramsTotal > 0 ? (gramsTotal - gramsUnresolved) / gramsTotal : 1.0, 2))
+                .unresolvedGrams(round(gramsUnresolved, 0))
                 .build();
     }
 

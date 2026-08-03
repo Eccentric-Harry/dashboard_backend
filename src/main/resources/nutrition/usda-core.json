@@ -3,221 +3,2789 @@
   "basis": "per 100 g edible portion",
   "source": "USDA FoodData Central (SR Legacy / Foundation Foods). Glycaemic index values from the International Tables of Glycemic Index and Glycemic Load Values (Atkinson, Foster-Powell & Brand-Miller). Entries marked \"estimated\": true are regional preparations absent from FDC and are derived from IFCT 2017 (Indian Food Composition Tables) or standard recipe composition; they carry lower confidence and are labelled as such in analysis output.",
   "foods": [
-    { "fdcId": 169756, "description": "Rice, white, long-grain, regular, enriched, cooked", "aliases": ["white rice cooked", "cooked rice", "steamed rice", "plain rice", "boiled rice", "rice"], "gi": 73,
-      "per100g": { "kcal": 130, "protein": 2.69, "carbs": 28.17, "fat": 0.28, "satFat": 0.077, "fiber": 0.4, "sugar": 0.05, "sodium": 1, "potassium": 35, "cholesterol": 0 } },
-    { "fdcId": 169704, "description": "Rice, brown, long-grain, cooked", "aliases": ["brown rice cooked", "brown rice"], "gi": 68,
-      "per100g": { "kcal": 123, "protein": 2.74, "carbs": 25.58, "fat": 0.97, "satFat": 0.257, "fiber": 1.6, "sugar": 0.24, "sodium": 4, "potassium": 86, "cholesterol": 0 } },
-    { "fdcId": 168878, "description": "Rice, white, long-grain, precooked or instant, enriched, prepared", "aliases": ["basmati rice cooked", "basmati rice", "jeera rice"], "gi": 58,
-      "per100g": { "kcal": 124, "protein": 2.42, "carbs": 26.05, "fat": 0.21, "satFat": 0.057, "fiber": 0.9, "sugar": 0.06, "sodium": 3, "potassium": 8, "cholesterol": 0 } },
-    { "fdcId": 168894, "description": "Wheat flour, whole-grain", "aliases": ["atta", "whole wheat flour", "wheat flour"], "gi": 70,
-      "per100g": { "kcal": 340, "protein": 13.21, "carbs": 71.97, "fat": 2.5, "satFat": 0.43, "fiber": 10.7, "sugar": 0.41, "sodium": 2, "potassium": 363, "cholesterol": 0 } },
-    { "fdcId": 168893, "description": "Wheat flour, white, all-purpose, enriched, bleached", "aliases": ["maida", "refined flour", "all purpose flour", "plain flour"], "gi": 85,
-      "per100g": { "kcal": 364, "protein": 10.33, "carbs": 76.31, "fat": 0.98, "satFat": 0.155, "fiber": 2.7, "sugar": 0.27, "sodium": 2, "potassium": 107, "cholesterol": 0 } },
-    { "fdcId": null, "description": "Chapati or roti, whole wheat, plain, cooked", "aliases": ["chapati", "roti", "phulka"], "gi": 62, "estimated": true,
-      "per100g": { "kcal": 297, "protein": 11.3, "carbs": 57.0, "fat": 3.7, "satFat": 0.8, "fiber": 8.0, "sugar": 1.2, "sodium": 190, "potassium": 250, "cholesterol": 0 } },
-    { "fdcId": null, "description": "Paratha, whole wheat, shallow-fried", "aliases": ["paratha", "parantha"], "gi": 62, "estimated": true,
-      "per100g": { "kcal": 326, "protein": 8.2, "carbs": 45.3, "fat": 12.8, "satFat": 4.6, "fiber": 6.1, "sugar": 1.0, "sodium": 280, "potassium": 200, "cholesterol": 0 } },
-    { "fdcId": 172686, "description": "Bread, white, commercially prepared", "aliases": ["white bread", "bread slice", "sandwich bread"], "gi": 75,
-      "per100g": { "kcal": 266, "protein": 7.64, "carbs": 50.61, "fat": 3.29, "satFat": 0.717, "fiber": 2.4, "sugar": 5.34, "sodium": 490, "potassium": 100, "cholesterol": 0 } },
-    { "fdcId": 172687, "description": "Bread, whole-wheat, commercially prepared", "aliases": ["brown bread", "whole wheat bread", "atta bread"], "gi": 74,
-      "per100g": { "kcal": 247, "protein": 12.95, "carbs": 41.29, "fat": 3.55, "satFat": 0.789, "fiber": 6.8, "sugar": 4.31, "sodium": 455, "potassium": 250, "cholesterol": 0 } },
-    { "fdcId": 168917, "description": "Semolina, enriched", "aliases": ["rava", "sooji", "suji", "semolina"], "gi": 66,
-      "per100g": { "kcal": 360, "protein": 12.68, "carbs": 72.83, "fat": 1.05, "satFat": 0.15, "fiber": 3.9, "sugar": 0.0, "sodium": 1, "potassium": 186, "cholesterol": 0 } },
-    { "fdcId": 168872, "description": "Rice, white, flaked or beaten", "aliases": ["poha", "flattened rice", "beaten rice", "avalakki"], "gi": 70, "estimated": true,
-      "per100g": { "kcal": 346, "protein": 6.6, "carbs": 77.3, "fat": 1.2, "satFat": 0.3, "fiber": 2.3, "sugar": 0.3, "sodium": 4, "potassium": 120, "cholesterol": 0 } },
-    { "fdcId": 169705, "description": "Oats", "aliases": ["oats", "rolled oats", "oatmeal dry"], "gi": 55,
-      "per100g": { "kcal": 389, "protein": 16.89, "carbs": 66.27, "fat": 6.9, "satFat": 1.217, "fiber": 10.6, "sugar": 0.0, "sodium": 2, "potassium": 429, "cholesterol": 0 } },
-    { "fdcId": null, "description": "Finger millet (ragi), whole", "aliases": ["ragi", "finger millet", "nachni"], "gi": 68, "estimated": true,
-      "per100g": { "kcal": 320, "protein": 7.3, "carbs": 66.8, "fat": 1.3, "satFat": 0.3, "fiber": 11.2, "sugar": 0.4, "sodium": 11, "potassium": 408, "cholesterol": 0 } },
-    { "fdcId": null, "description": "Pearl millet (bajra), whole", "aliases": ["bajra", "pearl millet"], "gi": 55, "estimated": true,
-      "per100g": { "kcal": 348, "protein": 11.6, "carbs": 61.8, "fat": 5.0, "satFat": 1.1, "fiber": 11.5, "sugar": 0.9, "sodium": 12, "potassium": 365, "cholesterol": 0 } },
-    { "fdcId": null, "description": "Sorghum (jowar), whole", "aliases": ["jowar", "sorghum"], "gi": 62, "estimated": true,
-      "per100g": { "kcal": 349, "protein": 10.4, "carbs": 67.7, "fat": 1.9, "satFat": 0.3, "fiber": 10.2, "sugar": 0.6, "sodium": 7, "potassium": 328, "cholesterol": 0 } },
-    { "fdcId": 168917, "description": "Quinoa, cooked", "aliases": ["quinoa cooked", "quinoa"], "gi": 53,
-      "per100g": { "kcal": 120, "protein": 4.4, "carbs": 21.3, "fat": 1.92, "satFat": 0.231, "fiber": 2.8, "sugar": 0.87, "sodium": 7, "potassium": 172, "cholesterol": 0 } },
-    { "fdcId": 168928, "description": "Pasta, cooked, enriched", "aliases": ["pasta cooked", "spaghetti", "macaroni", "noodles"], "gi": 49,
-      "per100g": { "kcal": 158, "protein": 5.8, "carbs": 30.86, "fat": 0.93, "satFat": 0.176, "fiber": 1.8, "sugar": 0.56, "sodium": 1, "potassium": 44, "cholesterol": 0 } },
-    { "fdcId": null, "description": "Idli, steamed fermented rice and black gram cake", "aliases": ["idli", "idly"], "gi": 69, "estimated": true,
-      "per100g": { "kcal": 132, "protein": 3.4, "carbs": 27.0, "fat": 0.6, "satFat": 0.15, "fiber": 1.2, "sugar": 0.3, "sodium": 300, "potassium": 70, "cholesterol": 0 } },
-    { "fdcId": null, "description": "Dosa, plain, fermented rice and black gram crepe, pan-fried", "aliases": ["dosa", "dosai", "plain dosa"], "gi": 70, "estimated": true,
-      "per100g": { "kcal": 168, "protein": 3.9, "carbs": 28.5, "fat": 4.2, "satFat": 1.6, "fiber": 1.4, "sugar": 0.4, "sodium": 320, "potassium": 85, "cholesterol": 0 } },
-
-    { "fdcId": 172420, "description": "Lentils, mature seeds, cooked, boiled, without salt", "aliases": ["masoor dal", "red lentils cooked", "lentils cooked", "dal", "daal", "cooked dal"], "gi": 32,
-      "per100g": { "kcal": 116, "protein": 9.02, "carbs": 20.13, "fat": 0.38, "satFat": 0.054, "fiber": 7.9, "sugar": 1.8, "sodium": 2, "potassium": 369, "cholesterol": 0 } },
-    { "fdcId": 172436, "description": "Pigeon peas (red gram), mature seeds, cooked, boiled, without salt", "aliases": ["toor dal", "arhar dal", "tur dal", "pigeon peas"], "gi": 29,
-      "per100g": { "kcal": 121, "protein": 6.76, "carbs": 23.25, "fat": 0.38, "satFat": 0.077, "fiber": 6.7, "sugar": 0.0, "sodium": 5, "potassium": 384, "cholesterol": 0 } },
-    { "fdcId": 172434, "description": "Mung beans, mature seeds, cooked, boiled, without salt", "aliases": ["moong dal", "mung dal", "green gram cooked"], "gi": 31,
-      "per100g": { "kcal": 105, "protein": 7.02, "carbs": 19.15, "fat": 0.38, "satFat": 0.114, "fiber": 7.6, "sugar": 2.0, "sodium": 2, "potassium": 266, "cholesterol": 0 } },
-    { "fdcId": 172438, "description": "Black gram (urad), mature seeds, cooked, boiled, without salt", "aliases": ["urad dal", "black gram", "ulundu"], "gi": 43,
-      "per100g": { "kcal": 105, "protein": 7.52, "carbs": 18.6, "fat": 0.51, "satFat": 0.084, "fiber": 5.7, "sugar": 0.0, "sodium": 3, "potassium": 351, "cholesterol": 0 } },
-    { "fdcId": 173801, "description": "Chickpeas (garbanzo beans, bengal gram), mature seeds, cooked, boiled, without salt", "aliases": ["chana", "chickpeas cooked", "kabuli chana", "chana dal", "bengal gram"], "gi": 28,
-      "per100g": { "kcal": 164, "protein": 8.86, "carbs": 27.42, "fat": 2.59, "satFat": 0.269, "fiber": 7.6, "sugar": 4.8, "sodium": 7, "potassium": 291, "cholesterol": 0 } },
-    { "fdcId": 175196, "description": "Beans, kidney, red, mature seeds, cooked, boiled, without salt", "aliases": ["rajma", "kidney beans cooked", "red kidney beans"], "gi": 24,
-      "per100g": { "kcal": 127, "protein": 8.67, "carbs": 22.8, "fat": 0.5, "satFat": 0.072, "fiber": 6.4, "sugar": 0.32, "sodium": 2, "potassium": 403, "cholesterol": 0 } },
-    { "fdcId": 174270, "description": "Soybeans, mature seeds, cooked, boiled, without salt", "aliases": ["soybean cooked", "soya beans"], "gi": 16,
-      "per100g": { "kcal": 173, "protein": 16.64, "carbs": 9.93, "fat": 8.97, "satFat": 1.297, "fiber": 6.0, "sugar": 3.0, "sodium": 1, "potassium": 515, "cholesterol": 0 } },
-    { "fdcId": 172451, "description": "Tofu, firm, prepared with calcium sulfate and magnesium chloride", "aliases": ["tofu", "soya paneer"], "gi": 15,
-      "per100g": { "kcal": 144, "protein": 17.19, "carbs": 2.78, "fat": 8.72, "satFat": 1.261, "fiber": 2.3, "sugar": 0.62, "sodium": 14, "potassium": 237, "cholesterol": 0 } },
-
-    { "fdcId": 171265, "description": "Milk, whole, 3.25% milkfat, with added vitamin D", "aliases": ["whole milk", "full fat milk", "milk"], "gi": 39,
-      "per100g": { "kcal": 61, "protein": 3.15, "carbs": 4.8, "fat": 3.25, "satFat": 1.865, "fiber": 0.0, "sugar": 5.05, "sodium": 43, "potassium": 132, "cholesterol": 10 } },
-    { "fdcId": 172217, "description": "Milk, reduced fat, fluid, 2% milkfat", "aliases": ["toned milk", "low fat milk", "skimmed milk", "double toned milk"], "gi": 30,
-      "per100g": { "kcal": 50, "protein": 3.3, "carbs": 4.8, "fat": 1.97, "satFat": 1.257, "fiber": 0.0, "sugar": 5.06, "sodium": 47, "potassium": 150, "cholesterol": 8 } },
-    { "fdcId": 171284, "description": "Yogurt, plain, whole milk", "aliases": ["curd", "dahi", "yogurt", "plain yogurt", "yoghurt"], "gi": 36,
-      "per100g": { "kcal": 61, "protein": 3.47, "carbs": 4.66, "fat": 3.25, "satFat": 2.096, "fiber": 0.0, "sugar": 4.66, "sodium": 46, "potassium": 155, "cholesterol": 13 } },
-    { "fdcId": null, "description": "Paneer (Indian pressed fresh cheese), whole milk", "aliases": ["paneer", "cottage cheese indian"], "gi": 27, "estimated": true,
-      "per100g": { "kcal": 296, "protein": 18.3, "carbs": 3.6, "fat": 22.8, "satFat": 14.2, "fiber": 0.0, "sugar": 3.6, "sodium": 22, "potassium": 110, "cholesterol": 68 } },
-    { "fdcId": 171507, "description": "Butter oil, anhydrous (ghee)", "aliases": ["ghee", "clarified butter", "desi ghee"], "gi": 0,
-      "per100g": { "kcal": 876, "protein": 0.28, "carbs": 0.0, "fat": 99.48, "satFat": 61.924, "fiber": 0.0, "sugar": 0.0, "sodium": 2, "potassium": 5, "cholesterol": 256 } },
-    { "fdcId": 173410, "description": "Butter, salted", "aliases": ["butter", "salted butter", "makhan"], "gi": 0,
-      "per100g": { "kcal": 717, "protein": 0.85, "carbs": 0.06, "fat": 81.11, "satFat": 51.368, "fiber": 0.0, "sugar": 0.06, "sodium": 643, "potassium": 24, "cholesterol": 215 } },
-    { "fdcId": 170899, "description": "Cheese, cheddar", "aliases": ["cheese", "cheddar cheese", "processed cheese"], "gi": 0,
-      "per100g": { "kcal": 403, "protein": 22.87, "carbs": 3.09, "fat": 33.31, "satFat": 18.867, "fiber": 0.0, "sugar": 0.48, "sodium": 653, "potassium": 76, "cholesterol": 99 } },
-    { "fdcId": 170873, "description": "Cream, fluid, heavy whipping", "aliases": ["cream", "fresh cream", "malai", "heavy cream"], "gi": 0,
-      "per100g": { "kcal": 340, "protein": 2.84, "carbs": 2.74, "fat": 36.08, "satFat": 23.033, "fiber": 0.0, "sugar": 2.92, "sodium": 38, "potassium": 95, "cholesterol": 113 } },
-    { "fdcId": null, "description": "Buttermilk (chaas), diluted cultured", "aliases": ["buttermilk", "chaas", "majjige"], "gi": 30, "estimated": true,
-      "per100g": { "kcal": 25, "protein": 1.6, "carbs": 2.6, "fat": 0.9, "satFat": 0.55, "fiber": 0.0, "sugar": 2.6, "sodium": 150, "potassium": 90, "cholesterol": 4 } },
-
-    { "fdcId": 171287, "description": "Egg, whole, raw, fresh", "aliases": ["egg", "eggs", "whole egg", "boiled egg", "anda"], "gi": 0,
-      "per100g": { "kcal": 143, "protein": 12.56, "carbs": 0.72, "fat": 9.51, "satFat": 3.126, "fiber": 0.0, "sugar": 0.37, "sodium": 142, "potassium": 138, "cholesterol": 372 } },
-    { "fdcId": 171477, "description": "Chicken, broilers or fryers, breast, meat only, cooked, roasted", "aliases": ["chicken breast", "chicken", "grilled chicken", "chicken curry meat"], "gi": 0,
-      "per100g": { "kcal": 165, "protein": 31.02, "carbs": 0.0, "fat": 3.57, "satFat": 1.01, "fiber": 0.0, "sugar": 0.0, "sodium": 74, "potassium": 256, "cholesterol": 85 } },
-    { "fdcId": 171506, "description": "Chicken, broilers or fryers, thigh, meat only, cooked, roasted", "aliases": ["chicken thigh", "chicken leg", "dark meat chicken"], "gi": 0,
-      "per100g": { "kcal": 209, "protein": 26.0, "carbs": 0.0, "fat": 10.9, "satFat": 3.01, "fiber": 0.0, "sugar": 0.0, "sodium": 88, "potassium": 240, "cholesterol": 135 } },
-    { "fdcId": 174354, "description": "Lamb or mutton, cooked", "aliases": ["mutton", "lamb", "goat meat"], "gi": 0,
-      "per100g": { "kcal": 258, "protein": 25.6, "carbs": 0.0, "fat": 16.5, "satFat": 7.03, "fiber": 0.0, "sugar": 0.0, "sodium": 72, "potassium": 310, "cholesterol": 97 } },
-    { "fdcId": 175168, "description": "Fish, finfish, cooked, dry heat (generic lean white fish)", "aliases": ["fish", "fish curry", "rohu", "pomfret", "grilled fish", "tilapia"], "gi": 0,
-      "per100g": { "kcal": 128, "protein": 26.15, "carbs": 0.0, "fat": 2.65, "satFat": 0.905, "fiber": 0.0, "sugar": 0.0, "sodium": 56, "potassium": 380, "cholesterol": 57 } },
-    { "fdcId": 175179, "description": "Crustaceans, shrimp, cooked, moist heat", "aliases": ["prawns", "shrimp", "prawn curry"], "gi": 0,
-      "per100g": { "kcal": 99, "protein": 20.91, "carbs": 0.2, "fat": 1.08, "satFat": 0.289, "fiber": 0.0, "sugar": 0.0, "sodium": 111, "potassium": 259, "cholesterol": 189 } },
-
-    { "fdcId": 171025, "description": "Oil, vegetable, sunflower", "aliases": ["sunflower oil", "cooking oil", "vegetable oil", "refined oil", "oil"], "gi": 0,
-      "per100g": { "kcal": 884, "protein": 0.0, "carbs": 0.0, "fat": 100.0, "satFat": 10.3, "fiber": 0.0, "sugar": 0.0, "sodium": 0, "potassium": 0, "cholesterol": 0 } },
-    { "fdcId": 172336, "description": "Oil, peanut (groundnut)", "aliases": ["groundnut oil", "peanut oil"], "gi": 0,
-      "per100g": { "kcal": 884, "protein": 0.0, "carbs": 0.0, "fat": 100.0, "satFat": 16.9, "fiber": 0.0, "sugar": 0.0, "sodium": 0, "potassium": 0, "cholesterol": 0 } },
-    { "fdcId": 171016, "description": "Oil, coconut", "aliases": ["coconut oil"], "gi": 0,
-      "per100g": { "kcal": 892, "protein": 0.0, "carbs": 0.0, "fat": 99.06, "satFat": 82.475, "fiber": 0.0, "sugar": 0.0, "sodium": 0, "potassium": 0, "cholesterol": 0 } },
-    { "fdcId": 172335, "description": "Oil, mustard", "aliases": ["mustard oil", "sarson oil"], "gi": 0,
-      "per100g": { "kcal": 884, "protein": 0.0, "carbs": 0.0, "fat": 100.0, "satFat": 11.58, "fiber": 0.0, "sugar": 0.0, "sodium": 0, "potassium": 0, "cholesterol": 0 } },
-    { "fdcId": 171413, "description": "Oil, olive, salad or cooking", "aliases": ["olive oil", "extra virgin olive oil"], "gi": 0,
-      "per100g": { "kcal": 884, "protein": 0.0, "carbs": 0.0, "fat": 100.0, "satFat": 13.808, "fiber": 0.0, "sugar": 0.0, "sodium": 2, "potassium": 1, "cholesterol": 0 } },
-    { "fdcId": 171030, "description": "Oil, sesame, salad or cooking", "aliases": ["sesame oil", "gingelly oil", "til oil"], "gi": 0,
-      "per100g": { "kcal": 884, "protein": 0.0, "carbs": 0.0, "fat": 100.0, "satFat": 14.2, "fiber": 0.0, "sugar": 0.0, "sodium": 0, "potassium": 0, "cholesterol": 0 } },
-
-    { "fdcId": 173468, "description": "Salt, table", "aliases": ["salt", "table salt", "namak", "sea salt", "iodised salt"], "gi": 0,
-      "per100g": { "kcal": 0, "protein": 0.0, "carbs": 0.0, "fat": 0.0, "satFat": 0.0, "fiber": 0.0, "sugar": 0.0, "sodium": 38758, "potassium": 8, "cholesterol": 0 } },
-    { "fdcId": 169655, "description": "Sugars, granulated", "aliases": ["sugar", "white sugar", "table sugar", "cane sugar"], "gi": 65,
-      "per100g": { "kcal": 387, "protein": 0.0, "carbs": 99.98, "fat": 0.0, "satFat": 0.0, "fiber": 0.0, "sugar": 99.8, "sodium": 1, "potassium": 2, "cholesterol": 0 } },
-    { "fdcId": null, "description": "Jaggery (gur), cane", "aliases": ["jaggery", "gur", "bellam"], "gi": 84, "estimated": true,
-      "per100g": { "kcal": 383, "protein": 0.4, "carbs": 95.0, "fat": 0.1, "satFat": 0.0, "fiber": 0.0, "sugar": 85.0, "sodium": 30, "potassium": 340, "cholesterol": 0 } },
-    { "fdcId": 169640, "description": "Honey", "aliases": ["honey", "shahad"], "gi": 61,
-      "per100g": { "kcal": 304, "protein": 0.3, "carbs": 82.4, "fat": 0.0, "satFat": 0.0, "fiber": 0.2, "sugar": 82.12, "sodium": 4, "potassium": 52, "cholesterol": 0 } },
-    { "fdcId": 168191, "description": "Tamarind, raw", "aliases": ["tamarind", "imli", "tamarind paste", "puli"], "gi": 25,
-      "per100g": { "kcal": 239, "protein": 2.8, "carbs": 62.5, "fat": 0.6, "satFat": 0.272, "fiber": 5.1, "sugar": 57.4, "sodium": 28, "potassium": 628, "cholesterol": 0 } },
-    { "fdcId": 170924, "description": "Coconut milk, raw (liquid expressed from grated meat and water)", "aliases": ["coconut milk", "thengai paal"], "gi": 0,
-      "per100g": { "kcal": 230, "protein": 2.29, "carbs": 5.54, "fat": 23.84, "satFat": 21.14, "fiber": 2.2, "sugar": 3.34, "sodium": 15, "potassium": 263, "cholesterol": 0 } },
-    { "fdcId": 170169, "description": "Nuts, coconut meat, raw", "aliases": ["coconut", "fresh coconut", "grated coconut", "thengai"], "gi": 45,
-      "per100g": { "kcal": 354, "protein": 3.33, "carbs": 15.23, "fat": 33.49, "satFat": 29.698, "fiber": 9.0, "sugar": 6.23, "sodium": 20, "potassium": 356, "cholesterol": 0 } },
-
-    { "fdcId": 170000, "description": "Onions, raw", "aliases": ["onion", "onions", "pyaz", "red onion"], "gi": 15,
-      "per100g": { "kcal": 40, "protein": 1.1, "carbs": 9.34, "fat": 0.1, "satFat": 0.042, "fiber": 1.7, "sugar": 4.24, "sodium": 4, "potassium": 146, "cholesterol": 0 } },
-    { "fdcId": 170457, "description": "Tomatoes, red, ripe, raw, year round average", "aliases": ["tomato", "tomatoes", "tamatar"], "gi": 15,
-      "per100g": { "kcal": 18, "protein": 0.88, "carbs": 3.89, "fat": 0.2, "satFat": 0.028, "fiber": 1.2, "sugar": 2.63, "sodium": 5, "potassium": 237, "cholesterol": 0 } },
-    { "fdcId": 170026, "description": "Potatoes, boiled, cooked without skin, flesh, without salt", "aliases": ["potato", "potatoes", "aloo", "boiled potato"], "gi": 78,
-      "per100g": { "kcal": 87, "protein": 1.87, "carbs": 20.01, "fat": 0.1, "satFat": 0.026, "fiber": 1.8, "sugar": 0.85, "sodium": 4, "potassium": 379, "cholesterol": 0 } },
-    { "fdcId": 168462, "description": "Spinach, raw", "aliases": ["spinach", "palak", "keerai"], "gi": 15,
-      "per100g": { "kcal": 23, "protein": 2.86, "carbs": 3.63, "fat": 0.39, "satFat": 0.063, "fiber": 2.2, "sugar": 0.42, "sodium": 79, "potassium": 558, "cholesterol": 0 } },
-    { "fdcId": 169986, "description": "Cauliflower, raw", "aliases": ["cauliflower", "gobi", "phool gobi"], "gi": 15,
-      "per100g": { "kcal": 25, "protein": 1.92, "carbs": 4.97, "fat": 0.28, "satFat": 0.13, "fiber": 2.0, "sugar": 1.91, "sodium": 30, "potassium": 299, "cholesterol": 0 } },
-    { "fdcId": 170393, "description": "Carrots, raw", "aliases": ["carrot", "carrots", "gajar"], "gi": 39,
-      "per100g": { "kcal": 41, "protein": 0.93, "carbs": 9.58, "fat": 0.24, "satFat": 0.032, "fiber": 2.8, "sugar": 4.74, "sodium": 69, "potassium": 320, "cholesterol": 0 } },
-    { "fdcId": 170419, "description": "Peas, green, raw", "aliases": ["green peas", "peas", "matar"], "gi": 51,
-      "per100g": { "kcal": 81, "protein": 5.42, "carbs": 14.45, "fat": 0.4, "satFat": 0.071, "fiber": 5.7, "sugar": 5.67, "sodium": 5, "potassium": 244, "cholesterol": 0 } },
-    { "fdcId": 169228, "description": "Eggplant (brinjal), raw", "aliases": ["brinjal", "eggplant", "baingan", "aubergine"], "gi": 15,
-      "per100g": { "kcal": 25, "protein": 0.98, "carbs": 5.88, "fat": 0.18, "satFat": 0.034, "fiber": 3.0, "sugar": 3.53, "sodium": 2, "potassium": 229, "cholesterol": 0 } },
-    { "fdcId": 168390, "description": "Okra, raw", "aliases": ["okra", "bhindi", "ladies finger"], "gi": 20,
-      "per100g": { "kcal": 33, "protein": 1.93, "carbs": 7.45, "fat": 0.19, "satFat": 0.026, "fiber": 3.2, "sugar": 1.48, "sodium": 7, "potassium": 299, "cholesterol": 0 } },
-    { "fdcId": 169975, "description": "Cabbage, raw", "aliases": ["cabbage", "patta gobi"], "gi": 15,
-      "per100g": { "kcal": 25, "protein": 1.28, "carbs": 5.8, "fat": 0.1, "satFat": 0.034, "fiber": 2.5, "sugar": 3.2, "sodium": 18, "potassium": 170, "cholesterol": 0 } },
-    { "fdcId": 170108, "description": "Peppers, sweet, green, raw (capsicum)", "aliases": ["capsicum", "bell pepper", "shimla mirch", "green pepper"], "gi": 15,
-      "per100g": { "kcal": 20, "protein": 0.86, "carbs": 4.64, "fat": 0.17, "satFat": 0.058, "fiber": 1.7, "sugar": 2.4, "sodium": 3, "potassium": 175, "cholesterol": 0 } },
-    { "fdcId": 168409, "description": "Gourd, bottle (calabash), raw", "aliases": ["bottle gourd", "lauki", "dudhi", "sorakaya"], "gi": 15,
-      "per100g": { "kcal": 14, "protein": 0.62, "carbs": 3.39, "fat": 0.02, "satFat": 0.003, "fiber": 0.5, "sugar": 0.0, "sodium": 2, "potassium": 150, "cholesterol": 0 } },
-    { "fdcId": 168409, "description": "Cucumber, with peel, raw", "aliases": ["cucumber", "kheera"], "gi": 15,
-      "per100g": { "kcal": 15, "protein": 0.65, "carbs": 3.63, "fat": 0.11, "satFat": 0.037, "fiber": 0.5, "sugar": 1.67, "sodium": 2, "potassium": 147, "cholesterol": 0 } },
-    { "fdcId": 169961, "description": "Beans, snap, green, raw", "aliases": ["green beans", "french beans", "beans"], "gi": 15,
-      "per100g": { "kcal": 31, "protein": 1.83, "carbs": 6.97, "fat": 0.22, "satFat": 0.05, "fiber": 2.7, "sugar": 3.26, "sodium": 6, "potassium": 211, "cholesterol": 0 } },
-    { "fdcId": 169963, "description": "Beets, raw", "aliases": ["beetroot", "beets", "chukandar"], "gi": 64,
-      "per100g": { "kcal": 43, "protein": 1.61, "carbs": 9.56, "fat": 0.17, "satFat": 0.027, "fiber": 2.8, "sugar": 6.76, "sodium": 78, "potassium": 325, "cholesterol": 0 } },
-    { "fdcId": 169279, "description": "Pumpkin, raw", "aliases": ["pumpkin", "kaddu", "gummadikaya"], "gi": 75,
-      "per100g": { "kcal": 26, "protein": 1.0, "carbs": 6.5, "fat": 0.1, "satFat": 0.052, "fiber": 0.5, "sugar": 2.76, "sodium": 1, "potassium": 340, "cholesterol": 0 } },
-    { "fdcId": 168409, "description": "Drumstick (moringa) pods, raw", "aliases": ["drumstick", "moringa", "munaga"], "gi": 20, "estimated": true,
-      "per100g": { "kcal": 37, "protein": 2.1, "carbs": 8.53, "fat": 0.2, "satFat": 0.03, "fiber": 3.2, "sugar": 0.0, "sodium": 42, "potassium": 461, "cholesterol": 0 } },
-    { "fdcId": 169230, "description": "Garlic, raw", "aliases": ["garlic", "lehsun", "garlic paste"], "gi": 0,
-      "per100g": { "kcal": 149, "protein": 6.36, "carbs": 33.06, "fat": 0.5, "satFat": 0.089, "fiber": 2.1, "sugar": 1.0, "sodium": 17, "potassium": 401, "cholesterol": 0 } },
-    { "fdcId": 169231, "description": "Ginger root, raw", "aliases": ["ginger", "adrak", "ginger paste", "ginger garlic paste"], "gi": 0,
-      "per100g": { "kcal": 80, "protein": 1.82, "carbs": 17.77, "fat": 0.75, "satFat": 0.203, "fiber": 2.0, "sugar": 1.7, "sodium": 13, "potassium": 415, "cholesterol": 0 } },
-    { "fdcId": 170106, "description": "Peppers, hot chili, green, raw", "aliases": ["green chilli", "green chili", "chilli", "mirchi"], "gi": 0,
-      "per100g": { "kcal": 40, "protein": 2.0, "carbs": 9.46, "fat": 0.2, "satFat": 0.021, "fiber": 1.5, "sugar": 5.1, "sodium": 7, "potassium": 340, "cholesterol": 0 } },
-    { "fdcId": 170931, "description": "Coriander (cilantro) leaves, raw", "aliases": ["coriander leaves", "cilantro", "dhaniya", "kothmir"], "gi": 0,
-      "per100g": { "kcal": 23, "protein": 2.13, "carbs": 3.67, "fat": 0.52, "satFat": 0.014, "fiber": 2.8, "sugar": 0.87, "sodium": 46, "potassium": 521, "cholesterol": 0 } },
-    { "fdcId": null, "description": "Curry leaves, raw", "aliases": ["curry leaves", "kadi patta", "karivepaku"], "gi": 0, "estimated": true,
-      "per100g": { "kcal": 108, "protein": 6.1, "carbs": 18.7, "fat": 1.0, "satFat": 0.2, "fiber": 6.4, "sugar": 0.0, "sodium": 10, "potassium": 500, "cholesterol": 0 } },
-
-    { "fdcId": 170554, "description": "Spices, turmeric, ground", "aliases": ["turmeric", "haldi", "turmeric powder"], "gi": 0,
-      "per100g": { "kcal": 312, "protein": 9.68, "carbs": 67.14, "fat": 3.25, "satFat": 1.838, "fiber": 22.7, "sugar": 3.21, "sodium": 27, "potassium": 2080, "cholesterol": 0 } },
-    { "fdcId": 170932, "description": "Spices, chili powder", "aliases": ["chilli powder", "red chilli powder", "lal mirch"], "gi": 0,
-      "per100g": { "kcal": 282, "protein": 13.46, "carbs": 49.7, "fat": 14.28, "satFat": 2.464, "fiber": 34.8, "sugar": 7.19, "sodium": 1640, "potassium": 1950, "cholesterol": 0 } },
-    { "fdcId": 170924, "description": "Spices, coriander seed", "aliases": ["coriander powder", "dhania powder", "coriander seed"], "gi": 0,
-      "per100g": { "kcal": 298, "protein": 12.37, "carbs": 54.99, "fat": 17.77, "satFat": 0.99, "fiber": 41.8, "sugar": 0.0, "sodium": 35, "potassium": 1267, "cholesterol": 0 } },
-    { "fdcId": 170923, "description": "Spices, cumin seed", "aliases": ["cumin", "jeera", "cumin powder", "cumin seed"], "gi": 0,
-      "per100g": { "kcal": 375, "protein": 17.81, "carbs": 44.24, "fat": 22.27, "satFat": 1.535, "fiber": 10.5, "sugar": 2.25, "sodium": 168, "potassium": 1788, "cholesterol": 0 } },
-    { "fdcId": 170934, "description": "Spices, mustard seed, yellow", "aliases": ["mustard seeds", "rai", "sarson"], "gi": 0,
-      "per100g": { "kcal": 508, "protein": 26.08, "carbs": 28.09, "fat": 36.24, "satFat": 1.989, "fiber": 12.2, "sugar": 6.79, "sodium": 13, "potassium": 738, "cholesterol": 0 } },
-    { "fdcId": null, "description": "Spices, garam masala blend", "aliases": ["garam masala", "sambar powder", "curry powder", "masala"], "gi": 0, "estimated": true,
-      "per100g": { "kcal": 379, "protein": 14.3, "carbs": 50.5, "fat": 15.2, "satFat": 2.0, "fiber": 33.2, "sugar": 2.7, "sodium": 52, "potassium": 1543, "cholesterol": 0 } },
-
-    { "fdcId": 170567, "description": "Nuts, almonds", "aliases": ["almonds", "badam", "almond"], "gi": 0,
-      "per100g": { "kcal": 579, "protein": 21.15, "carbs": 21.55, "fat": 49.93, "satFat": 3.802, "fiber": 12.5, "sugar": 4.35, "sodium": 1, "potassium": 733, "cholesterol": 0 } },
-    { "fdcId": 170162, "description": "Nuts, cashew nuts, raw", "aliases": ["cashew", "cashews", "kaju"], "gi": 25,
-      "per100g": { "kcal": 553, "protein": 18.22, "carbs": 30.19, "fat": 43.85, "satFat": 7.783, "fiber": 3.3, "sugar": 5.91, "sodium": 12, "potassium": 660, "cholesterol": 0 } },
-    { "fdcId": 172430, "description": "Peanuts, all types, raw", "aliases": ["peanuts", "groundnut", "moongphali"], "gi": 14,
-      "per100g": { "kcal": 567, "protein": 25.8, "carbs": 16.13, "fat": 49.24, "satFat": 6.279, "fiber": 8.5, "sugar": 4.72, "sodium": 18, "potassium": 705, "cholesterol": 0 } },
-    { "fdcId": 170187, "description": "Nuts, walnuts, english", "aliases": ["walnuts", "akhrot", "walnut"], "gi": 0,
-      "per100g": { "kcal": 654, "protein": 15.23, "carbs": 13.71, "fat": 65.21, "satFat": 6.126, "fiber": 6.7, "sugar": 2.61, "sodium": 2, "potassium": 441, "cholesterol": 0 } },
-    { "fdcId": 170150, "description": "Seeds, sesame seeds, whole, dried", "aliases": ["sesame seeds", "til", "ellu"], "gi": 0,
-      "per100g": { "kcal": 573, "protein": 17.73, "carbs": 23.45, "fat": 49.67, "satFat": 6.957, "fiber": 11.8, "sugar": 0.3, "sodium": 11, "potassium": 468, "cholesterol": 0 } },
-    { "fdcId": 169414, "description": "Seeds, flaxseed", "aliases": ["flaxseed", "alsi", "linseed"], "gi": 0,
-      "per100g": { "kcal": 534, "protein": 18.29, "carbs": 28.88, "fat": 42.16, "satFat": 3.663, "fiber": 27.3, "sugar": 1.55, "sodium": 30, "potassium": 813, "cholesterol": 0 } },
-
-    { "fdcId": 173944, "description": "Bananas, raw", "aliases": ["banana", "kela", "arati pandu"], "gi": 51,
-      "per100g": { "kcal": 89, "protein": 1.09, "carbs": 22.84, "fat": 0.33, "satFat": 0.112, "fiber": 2.6, "sugar": 12.23, "sodium": 1, "potassium": 358, "cholesterol": 0 } },
-    { "fdcId": 171688, "description": "Apples, raw, with skin", "aliases": ["apple", "seb"], "gi": 36,
-      "per100g": { "kcal": 52, "protein": 0.26, "carbs": 13.81, "fat": 0.17, "satFat": 0.028, "fiber": 2.4, "sugar": 10.39, "sodium": 1, "potassium": 107, "cholesterol": 0 } },
-    { "fdcId": 169910, "description": "Mangos, raw", "aliases": ["mango", "aam"], "gi": 51,
-      "per100g": { "kcal": 60, "protein": 0.82, "carbs": 14.98, "fat": 0.38, "satFat": 0.092, "fiber": 1.6, "sugar": 13.66, "sodium": 1, "potassium": 168, "cholesterol": 0 } },
-    { "fdcId": 169097, "description": "Oranges, raw, all commercial varieties", "aliases": ["orange", "santra", "mosambi"], "gi": 43,
-      "per100g": { "kcal": 47, "protein": 0.94, "carbs": 11.75, "fat": 0.12, "satFat": 0.015, "fiber": 2.4, "sugar": 9.35, "sodium": 0, "potassium": 181, "cholesterol": 0 } },
-    { "fdcId": 174682, "description": "Grapes, red or green, raw", "aliases": ["grapes", "angoor"], "gi": 59,
-      "per100g": { "kcal": 69, "protein": 0.72, "carbs": 18.1, "fat": 0.16, "satFat": 0.054, "fiber": 0.9, "sugar": 15.48, "sodium": 2, "potassium": 191, "cholesterol": 0 } },
-    { "fdcId": 169926, "description": "Papayas, raw", "aliases": ["papaya", "papita"], "gi": 60,
-      "per100g": { "kcal": 43, "protein": 0.47, "carbs": 10.82, "fat": 0.26, "satFat": 0.081, "fiber": 1.7, "sugar": 7.82, "sodium": 8, "potassium": 182, "cholesterol": 0 } },
-    { "fdcId": 167765, "description": "Watermelon, raw", "aliases": ["watermelon", "tarbooj"], "gi": 76,
-      "per100g": { "kcal": 30, "protein": 0.61, "carbs": 7.55, "fat": 0.15, "satFat": 0.016, "fiber": 0.4, "sugar": 6.2, "sodium": 1, "potassium": 112, "cholesterol": 0 } },
-    { "fdcId": 173032, "description": "Guavas, common, raw", "aliases": ["guava", "amrood", "jamakaya"], "gi": 12,
-      "per100g": { "kcal": 68, "protein": 2.55, "carbs": 14.32, "fat": 0.95, "satFat": 0.272, "fiber": 5.4, "sugar": 8.92, "sodium": 2, "potassium": 417, "cholesterol": 0 } },
-    { "fdcId": 169134, "description": "Pomegranates, raw", "aliases": ["pomegranate", "anar", "danimma"], "gi": 35,
-      "per100g": { "kcal": 83, "protein": 1.67, "carbs": 18.7, "fat": 1.17, "satFat": 0.12, "fiber": 4.0, "sugar": 13.67, "sodium": 3, "potassium": 236, "cholesterol": 0 } },
-    { "fdcId": 168191, "description": "Dates, medjool", "aliases": ["dates", "khajur", "medjool dates"], "gi": 42,
-      "per100g": { "kcal": 277, "protein": 1.81, "carbs": 74.97, "fat": 0.15, "satFat": 0.032, "fiber": 6.7, "sugar": 66.47, "sodium": 1, "potassium": 696, "cholesterol": 0 } },
-
-    { "fdcId": null, "description": "Tea, prepared with milk and sugar (Indian chai)", "aliases": ["chai", "tea with milk", "masala chai", "milk tea"], "gi": 50, "estimated": true,
-      "per100g": { "kcal": 48, "protein": 1.3, "carbs": 7.8, "fat": 1.3, "satFat": 0.8, "fiber": 0.0, "sugar": 7.2, "sodium": 18, "potassium": 55, "cholesterol": 4 } },
-    { "fdcId": null, "description": "Coffee, prepared with milk and sugar (South Indian filter coffee)", "aliases": ["filter coffee", "coffee with milk", "kaapi"], "gi": 45, "estimated": true,
-      "per100g": { "kcal": 52, "protein": 1.5, "carbs": 8.1, "fat": 1.5, "satFat": 0.9, "fiber": 0.0, "sugar": 7.5, "sodium": 20, "potassium": 70, "cholesterol": 5 } },
-    { "fdcId": 171890, "description": "Beverages, coffee, brewed, prepared with tap water", "aliases": ["black coffee", "coffee", "americano"], "gi": 0,
-      "per100g": { "kcal": 1, "protein": 0.12, "carbs": 0.0, "fat": 0.02, "satFat": 0.002, "fiber": 0.0, "sugar": 0.0, "sodium": 2, "potassium": 49, "cholesterol": 0 } },
-    { "fdcId": 171917, "description": "Beverages, water, tap, drinking", "aliases": ["water", "drinking water"], "gi": 0,
-      "per100g": { "kcal": 0, "protein": 0.0, "carbs": 0.0, "fat": 0.0, "satFat": 0.0, "fiber": 0.0, "sugar": 0.0, "sodium": 4, "potassium": 0, "cholesterol": 0 } }
+    {
+      "fdcId": 169756,
+      "description": "Rice, white, long-grain, regular, enriched, cooked",
+      "aliases": [
+        "white rice cooked",
+        "cooked rice",
+        "steamed rice",
+        "plain rice",
+        "boiled rice",
+        "rice"
+      ],
+      "gi": 73,
+      "per100g": {
+        "kcal": 130,
+        "protein": 2.69,
+        "carbs": 28.17,
+        "fat": 0.28,
+        "satFat": 0.077,
+        "fiber": 0.4,
+        "sugar": 0.05,
+        "sodium": 1,
+        "potassium": 35,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 169704,
+      "description": "Rice, brown, long-grain, cooked",
+      "aliases": [
+        "brown rice cooked",
+        "brown rice"
+      ],
+      "gi": 68,
+      "per100g": {
+        "kcal": 123,
+        "protein": 2.74,
+        "carbs": 25.58,
+        "fat": 0.97,
+        "satFat": 0.257,
+        "fiber": 1.6,
+        "sugar": 0.24,
+        "sodium": 4,
+        "potassium": 86,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 168878,
+      "description": "Rice, white, long-grain, precooked or instant, enriched, prepared",
+      "aliases": [
+        "basmati rice cooked",
+        "basmati rice",
+        "jeera rice"
+      ],
+      "gi": 58,
+      "per100g": {
+        "kcal": 124,
+        "protein": 2.42,
+        "carbs": 26.05,
+        "fat": 0.21,
+        "satFat": 0.057,
+        "fiber": 0.9,
+        "sugar": 0.06,
+        "sodium": 3,
+        "potassium": 8,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 168894,
+      "description": "Wheat flour, whole-grain",
+      "aliases": [
+        "atta",
+        "whole wheat flour",
+        "wheat flour"
+      ],
+      "gi": 70,
+      "per100g": {
+        "kcal": 340,
+        "protein": 13.21,
+        "carbs": 71.97,
+        "fat": 2.5,
+        "satFat": 0.43,
+        "fiber": 10.7,
+        "sugar": 0.41,
+        "sodium": 2,
+        "potassium": 363,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 168893,
+      "description": "Wheat flour, white, all-purpose, enriched, bleached",
+      "aliases": [
+        "maida",
+        "refined flour",
+        "all purpose flour",
+        "plain flour"
+      ],
+      "gi": 85,
+      "per100g": {
+        "kcal": 364,
+        "protein": 10.33,
+        "carbs": 76.31,
+        "fat": 0.98,
+        "satFat": 0.155,
+        "fiber": 2.7,
+        "sugar": 0.27,
+        "sodium": 2,
+        "potassium": 107,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": null,
+      "description": "Chapati or roti, whole wheat, plain, cooked",
+      "aliases": [
+        "chapati",
+        "roti",
+        "phulka"
+      ],
+      "gi": 62,
+      "estimated": true,
+      "per100g": {
+        "kcal": 297,
+        "protein": 11.3,
+        "carbs": 57.0,
+        "fat": 3.7,
+        "satFat": 0.8,
+        "fiber": 8.0,
+        "sugar": 1.2,
+        "sodium": 190,
+        "potassium": 250,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": null,
+      "description": "Paratha, whole wheat, shallow-fried",
+      "aliases": [
+        "paratha",
+        "parantha"
+      ],
+      "gi": 62,
+      "estimated": true,
+      "per100g": {
+        "kcal": 326,
+        "protein": 8.2,
+        "carbs": 45.3,
+        "fat": 12.8,
+        "satFat": 4.6,
+        "fiber": 6.1,
+        "sugar": 1.0,
+        "sodium": 280,
+        "potassium": 200,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 172686,
+      "description": "Bread, white, commercially prepared",
+      "aliases": [
+        "white bread",
+        "bread slice",
+        "sandwich bread"
+      ],
+      "gi": 75,
+      "per100g": {
+        "kcal": 266,
+        "protein": 7.64,
+        "carbs": 50.61,
+        "fat": 3.29,
+        "satFat": 0.717,
+        "fiber": 2.4,
+        "sugar": 5.34,
+        "sodium": 490,
+        "potassium": 100,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 172687,
+      "description": "Bread, whole-wheat, commercially prepared",
+      "aliases": [
+        "brown bread",
+        "whole wheat bread",
+        "atta bread"
+      ],
+      "gi": 74,
+      "per100g": {
+        "kcal": 247,
+        "protein": 12.95,
+        "carbs": 41.29,
+        "fat": 3.55,
+        "satFat": 0.789,
+        "fiber": 6.8,
+        "sugar": 4.31,
+        "sodium": 455,
+        "potassium": 250,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 168917,
+      "description": "Semolina, enriched",
+      "aliases": [
+        "rava",
+        "sooji",
+        "suji",
+        "semolina"
+      ],
+      "gi": 66,
+      "per100g": {
+        "kcal": 360,
+        "protein": 12.68,
+        "carbs": 72.83,
+        "fat": 1.05,
+        "satFat": 0.15,
+        "fiber": 3.9,
+        "sugar": 0.0,
+        "sodium": 1,
+        "potassium": 186,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 168872,
+      "description": "Rice, white, flaked or beaten",
+      "aliases": [
+        "poha",
+        "flattened rice",
+        "beaten rice",
+        "avalakki"
+      ],
+      "gi": 70,
+      "estimated": true,
+      "per100g": {
+        "kcal": 346,
+        "protein": 6.6,
+        "carbs": 77.3,
+        "fat": 1.2,
+        "satFat": 0.3,
+        "fiber": 2.3,
+        "sugar": 0.3,
+        "sodium": 4,
+        "potassium": 120,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 169705,
+      "description": "Oats",
+      "aliases": [
+        "oats",
+        "rolled oats",
+        "oatmeal dry"
+      ],
+      "gi": 55,
+      "per100g": {
+        "kcal": 389,
+        "protein": 16.89,
+        "carbs": 66.27,
+        "fat": 6.9,
+        "satFat": 1.217,
+        "fiber": 10.6,
+        "sugar": 0.0,
+        "sodium": 2,
+        "potassium": 429,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": null,
+      "description": "Finger millet (ragi), whole",
+      "aliases": [
+        "ragi",
+        "finger millet",
+        "nachni"
+      ],
+      "gi": 68,
+      "estimated": true,
+      "per100g": {
+        "kcal": 320,
+        "protein": 7.3,
+        "carbs": 66.8,
+        "fat": 1.3,
+        "satFat": 0.3,
+        "fiber": 11.2,
+        "sugar": 0.4,
+        "sodium": 11,
+        "potassium": 408,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": null,
+      "description": "Pearl millet (bajra), whole",
+      "aliases": [
+        "bajra",
+        "pearl millet"
+      ],
+      "gi": 55,
+      "estimated": true,
+      "per100g": {
+        "kcal": 348,
+        "protein": 11.6,
+        "carbs": 61.8,
+        "fat": 5.0,
+        "satFat": 1.1,
+        "fiber": 11.5,
+        "sugar": 0.9,
+        "sodium": 12,
+        "potassium": 365,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": null,
+      "description": "Sorghum (jowar), whole",
+      "aliases": [
+        "jowar",
+        "sorghum"
+      ],
+      "gi": 62,
+      "estimated": true,
+      "per100g": {
+        "kcal": 349,
+        "protein": 10.4,
+        "carbs": 67.7,
+        "fat": 1.9,
+        "satFat": 0.3,
+        "fiber": 10.2,
+        "sugar": 0.6,
+        "sodium": 7,
+        "potassium": 328,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 168917,
+      "description": "Quinoa, cooked",
+      "aliases": [
+        "quinoa cooked",
+        "quinoa"
+      ],
+      "gi": 53,
+      "per100g": {
+        "kcal": 120,
+        "protein": 4.4,
+        "carbs": 21.3,
+        "fat": 1.92,
+        "satFat": 0.231,
+        "fiber": 2.8,
+        "sugar": 0.87,
+        "sodium": 7,
+        "potassium": 172,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 168928,
+      "description": "Pasta, cooked, enriched",
+      "aliases": [
+        "pasta cooked",
+        "spaghetti",
+        "macaroni",
+        "noodles"
+      ],
+      "gi": 49,
+      "per100g": {
+        "kcal": 158,
+        "protein": 5.8,
+        "carbs": 30.86,
+        "fat": 0.93,
+        "satFat": 0.176,
+        "fiber": 1.8,
+        "sugar": 0.56,
+        "sodium": 1,
+        "potassium": 44,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": null,
+      "description": "Idli, steamed fermented rice and black gram cake",
+      "aliases": [
+        "idli",
+        "idly"
+      ],
+      "gi": 69,
+      "estimated": true,
+      "per100g": {
+        "kcal": 132,
+        "protein": 3.4,
+        "carbs": 27.0,
+        "fat": 0.6,
+        "satFat": 0.15,
+        "fiber": 1.2,
+        "sugar": 0.3,
+        "sodium": 300,
+        "potassium": 70,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": null,
+      "description": "Dosa, plain, fermented rice and black gram crepe, pan-fried",
+      "aliases": [
+        "dosa",
+        "dosai",
+        "plain dosa"
+      ],
+      "gi": 70,
+      "estimated": true,
+      "per100g": {
+        "kcal": 168,
+        "protein": 3.9,
+        "carbs": 28.5,
+        "fat": 4.2,
+        "satFat": 1.6,
+        "fiber": 1.4,
+        "sugar": 0.4,
+        "sodium": 320,
+        "potassium": 85,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 172420,
+      "description": "Lentils, mature seeds, cooked, boiled, without salt",
+      "aliases": [
+        "masoor dal",
+        "red lentils cooked",
+        "lentils cooked",
+        "dal",
+        "daal",
+        "cooked dal"
+      ],
+      "gi": 32,
+      "per100g": {
+        "kcal": 116,
+        "protein": 9.02,
+        "carbs": 20.13,
+        "fat": 0.38,
+        "satFat": 0.054,
+        "fiber": 7.9,
+        "sugar": 1.8,
+        "sodium": 2,
+        "potassium": 369,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 172436,
+      "description": "Pigeon peas (red gram), mature seeds, cooked, boiled, without salt",
+      "aliases": [
+        "toor dal",
+        "arhar dal",
+        "tur dal",
+        "pigeon peas"
+      ],
+      "gi": 29,
+      "per100g": {
+        "kcal": 121,
+        "protein": 6.76,
+        "carbs": 23.25,
+        "fat": 0.38,
+        "satFat": 0.077,
+        "fiber": 6.7,
+        "sugar": 0.0,
+        "sodium": 5,
+        "potassium": 384,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 172434,
+      "description": "Mung beans, mature seeds, cooked, boiled, without salt",
+      "aliases": [
+        "moong dal",
+        "mung dal",
+        "green gram cooked"
+      ],
+      "gi": 31,
+      "per100g": {
+        "kcal": 105,
+        "protein": 7.02,
+        "carbs": 19.15,
+        "fat": 0.38,
+        "satFat": 0.114,
+        "fiber": 7.6,
+        "sugar": 2.0,
+        "sodium": 2,
+        "potassium": 266,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 172438,
+      "description": "Black gram (urad), mature seeds, cooked, boiled, without salt",
+      "aliases": [
+        "urad dal",
+        "black gram",
+        "ulundu"
+      ],
+      "gi": 43,
+      "per100g": {
+        "kcal": 105,
+        "protein": 7.52,
+        "carbs": 18.6,
+        "fat": 0.51,
+        "satFat": 0.084,
+        "fiber": 5.7,
+        "sugar": 0.0,
+        "sodium": 3,
+        "potassium": 351,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 173801,
+      "description": "Chickpeas (garbanzo beans, bengal gram), mature seeds, cooked, boiled, without salt",
+      "aliases": [
+        "chana",
+        "chickpeas cooked",
+        "kabuli chana",
+        "chana dal",
+        "bengal gram"
+      ],
+      "gi": 28,
+      "per100g": {
+        "kcal": 164,
+        "protein": 8.86,
+        "carbs": 27.42,
+        "fat": 2.59,
+        "satFat": 0.269,
+        "fiber": 7.6,
+        "sugar": 4.8,
+        "sodium": 7,
+        "potassium": 291,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 175196,
+      "description": "Beans, kidney, red, mature seeds, cooked, boiled, without salt",
+      "aliases": [
+        "rajma",
+        "kidney beans cooked",
+        "red kidney beans"
+      ],
+      "gi": 24,
+      "per100g": {
+        "kcal": 127,
+        "protein": 8.67,
+        "carbs": 22.8,
+        "fat": 0.5,
+        "satFat": 0.072,
+        "fiber": 6.4,
+        "sugar": 0.32,
+        "sodium": 2,
+        "potassium": 403,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 174270,
+      "description": "Soybeans, mature seeds, cooked, boiled, without salt",
+      "aliases": [
+        "soybean cooked",
+        "soya beans"
+      ],
+      "gi": 16,
+      "per100g": {
+        "kcal": 173,
+        "protein": 16.64,
+        "carbs": 9.93,
+        "fat": 8.97,
+        "satFat": 1.297,
+        "fiber": 6.0,
+        "sugar": 3.0,
+        "sodium": 1,
+        "potassium": 515,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 172451,
+      "description": "Tofu, firm, prepared with calcium sulfate and magnesium chloride",
+      "aliases": [
+        "tofu",
+        "soya paneer"
+      ],
+      "gi": 15,
+      "per100g": {
+        "kcal": 144,
+        "protein": 17.19,
+        "carbs": 2.78,
+        "fat": 8.72,
+        "satFat": 1.261,
+        "fiber": 2.3,
+        "sugar": 0.62,
+        "sodium": 14,
+        "potassium": 237,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 171265,
+      "description": "Milk, whole, 3.25% milkfat, with added vitamin D",
+      "aliases": [
+        "whole milk",
+        "full fat milk",
+        "milk"
+      ],
+      "gi": 39,
+      "per100g": {
+        "kcal": 61,
+        "protein": 3.15,
+        "carbs": 4.8,
+        "fat": 3.25,
+        "satFat": 1.865,
+        "fiber": 0.0,
+        "sugar": 5.05,
+        "sodium": 43,
+        "potassium": 132,
+        "cholesterol": 10
+      }
+    },
+    {
+      "fdcId": 172217,
+      "description": "Milk, reduced fat, fluid, 2% milkfat",
+      "aliases": [
+        "toned milk",
+        "low fat milk",
+        "skimmed milk",
+        "double toned milk"
+      ],
+      "gi": 30,
+      "per100g": {
+        "kcal": 50,
+        "protein": 3.3,
+        "carbs": 4.8,
+        "fat": 1.97,
+        "satFat": 1.257,
+        "fiber": 0.0,
+        "sugar": 5.06,
+        "sodium": 47,
+        "potassium": 150,
+        "cholesterol": 8
+      }
+    },
+    {
+      "fdcId": 171284,
+      "description": "Yogurt, plain, whole milk",
+      "aliases": [
+        "curd",
+        "dahi",
+        "yogurt",
+        "plain yogurt",
+        "yoghurt"
+      ],
+      "gi": 36,
+      "per100g": {
+        "kcal": 61,
+        "protein": 3.47,
+        "carbs": 4.66,
+        "fat": 3.25,
+        "satFat": 2.096,
+        "fiber": 0.0,
+        "sugar": 4.66,
+        "sodium": 46,
+        "potassium": 155,
+        "cholesterol": 13
+      }
+    },
+    {
+      "fdcId": null,
+      "description": "Paneer (Indian pressed fresh cheese), whole milk",
+      "aliases": [
+        "paneer",
+        "cottage cheese indian"
+      ],
+      "gi": 27,
+      "estimated": true,
+      "per100g": {
+        "kcal": 296,
+        "protein": 18.3,
+        "carbs": 3.6,
+        "fat": 22.8,
+        "satFat": 14.2,
+        "fiber": 0.0,
+        "sugar": 3.6,
+        "sodium": 22,
+        "potassium": 110,
+        "cholesterol": 68
+      }
+    },
+    {
+      "fdcId": 171507,
+      "description": "Butter oil, anhydrous (ghee)",
+      "aliases": [
+        "ghee",
+        "clarified butter",
+        "desi ghee"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 876,
+        "protein": 0.28,
+        "carbs": 0.0,
+        "fat": 99.48,
+        "satFat": 61.924,
+        "fiber": 0.0,
+        "sugar": 0.0,
+        "sodium": 2,
+        "potassium": 5,
+        "cholesterol": 256
+      }
+    },
+    {
+      "fdcId": 173410,
+      "description": "Butter, salted",
+      "aliases": [
+        "butter",
+        "salted butter",
+        "makhan"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 717,
+        "protein": 0.85,
+        "carbs": 0.06,
+        "fat": 81.11,
+        "satFat": 51.368,
+        "fiber": 0.0,
+        "sugar": 0.06,
+        "sodium": 643,
+        "potassium": 24,
+        "cholesterol": 215
+      }
+    },
+    {
+      "fdcId": 170899,
+      "description": "Cheese, cheddar",
+      "aliases": [
+        "cheese",
+        "cheddar cheese",
+        "processed cheese"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 403,
+        "protein": 22.87,
+        "carbs": 3.09,
+        "fat": 33.31,
+        "satFat": 18.867,
+        "fiber": 0.0,
+        "sugar": 0.48,
+        "sodium": 653,
+        "potassium": 76,
+        "cholesterol": 99
+      }
+    },
+    {
+      "fdcId": 170873,
+      "description": "Cream, fluid, heavy whipping",
+      "aliases": [
+        "cream",
+        "fresh cream",
+        "malai",
+        "heavy cream"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 340,
+        "protein": 2.84,
+        "carbs": 2.74,
+        "fat": 36.08,
+        "satFat": 23.033,
+        "fiber": 0.0,
+        "sugar": 2.92,
+        "sodium": 38,
+        "potassium": 95,
+        "cholesterol": 113
+      }
+    },
+    {
+      "fdcId": null,
+      "description": "Buttermilk (chaas), diluted cultured",
+      "aliases": [
+        "buttermilk",
+        "chaas",
+        "majjige"
+      ],
+      "gi": 30,
+      "estimated": true,
+      "per100g": {
+        "kcal": 25,
+        "protein": 1.6,
+        "carbs": 2.6,
+        "fat": 0.9,
+        "satFat": 0.55,
+        "fiber": 0.0,
+        "sugar": 2.6,
+        "sodium": 150,
+        "potassium": 90,
+        "cholesterol": 4
+      }
+    },
+    {
+      "fdcId": 171287,
+      "description": "Egg, whole, raw, fresh",
+      "aliases": [
+        "egg",
+        "eggs",
+        "whole egg",
+        "anda"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 143,
+        "protein": 12.56,
+        "carbs": 0.72,
+        "fat": 9.51,
+        "satFat": 3.126,
+        "fiber": 0.0,
+        "sugar": 0.37,
+        "sodium": 142,
+        "potassium": 138,
+        "cholesterol": 372
+      }
+    },
+    {
+      "fdcId": 171477,
+      "description": "Chicken, broilers or fryers, breast, meat only, cooked, roasted",
+      "aliases": [
+        "chicken breast",
+        "chicken",
+        "grilled chicken",
+        "chicken curry meat"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 165,
+        "protein": 31.02,
+        "carbs": 0.0,
+        "fat": 3.57,
+        "satFat": 1.01,
+        "fiber": 0.0,
+        "sugar": 0.0,
+        "sodium": 74,
+        "potassium": 256,
+        "cholesterol": 85
+      }
+    },
+    {
+      "fdcId": 171506,
+      "description": "Chicken, broilers or fryers, thigh, meat only, cooked, roasted",
+      "aliases": [
+        "chicken thigh",
+        "chicken leg",
+        "dark meat chicken"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 209,
+        "protein": 26.0,
+        "carbs": 0.0,
+        "fat": 10.9,
+        "satFat": 3.01,
+        "fiber": 0.0,
+        "sugar": 0.0,
+        "sodium": 88,
+        "potassium": 240,
+        "cholesterol": 135
+      }
+    },
+    {
+      "fdcId": 174354,
+      "description": "Lamb or mutton, cooked",
+      "aliases": [
+        "mutton",
+        "lamb",
+        "goat meat"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 258,
+        "protein": 25.6,
+        "carbs": 0.0,
+        "fat": 16.5,
+        "satFat": 7.03,
+        "fiber": 0.0,
+        "sugar": 0.0,
+        "sodium": 72,
+        "potassium": 310,
+        "cholesterol": 97
+      }
+    },
+    {
+      "fdcId": 175168,
+      "description": "Fish, finfish, cooked, dry heat (generic lean white fish)",
+      "aliases": [
+        "fish",
+        "fish curry",
+        "rohu",
+        "pomfret",
+        "grilled fish",
+        "tilapia"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 128,
+        "protein": 26.15,
+        "carbs": 0.0,
+        "fat": 2.65,
+        "satFat": 0.905,
+        "fiber": 0.0,
+        "sugar": 0.0,
+        "sodium": 56,
+        "potassium": 380,
+        "cholesterol": 57
+      }
+    },
+    {
+      "fdcId": 175179,
+      "description": "Crustaceans, shrimp, cooked, moist heat",
+      "aliases": [
+        "prawns",
+        "shrimp",
+        "prawn curry"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 99,
+        "protein": 20.91,
+        "carbs": 0.2,
+        "fat": 1.08,
+        "satFat": 0.289,
+        "fiber": 0.0,
+        "sugar": 0.0,
+        "sodium": 111,
+        "potassium": 259,
+        "cholesterol": 189
+      }
+    },
+    {
+      "fdcId": 171025,
+      "description": "Oil, vegetable, sunflower",
+      "aliases": [
+        "sunflower oil",
+        "cooking oil",
+        "vegetable oil",
+        "refined oil",
+        "oil"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 884,
+        "protein": 0.0,
+        "carbs": 0.0,
+        "fat": 100.0,
+        "satFat": 10.3,
+        "fiber": 0.0,
+        "sugar": 0.0,
+        "sodium": 0,
+        "potassium": 0,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 172336,
+      "description": "Oil, peanut (groundnut)",
+      "aliases": [
+        "groundnut oil",
+        "peanut oil"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 884,
+        "protein": 0.0,
+        "carbs": 0.0,
+        "fat": 100.0,
+        "satFat": 16.9,
+        "fiber": 0.0,
+        "sugar": 0.0,
+        "sodium": 0,
+        "potassium": 0,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 171016,
+      "description": "Oil, coconut",
+      "aliases": [
+        "coconut oil"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 892,
+        "protein": 0.0,
+        "carbs": 0.0,
+        "fat": 99.06,
+        "satFat": 82.475,
+        "fiber": 0.0,
+        "sugar": 0.0,
+        "sodium": 0,
+        "potassium": 0,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 172335,
+      "description": "Oil, mustard",
+      "aliases": [
+        "mustard oil",
+        "sarson oil"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 884,
+        "protein": 0.0,
+        "carbs": 0.0,
+        "fat": 100.0,
+        "satFat": 11.58,
+        "fiber": 0.0,
+        "sugar": 0.0,
+        "sodium": 0,
+        "potassium": 0,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 171413,
+      "description": "Oil, olive, salad or cooking",
+      "aliases": [
+        "olive oil",
+        "extra virgin olive oil"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 884,
+        "protein": 0.0,
+        "carbs": 0.0,
+        "fat": 100.0,
+        "satFat": 13.808,
+        "fiber": 0.0,
+        "sugar": 0.0,
+        "sodium": 2,
+        "potassium": 1,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 171030,
+      "description": "Oil, sesame, salad or cooking",
+      "aliases": [
+        "sesame oil",
+        "gingelly oil",
+        "til oil"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 884,
+        "protein": 0.0,
+        "carbs": 0.0,
+        "fat": 100.0,
+        "satFat": 14.2,
+        "fiber": 0.0,
+        "sugar": 0.0,
+        "sodium": 0,
+        "potassium": 0,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 173468,
+      "description": "Salt, table",
+      "aliases": [
+        "salt",
+        "table salt",
+        "namak",
+        "sea salt",
+        "iodised salt"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 0,
+        "protein": 0.0,
+        "carbs": 0.0,
+        "fat": 0.0,
+        "satFat": 0.0,
+        "fiber": 0.0,
+        "sugar": 0.0,
+        "sodium": 38758,
+        "potassium": 8,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 169655,
+      "description": "Sugars, granulated",
+      "aliases": [
+        "sugar",
+        "white sugar",
+        "table sugar",
+        "cane sugar"
+      ],
+      "gi": 65,
+      "per100g": {
+        "kcal": 387,
+        "protein": 0.0,
+        "carbs": 99.98,
+        "fat": 0.0,
+        "satFat": 0.0,
+        "fiber": 0.0,
+        "sugar": 99.8,
+        "sodium": 1,
+        "potassium": 2,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": null,
+      "description": "Jaggery (gur), cane",
+      "aliases": [
+        "jaggery",
+        "gur",
+        "bellam"
+      ],
+      "gi": 84,
+      "estimated": true,
+      "per100g": {
+        "kcal": 383,
+        "protein": 0.4,
+        "carbs": 95.0,
+        "fat": 0.1,
+        "satFat": 0.0,
+        "fiber": 0.0,
+        "sugar": 85.0,
+        "sodium": 30,
+        "potassium": 340,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 169640,
+      "description": "Honey",
+      "aliases": [
+        "honey",
+        "shahad"
+      ],
+      "gi": 61,
+      "per100g": {
+        "kcal": 304,
+        "protein": 0.3,
+        "carbs": 82.4,
+        "fat": 0.0,
+        "satFat": 0.0,
+        "fiber": 0.2,
+        "sugar": 82.12,
+        "sodium": 4,
+        "potassium": 52,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 168191,
+      "description": "Tamarind, raw",
+      "aliases": [
+        "tamarind",
+        "imli",
+        "tamarind paste",
+        "puli"
+      ],
+      "gi": 25,
+      "per100g": {
+        "kcal": 239,
+        "protein": 2.8,
+        "carbs": 62.5,
+        "fat": 0.6,
+        "satFat": 0.272,
+        "fiber": 5.1,
+        "sugar": 57.4,
+        "sodium": 28,
+        "potassium": 628,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170924,
+      "description": "Coconut milk, raw (liquid expressed from grated meat and water)",
+      "aliases": [
+        "coconut milk",
+        "thengai paal"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 230,
+        "protein": 2.29,
+        "carbs": 5.54,
+        "fat": 23.84,
+        "satFat": 21.14,
+        "fiber": 2.2,
+        "sugar": 3.34,
+        "sodium": 15,
+        "potassium": 263,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170169,
+      "description": "Nuts, coconut meat, raw",
+      "aliases": [
+        "coconut",
+        "fresh coconut",
+        "grated coconut",
+        "thengai"
+      ],
+      "gi": 45,
+      "per100g": {
+        "kcal": 354,
+        "protein": 3.33,
+        "carbs": 15.23,
+        "fat": 33.49,
+        "satFat": 29.698,
+        "fiber": 9.0,
+        "sugar": 6.23,
+        "sodium": 20,
+        "potassium": 356,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170000,
+      "description": "Onions, raw",
+      "aliases": [
+        "onion",
+        "onions",
+        "pyaz",
+        "red onion"
+      ],
+      "gi": 15,
+      "per100g": {
+        "kcal": 40,
+        "protein": 1.1,
+        "carbs": 9.34,
+        "fat": 0.1,
+        "satFat": 0.042,
+        "fiber": 1.7,
+        "sugar": 4.24,
+        "sodium": 4,
+        "potassium": 146,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170457,
+      "description": "Tomatoes, red, ripe, raw, year round average",
+      "aliases": [
+        "tomato",
+        "tomatoes",
+        "tamatar"
+      ],
+      "gi": 15,
+      "per100g": {
+        "kcal": 18,
+        "protein": 0.88,
+        "carbs": 3.89,
+        "fat": 0.2,
+        "satFat": 0.028,
+        "fiber": 1.2,
+        "sugar": 2.63,
+        "sodium": 5,
+        "potassium": 237,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170026,
+      "description": "Potatoes, boiled, cooked without skin, flesh, without salt",
+      "aliases": [
+        "potato",
+        "potatoes",
+        "aloo",
+        "boiled potato"
+      ],
+      "gi": 78,
+      "per100g": {
+        "kcal": 87,
+        "protein": 1.87,
+        "carbs": 20.01,
+        "fat": 0.1,
+        "satFat": 0.026,
+        "fiber": 1.8,
+        "sugar": 0.85,
+        "sodium": 4,
+        "potassium": 379,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 168462,
+      "description": "Spinach, raw",
+      "aliases": [
+        "spinach",
+        "palak",
+        "keerai"
+      ],
+      "gi": 15,
+      "per100g": {
+        "kcal": 23,
+        "protein": 2.86,
+        "carbs": 3.63,
+        "fat": 0.39,
+        "satFat": 0.063,
+        "fiber": 2.2,
+        "sugar": 0.42,
+        "sodium": 79,
+        "potassium": 558,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 169986,
+      "description": "Cauliflower, raw",
+      "aliases": [
+        "cauliflower",
+        "gobi",
+        "phool gobi"
+      ],
+      "gi": 15,
+      "per100g": {
+        "kcal": 25,
+        "protein": 1.92,
+        "carbs": 4.97,
+        "fat": 0.28,
+        "satFat": 0.13,
+        "fiber": 2.0,
+        "sugar": 1.91,
+        "sodium": 30,
+        "potassium": 299,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170393,
+      "description": "Carrots, raw",
+      "aliases": [
+        "carrot",
+        "carrots",
+        "gajar"
+      ],
+      "gi": 39,
+      "per100g": {
+        "kcal": 41,
+        "protein": 0.93,
+        "carbs": 9.58,
+        "fat": 0.24,
+        "satFat": 0.032,
+        "fiber": 2.8,
+        "sugar": 4.74,
+        "sodium": 69,
+        "potassium": 320,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170419,
+      "description": "Peas, green, raw",
+      "aliases": [
+        "green peas",
+        "peas",
+        "matar"
+      ],
+      "gi": 51,
+      "per100g": {
+        "kcal": 81,
+        "protein": 5.42,
+        "carbs": 14.45,
+        "fat": 0.4,
+        "satFat": 0.071,
+        "fiber": 5.7,
+        "sugar": 5.67,
+        "sodium": 5,
+        "potassium": 244,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 169228,
+      "description": "Eggplant (brinjal), raw",
+      "aliases": [
+        "brinjal",
+        "eggplant",
+        "baingan",
+        "aubergine"
+      ],
+      "gi": 15,
+      "per100g": {
+        "kcal": 25,
+        "protein": 0.98,
+        "carbs": 5.88,
+        "fat": 0.18,
+        "satFat": 0.034,
+        "fiber": 3.0,
+        "sugar": 3.53,
+        "sodium": 2,
+        "potassium": 229,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 168390,
+      "description": "Okra, raw",
+      "aliases": [
+        "okra",
+        "bhindi",
+        "ladies finger"
+      ],
+      "gi": 20,
+      "per100g": {
+        "kcal": 33,
+        "protein": 1.93,
+        "carbs": 7.45,
+        "fat": 0.19,
+        "satFat": 0.026,
+        "fiber": 3.2,
+        "sugar": 1.48,
+        "sodium": 7,
+        "potassium": 299,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 169975,
+      "description": "Cabbage, raw",
+      "aliases": [
+        "cabbage",
+        "patta gobi"
+      ],
+      "gi": 15,
+      "per100g": {
+        "kcal": 25,
+        "protein": 1.28,
+        "carbs": 5.8,
+        "fat": 0.1,
+        "satFat": 0.034,
+        "fiber": 2.5,
+        "sugar": 3.2,
+        "sodium": 18,
+        "potassium": 170,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170108,
+      "description": "Peppers, sweet, green, raw (capsicum)",
+      "aliases": [
+        "capsicum",
+        "bell pepper",
+        "shimla mirch",
+        "green pepper"
+      ],
+      "gi": 15,
+      "per100g": {
+        "kcal": 20,
+        "protein": 0.86,
+        "carbs": 4.64,
+        "fat": 0.17,
+        "satFat": 0.058,
+        "fiber": 1.7,
+        "sugar": 2.4,
+        "sodium": 3,
+        "potassium": 175,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 168409,
+      "description": "Gourd, bottle (calabash), raw",
+      "aliases": [
+        "bottle gourd",
+        "lauki",
+        "dudhi",
+        "sorakaya"
+      ],
+      "gi": 15,
+      "per100g": {
+        "kcal": 14,
+        "protein": 0.62,
+        "carbs": 3.39,
+        "fat": 0.02,
+        "satFat": 0.003,
+        "fiber": 0.5,
+        "sugar": 0.0,
+        "sodium": 2,
+        "potassium": 150,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 168409,
+      "description": "Cucumber, with peel, raw",
+      "aliases": [
+        "cucumber",
+        "kheera"
+      ],
+      "gi": 15,
+      "per100g": {
+        "kcal": 15,
+        "protein": 0.65,
+        "carbs": 3.63,
+        "fat": 0.11,
+        "satFat": 0.037,
+        "fiber": 0.5,
+        "sugar": 1.67,
+        "sodium": 2,
+        "potassium": 147,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 169961,
+      "description": "Beans, snap, green, raw",
+      "aliases": [
+        "green beans",
+        "french beans",
+        "beans"
+      ],
+      "gi": 15,
+      "per100g": {
+        "kcal": 31,
+        "protein": 1.83,
+        "carbs": 6.97,
+        "fat": 0.22,
+        "satFat": 0.05,
+        "fiber": 2.7,
+        "sugar": 3.26,
+        "sodium": 6,
+        "potassium": 211,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 169963,
+      "description": "Beets, raw",
+      "aliases": [
+        "beetroot",
+        "beets",
+        "chukandar"
+      ],
+      "gi": 64,
+      "per100g": {
+        "kcal": 43,
+        "protein": 1.61,
+        "carbs": 9.56,
+        "fat": 0.17,
+        "satFat": 0.027,
+        "fiber": 2.8,
+        "sugar": 6.76,
+        "sodium": 78,
+        "potassium": 325,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 169279,
+      "description": "Pumpkin, raw",
+      "aliases": [
+        "pumpkin",
+        "kaddu",
+        "gummadikaya"
+      ],
+      "gi": 75,
+      "per100g": {
+        "kcal": 26,
+        "protein": 1.0,
+        "carbs": 6.5,
+        "fat": 0.1,
+        "satFat": 0.052,
+        "fiber": 0.5,
+        "sugar": 2.76,
+        "sodium": 1,
+        "potassium": 340,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 168409,
+      "description": "Drumstick (moringa) pods, raw",
+      "aliases": [
+        "drumstick",
+        "moringa",
+        "munaga"
+      ],
+      "gi": 20,
+      "estimated": true,
+      "per100g": {
+        "kcal": 37,
+        "protein": 2.1,
+        "carbs": 8.53,
+        "fat": 0.2,
+        "satFat": 0.03,
+        "fiber": 3.2,
+        "sugar": 0.0,
+        "sodium": 42,
+        "potassium": 461,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 169230,
+      "description": "Garlic, raw",
+      "aliases": [
+        "garlic",
+        "lehsun",
+        "garlic paste"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 149,
+        "protein": 6.36,
+        "carbs": 33.06,
+        "fat": 0.5,
+        "satFat": 0.089,
+        "fiber": 2.1,
+        "sugar": 1.0,
+        "sodium": 17,
+        "potassium": 401,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 169231,
+      "description": "Ginger root, raw",
+      "aliases": [
+        "ginger",
+        "adrak",
+        "ginger paste",
+        "ginger garlic paste"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 80,
+        "protein": 1.82,
+        "carbs": 17.77,
+        "fat": 0.75,
+        "satFat": 0.203,
+        "fiber": 2.0,
+        "sugar": 1.7,
+        "sodium": 13,
+        "potassium": 415,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170106,
+      "description": "Peppers, hot chili, green, raw",
+      "aliases": [
+        "green chilli",
+        "green chili",
+        "chilli",
+        "mirchi"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 40,
+        "protein": 2.0,
+        "carbs": 9.46,
+        "fat": 0.2,
+        "satFat": 0.021,
+        "fiber": 1.5,
+        "sugar": 5.1,
+        "sodium": 7,
+        "potassium": 340,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170931,
+      "description": "Coriander (cilantro) leaves, raw",
+      "aliases": [
+        "coriander leaves",
+        "cilantro",
+        "dhaniya",
+        "kothmir"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 23,
+        "protein": 2.13,
+        "carbs": 3.67,
+        "fat": 0.52,
+        "satFat": 0.014,
+        "fiber": 2.8,
+        "sugar": 0.87,
+        "sodium": 46,
+        "potassium": 521,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": null,
+      "description": "Curry leaves, raw",
+      "aliases": [
+        "curry leaves",
+        "kadi patta",
+        "karivepaku"
+      ],
+      "gi": 0,
+      "estimated": true,
+      "per100g": {
+        "kcal": 108,
+        "protein": 6.1,
+        "carbs": 18.7,
+        "fat": 1.0,
+        "satFat": 0.2,
+        "fiber": 6.4,
+        "sugar": 0.0,
+        "sodium": 10,
+        "potassium": 500,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170554,
+      "description": "Spices, turmeric, ground",
+      "aliases": [
+        "turmeric",
+        "haldi",
+        "turmeric powder"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 312,
+        "protein": 9.68,
+        "carbs": 67.14,
+        "fat": 3.25,
+        "satFat": 1.838,
+        "fiber": 22.7,
+        "sugar": 3.21,
+        "sodium": 27,
+        "potassium": 2080,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170932,
+      "description": "Spices, chili powder",
+      "aliases": [
+        "chilli powder",
+        "red chilli powder",
+        "lal mirch"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 282,
+        "protein": 13.46,
+        "carbs": 49.7,
+        "fat": 14.28,
+        "satFat": 2.464,
+        "fiber": 34.8,
+        "sugar": 7.19,
+        "sodium": 1640,
+        "potassium": 1950,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170924,
+      "description": "Spices, coriander seed",
+      "aliases": [
+        "coriander powder",
+        "dhania powder",
+        "coriander seed"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 298,
+        "protein": 12.37,
+        "carbs": 54.99,
+        "fat": 17.77,
+        "satFat": 0.99,
+        "fiber": 41.8,
+        "sugar": 0.0,
+        "sodium": 35,
+        "potassium": 1267,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170923,
+      "description": "Spices, cumin seed",
+      "aliases": [
+        "cumin",
+        "jeera",
+        "cumin powder",
+        "cumin seed"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 375,
+        "protein": 17.81,
+        "carbs": 44.24,
+        "fat": 22.27,
+        "satFat": 1.535,
+        "fiber": 10.5,
+        "sugar": 2.25,
+        "sodium": 168,
+        "potassium": 1788,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170934,
+      "description": "Spices, mustard seed, yellow",
+      "aliases": [
+        "mustard seeds",
+        "rai",
+        "sarson"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 508,
+        "protein": 26.08,
+        "carbs": 28.09,
+        "fat": 36.24,
+        "satFat": 1.989,
+        "fiber": 12.2,
+        "sugar": 6.79,
+        "sodium": 13,
+        "potassium": 738,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": null,
+      "description": "Spices, garam masala blend",
+      "aliases": [
+        "garam masala",
+        "sambar powder",
+        "curry powder",
+        "masala"
+      ],
+      "gi": 0,
+      "estimated": true,
+      "per100g": {
+        "kcal": 379,
+        "protein": 14.3,
+        "carbs": 50.5,
+        "fat": 15.2,
+        "satFat": 2.0,
+        "fiber": 33.2,
+        "sugar": 2.7,
+        "sodium": 52,
+        "potassium": 1543,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170567,
+      "description": "Nuts, almonds",
+      "aliases": [
+        "almonds",
+        "badam",
+        "almond"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 579,
+        "protein": 21.15,
+        "carbs": 21.55,
+        "fat": 49.93,
+        "satFat": 3.802,
+        "fiber": 12.5,
+        "sugar": 4.35,
+        "sodium": 1,
+        "potassium": 733,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170162,
+      "description": "Nuts, cashew nuts, raw",
+      "aliases": [
+        "cashew",
+        "cashews",
+        "kaju"
+      ],
+      "gi": 25,
+      "per100g": {
+        "kcal": 553,
+        "protein": 18.22,
+        "carbs": 30.19,
+        "fat": 43.85,
+        "satFat": 7.783,
+        "fiber": 3.3,
+        "sugar": 5.91,
+        "sodium": 12,
+        "potassium": 660,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 172430,
+      "description": "Peanuts, all types, raw",
+      "aliases": [
+        "peanuts",
+        "groundnut",
+        "moongphali"
+      ],
+      "gi": 14,
+      "per100g": {
+        "kcal": 567,
+        "protein": 25.8,
+        "carbs": 16.13,
+        "fat": 49.24,
+        "satFat": 6.279,
+        "fiber": 8.5,
+        "sugar": 4.72,
+        "sodium": 18,
+        "potassium": 705,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170187,
+      "description": "Nuts, walnuts, english",
+      "aliases": [
+        "walnuts",
+        "akhrot",
+        "walnut"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 654,
+        "protein": 15.23,
+        "carbs": 13.71,
+        "fat": 65.21,
+        "satFat": 6.126,
+        "fiber": 6.7,
+        "sugar": 2.61,
+        "sodium": 2,
+        "potassium": 441,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170150,
+      "description": "Seeds, sesame seeds, whole, dried",
+      "aliases": [
+        "sesame seeds",
+        "til",
+        "ellu"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 573,
+        "protein": 17.73,
+        "carbs": 23.45,
+        "fat": 49.67,
+        "satFat": 6.957,
+        "fiber": 11.8,
+        "sugar": 0.3,
+        "sodium": 11,
+        "potassium": 468,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 169414,
+      "description": "Seeds, flaxseed",
+      "aliases": [
+        "flaxseed",
+        "alsi",
+        "linseed"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 534,
+        "protein": 18.29,
+        "carbs": 28.88,
+        "fat": 42.16,
+        "satFat": 3.663,
+        "fiber": 27.3,
+        "sugar": 1.55,
+        "sodium": 30,
+        "potassium": 813,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 173944,
+      "description": "Bananas, raw",
+      "aliases": [
+        "banana",
+        "kela",
+        "arati pandu"
+      ],
+      "gi": 51,
+      "per100g": {
+        "kcal": 89,
+        "protein": 1.09,
+        "carbs": 22.84,
+        "fat": 0.33,
+        "satFat": 0.112,
+        "fiber": 2.6,
+        "sugar": 12.23,
+        "sodium": 1,
+        "potassium": 358,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 171688,
+      "description": "Apples, raw, with skin",
+      "aliases": [
+        "apple",
+        "seb"
+      ],
+      "gi": 36,
+      "per100g": {
+        "kcal": 52,
+        "protein": 0.26,
+        "carbs": 13.81,
+        "fat": 0.17,
+        "satFat": 0.028,
+        "fiber": 2.4,
+        "sugar": 10.39,
+        "sodium": 1,
+        "potassium": 107,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 169910,
+      "description": "Mangos, raw",
+      "aliases": [
+        "mango",
+        "aam"
+      ],
+      "gi": 51,
+      "per100g": {
+        "kcal": 60,
+        "protein": 0.82,
+        "carbs": 14.98,
+        "fat": 0.38,
+        "satFat": 0.092,
+        "fiber": 1.6,
+        "sugar": 13.66,
+        "sodium": 1,
+        "potassium": 168,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 169097,
+      "description": "Oranges, raw, all commercial varieties",
+      "aliases": [
+        "orange",
+        "santra",
+        "mosambi"
+      ],
+      "gi": 43,
+      "per100g": {
+        "kcal": 47,
+        "protein": 0.94,
+        "carbs": 11.75,
+        "fat": 0.12,
+        "satFat": 0.015,
+        "fiber": 2.4,
+        "sugar": 9.35,
+        "sodium": 0,
+        "potassium": 181,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 174682,
+      "description": "Grapes, red or green, raw",
+      "aliases": [
+        "grapes",
+        "angoor"
+      ],
+      "gi": 59,
+      "per100g": {
+        "kcal": 69,
+        "protein": 0.72,
+        "carbs": 18.1,
+        "fat": 0.16,
+        "satFat": 0.054,
+        "fiber": 0.9,
+        "sugar": 15.48,
+        "sodium": 2,
+        "potassium": 191,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 169926,
+      "description": "Papayas, raw",
+      "aliases": [
+        "papaya",
+        "papita"
+      ],
+      "gi": 60,
+      "per100g": {
+        "kcal": 43,
+        "protein": 0.47,
+        "carbs": 10.82,
+        "fat": 0.26,
+        "satFat": 0.081,
+        "fiber": 1.7,
+        "sugar": 7.82,
+        "sodium": 8,
+        "potassium": 182,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 167765,
+      "description": "Watermelon, raw",
+      "aliases": [
+        "watermelon",
+        "tarbooj"
+      ],
+      "gi": 76,
+      "per100g": {
+        "kcal": 30,
+        "protein": 0.61,
+        "carbs": 7.55,
+        "fat": 0.15,
+        "satFat": 0.016,
+        "fiber": 0.4,
+        "sugar": 6.2,
+        "sodium": 1,
+        "potassium": 112,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 173032,
+      "description": "Guavas, common, raw",
+      "aliases": [
+        "guava",
+        "amrood",
+        "jamakaya"
+      ],
+      "gi": 12,
+      "per100g": {
+        "kcal": 68,
+        "protein": 2.55,
+        "carbs": 14.32,
+        "fat": 0.95,
+        "satFat": 0.272,
+        "fiber": 5.4,
+        "sugar": 8.92,
+        "sodium": 2,
+        "potassium": 417,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 169134,
+      "description": "Pomegranates, raw",
+      "aliases": [
+        "pomegranate",
+        "anar",
+        "danimma"
+      ],
+      "gi": 35,
+      "per100g": {
+        "kcal": 83,
+        "protein": 1.67,
+        "carbs": 18.7,
+        "fat": 1.17,
+        "satFat": 0.12,
+        "fiber": 4.0,
+        "sugar": 13.67,
+        "sodium": 3,
+        "potassium": 236,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 168191,
+      "description": "Dates, medjool",
+      "aliases": [
+        "dates",
+        "khajur",
+        "medjool dates"
+      ],
+      "gi": 42,
+      "per100g": {
+        "kcal": 277,
+        "protein": 1.81,
+        "carbs": 74.97,
+        "fat": 0.15,
+        "satFat": 0.032,
+        "fiber": 6.7,
+        "sugar": 66.47,
+        "sodium": 1,
+        "potassium": 696,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": null,
+      "description": "Tea, prepared with milk and sugar (Indian chai)",
+      "aliases": [
+        "chai",
+        "tea with milk",
+        "masala chai",
+        "milk tea"
+      ],
+      "gi": 50,
+      "estimated": true,
+      "per100g": {
+        "kcal": 48,
+        "protein": 1.3,
+        "carbs": 7.8,
+        "fat": 1.3,
+        "satFat": 0.8,
+        "fiber": 0.0,
+        "sugar": 7.2,
+        "sodium": 18,
+        "potassium": 55,
+        "cholesterol": 4
+      }
+    },
+    {
+      "fdcId": null,
+      "description": "Coffee, prepared with milk and sugar (South Indian filter coffee)",
+      "aliases": [
+        "filter coffee",
+        "coffee with milk",
+        "kaapi"
+      ],
+      "gi": 45,
+      "estimated": true,
+      "per100g": {
+        "kcal": 52,
+        "protein": 1.5,
+        "carbs": 8.1,
+        "fat": 1.5,
+        "satFat": 0.9,
+        "fiber": 0.0,
+        "sugar": 7.5,
+        "sodium": 20,
+        "potassium": 70,
+        "cholesterol": 5
+      }
+    },
+    {
+      "fdcId": 171890,
+      "description": "Beverages, coffee, brewed, prepared with tap water",
+      "aliases": [
+        "black coffee",
+        "coffee",
+        "americano"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 1,
+        "protein": 0.12,
+        "carbs": 0.0,
+        "fat": 0.02,
+        "satFat": 0.002,
+        "fiber": 0.0,
+        "sugar": 0.0,
+        "sodium": 2,
+        "potassium": 49,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 171917,
+      "description": "Beverages, water, tap, drinking",
+      "aliases": [
+        "water",
+        "drinking water"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 0,
+        "protein": 0.0,
+        "carbs": 0.0,
+        "fat": 0.0,
+        "satFat": 0.0,
+        "fiber": 0.0,
+        "sugar": 0.0,
+        "sodium": 4,
+        "potassium": 0,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170903,
+      "description": "Yogurt, Greek, plain, nonfat",
+      "aliases": [
+        "greek yogurt",
+        "greek yoghurt",
+        "hung curd",
+        "strained yogurt"
+      ],
+      "gi": 11,
+      "per100g": {
+        "kcal": 59,
+        "protein": 10.19,
+        "carbs": 3.6,
+        "fat": 0.39,
+        "satFat": 0.117,
+        "fiber": 0,
+        "sugar": 3.24,
+        "sodium": 36,
+        "potassium": 141,
+        "cholesterol": 5
+      }
+    },
+    {
+      "fdcId": 171304,
+      "description": "Yogurt, Greek, plain, whole milk",
+      "aliases": [
+        "full fat greek yogurt",
+        "greek yogurt whole"
+      ],
+      "gi": 11,
+      "per100g": {
+        "kcal": 97,
+        "protein": 9.0,
+        "carbs": 3.98,
+        "fat": 5.0,
+        "satFat": 3.21,
+        "fiber": 0,
+        "sugar": 4.0,
+        "sodium": 35,
+        "potassium": 141,
+        "cholesterol": 13
+      }
+    },
+    {
+      "fdcId": 172175,
+      "description": "Cheese, cottage, lowfat, 2% milkfat",
+      "aliases": [
+        "cottage cheese",
+        "low fat cottage cheese"
+      ],
+      "gi": 10,
+      "per100g": {
+        "kcal": 84,
+        "protein": 11.12,
+        "carbs": 4.31,
+        "fat": 2.3,
+        "satFat": 0.729,
+        "fiber": 0,
+        "sugar": 4.1,
+        "sodium": 330,
+        "potassium": 84,
+        "cholesterol": 12
+      }
+    },
+    {
+      "fdcId": 174276,
+      "description": "Soy protein concentrate (textured vegetable protein), dry",
+      "aliases": [
+        "soya chunks",
+        "soya granules",
+        "soy chunks",
+        "meal maker",
+        "nutrela",
+        "textured vegetable protein",
+        "tvp",
+        "soya nuggets"
+      ],
+      "gi": 15,
+      "estimated": true,
+      "per100g": {
+        "kcal": 336,
+        "protein": 52.0,
+        "carbs": 33.0,
+        "fat": 0.5,
+        "satFat": 0.1,
+        "fiber": 13.0,
+        "sugar": 3.0,
+        "sodium": 20,
+        "potassium": 2200,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": null,
+      "description": "Whey protein powder, isolate",
+      "aliases": [
+        "whey protein",
+        "protein powder",
+        "whey isolate",
+        "protein shake powder"
+      ],
+      "gi": 0,
+      "estimated": true,
+      "per100g": {
+        "kcal": 370,
+        "protein": 80.0,
+        "carbs": 8.0,
+        "fat": 3.0,
+        "satFat": 1.5,
+        "fiber": 0.0,
+        "sugar": 3.0,
+        "sodium": 300,
+        "potassium": 400,
+        "cholesterol": 10
+      }
+    },
+    {
+      "fdcId": 172183,
+      "description": "Egg, white, raw, fresh",
+      "aliases": [
+        "egg white",
+        "egg whites",
+        "albumen"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 52,
+        "protein": 10.9,
+        "carbs": 0.73,
+        "fat": 0.17,
+        "satFat": 0.0,
+        "fiber": 0,
+        "sugar": 0.71,
+        "sodium": 166,
+        "potassium": 163,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 172184,
+      "description": "Egg, yolk, raw, fresh",
+      "aliases": [
+        "egg yolk",
+        "egg yolks"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 322,
+        "protein": 15.86,
+        "carbs": 3.59,
+        "fat": 26.54,
+        "satFat": 9.551,
+        "fiber": 0,
+        "sugar": 0.56,
+        "sodium": 48,
+        "potassium": 109,
+        "cholesterol": 1085
+      }
+    },
+    {
+      "fdcId": 172185,
+      "description": "Egg, whole, cooked, hard-boiled",
+      "aliases": [
+        "boiled egg",
+        "hard boiled egg",
+        "egg boiled"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 155,
+        "protein": 12.58,
+        "carbs": 1.12,
+        "fat": 10.61,
+        "satFat": 3.267,
+        "fiber": 0,
+        "sugar": 1.12,
+        "sodium": 124,
+        "potassium": 126,
+        "cholesterol": 373
+      }
+    },
+    {
+      "fdcId": 171077,
+      "description": "Chicken, broilers or fryers, breast, meat only, raw",
+      "aliases": [
+        "raw chicken breast",
+        "raw chicken",
+        "uncooked chicken"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 120,
+        "protein": 22.5,
+        "carbs": 0.0,
+        "fat": 2.62,
+        "satFat": 0.69,
+        "fiber": 0,
+        "sugar": 0,
+        "sodium": 45,
+        "potassium": 334,
+        "cholesterol": 64
+      }
+    },
+    {
+      "fdcId": null,
+      "description": "Chicken, tandoori or grilled, marinated, roasted",
+      "aliases": [
+        "tandoori chicken",
+        "chicken tikka",
+        "roast chicken"
+      ],
+      "gi": 0,
+      "estimated": true,
+      "per100g": {
+        "kcal": 195,
+        "protein": 29.0,
+        "carbs": 2.5,
+        "fat": 7.5,
+        "satFat": 2.1,
+        "fiber": 0.2,
+        "sugar": 1.5,
+        "sodium": 420,
+        "potassium": 290,
+        "cholesterol": 95
+      }
+    },
+    {
+      "fdcId": 172420,
+      "description": "Lentils, mature seeds, raw",
+      "aliases": [
+        "raw masoor dal",
+        "dry lentils",
+        "uncooked dal",
+        "raw dal"
+      ],
+      "gi": 32,
+      "per100g": {
+        "kcal": 352,
+        "protein": 24.63,
+        "carbs": 63.35,
+        "fat": 1.06,
+        "satFat": 0.154,
+        "fiber": 10.7,
+        "sugar": 2.03,
+        "sodium": 6,
+        "potassium": 955,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 172000,
+      "description": "Chickpea flour (besan)",
+      "aliases": [
+        "besan",
+        "gram flour",
+        "chickpea flour",
+        "chana atta"
+      ],
+      "gi": 35,
+      "per100g": {
+        "kcal": 387,
+        "protein": 22.39,
+        "carbs": 57.82,
+        "fat": 6.69,
+        "satFat": 0.694,
+        "fiber": 10.8,
+        "sugar": 10.85,
+        "sodium": 64,
+        "potassium": 846,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 172470,
+      "description": "Peanut butter, smooth style",
+      "aliases": [
+        "peanut butter",
+        "groundnut butter"
+      ],
+      "gi": 14,
+      "per100g": {
+        "kcal": 588,
+        "protein": 25.09,
+        "carbs": 19.56,
+        "fat": 50.39,
+        "satFat": 10.325,
+        "fiber": 5.6,
+        "sugar": 9.22,
+        "sodium": 429,
+        "potassium": 649,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 175159,
+      "description": "Fish, tuna, light, canned in water, drained",
+      "aliases": [
+        "canned tuna",
+        "tuna",
+        "tinned tuna"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 116,
+        "protein": 25.51,
+        "carbs": 0.0,
+        "fat": 0.82,
+        "satFat": 0.234,
+        "fiber": 0,
+        "sugar": 0,
+        "sodium": 247,
+        "potassium": 237,
+        "cholesterol": 30
+      }
+    },
+    {
+      "fdcId": 175167,
+      "description": "Fish, salmon, Atlantic, farmed, cooked, dry heat",
+      "aliases": [
+        "salmon",
+        "grilled salmon"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 206,
+        "protein": 22.1,
+        "carbs": 0.0,
+        "fat": 12.35,
+        "satFat": 2.5,
+        "fiber": 0,
+        "sugar": 0,
+        "sodium": 61,
+        "potassium": 384,
+        "cholesterol": 63
+      }
+    },
+    {
+      "fdcId": 170890,
+      "description": "Cheese, mozzarella, whole milk",
+      "aliases": [
+        "mozzarella",
+        "pizza cheese"
+      ],
+      "gi": 0,
+      "per100g": {
+        "kcal": 300,
+        "protein": 22.17,
+        "carbs": 2.19,
+        "fat": 22.35,
+        "satFat": 13.15,
+        "fiber": 0,
+        "sugar": 1.03,
+        "sodium": 627,
+        "potassium": 76,
+        "cholesterol": 79
+      }
+    },
+    {
+      "fdcId": 171269,
+      "description": "Milk, buffalo, fluid",
+      "aliases": [
+        "buffalo milk",
+        "bhains milk"
+      ],
+      "gi": 27,
+      "per100g": {
+        "kcal": 97,
+        "protein": 3.75,
+        "carbs": 5.18,
+        "fat": 6.89,
+        "satFat": 4.6,
+        "fiber": 0,
+        "sugar": 5.18,
+        "sodium": 52,
+        "potassium": 178,
+        "cholesterol": 19
+      }
+    },
+    {
+      "fdcId": 175217,
+      "description": "Beverages, soy milk, unsweetened",
+      "aliases": [
+        "soy milk",
+        "soya milk"
+      ],
+      "gi": 34,
+      "per100g": {
+        "kcal": 54,
+        "protein": 3.27,
+        "carbs": 6.28,
+        "fat": 1.75,
+        "satFat": 0.205,
+        "fiber": 0.4,
+        "sugar": 3.99,
+        "sodium": 51,
+        "potassium": 118,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 172427,
+      "description": "Mung beans, mature seeds, sprouted, raw",
+      "aliases": [
+        "moong sprouts",
+        "sprouts",
+        "sprouted moong",
+        "bean sprouts"
+      ],
+      "gi": 25,
+      "per100g": {
+        "kcal": 30,
+        "protein": 3.04,
+        "carbs": 5.94,
+        "fat": 0.18,
+        "satFat": 0.046,
+        "fiber": 1.8,
+        "sugar": 4.13,
+        "sodium": 6,
+        "potassium": 149,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170554,
+      "description": "Seeds, chia, dried",
+      "aliases": [
+        "chia seeds",
+        "chia"
+      ],
+      "gi": 1,
+      "per100g": {
+        "kcal": 486,
+        "protein": 16.54,
+        "carbs": 42.12,
+        "fat": 30.74,
+        "satFat": 3.33,
+        "fiber": 34.4,
+        "sugar": 0,
+        "sodium": 16,
+        "potassium": 407,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 170556,
+      "description": "Seeds, pumpkin, roasted",
+      "aliases": [
+        "pumpkin seeds",
+        "pepitas"
+      ],
+      "gi": 10,
+      "per100g": {
+        "kcal": 559,
+        "protein": 30.23,
+        "carbs": 10.71,
+        "fat": 49.05,
+        "satFat": 8.659,
+        "fiber": 6.0,
+        "sugar": 1.29,
+        "sodium": 18,
+        "potassium": 809,
+        "cholesterol": 0
+      }
+    },
+    {
+      "fdcId": 174282,
+      "description": "Soybeans, mature seeds, dry roasted",
+      "aliases": [
+        "roasted soybeans",
+        "soya beans dry"
+      ],
+      "gi": 16,
+      "per100g": {
+        "kcal": 451,
+        "protein": 39.58,
+        "carbs": 32.69,
+        "fat": 21.62,
+        "satFat": 3.088,
+        "fiber": 7.0,
+        "sugar": 0,
+        "sodium": 2,
+        "potassium": 1470,
+        "cholesterol": 0
+      }
+    }
   ]
 }

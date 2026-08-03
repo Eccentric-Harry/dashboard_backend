@@ -63,6 +63,10 @@ public class NutritionPipelineService {
     private final MealAnalysisCacheService cache;
     private ObjectMapper objectMapper;
 
+    /** USD→INR rate for the rupee figure shown in the UI. Config, because it drifts. */
+    @org.springframework.beans.factory.annotation.Value("${ai.providers.usd-to-inr:95.3}")
+    private double usdToInr;
+
     public NutritionPipelineService(
             @Qualifier("geminiVisionProvider") VisionProvider primaryProvider,
             @Qualifier("claudeVisionProvider") VisionProvider fallbackProvider,
@@ -120,6 +124,10 @@ public class NutritionPipelineService {
         List<byte[]> images = imagePreprocessor.prepare(
                 imageBytes != null ? imageBytes : new ArrayList<>());
 
+        // Every paid call reports its token spend here, so the stored meal carries its own
+        // cost rather than leaving it to be reconstructed from logs after the fact.
+        List<TokenUsage> usages = java.util.Collections.synchronizedList(new ArrayList<>());
+
         // ── 1. Vision extraction (cached by image content + description) ───
         String extractionKey = cache.extractionKey(images, textDescription);
         Optional<String> cachedExtraction = cache.get(extractionKey);
@@ -139,6 +147,7 @@ public class NutritionPipelineService {
                             .mediaResolution("media_resolution_medium")
                             .maxOutputTokens(2048)
                             .responseSchema(GeminiSchemas.extraction())
+                            .usageSink(usages::add)
                             .build()));
             cache.put(MealAnalysisCacheService.KIND_EXTRACTION, extractionKey, extractionJson);
         }
@@ -179,6 +188,7 @@ public class NutritionPipelineService {
                             .thinkingLevel("medium")
                             .maxOutputTokens(2048)
                             .responseSchema(GeminiSchemas.narrative())
+                            .usageSink(usages::add)
                             .build()));
             narrative = objectMapper.readValue(narrativeJson, NarrativeResponse.class);
             cache.put(MealAnalysisCacheService.KIND_NARRATIVE, narrativeKey, narrativeJson);
@@ -188,8 +198,14 @@ public class NutritionPipelineService {
                 Math.round(computed.getTotals().getKcal()), computed.getGlycaemicLoad(),
                 flags.size(), extractionFromCache, narrativeFromCache);
 
+        TokenUsage.Summary cost = summariseCost(usages, extractionFromCache, narrativeFromCache);
+        log.info("[NutritionPipeline] Cost this analysis: ${} (Rs {}) — {} in / {} out tokens",
+                String.format("%.5f", cost.getTotalCostUsd()),
+                String.format("%.2f", cost.getTotalCostInr()),
+                cost.getTotalInputTokens(), cost.getTotalOutputTokens());
+
         return assemble(extraction, computed, ctx, flags, budget, score, narrative,
-                extractionFromCache && narrativeFromCache);
+                extractionFromCache && narrativeFromCache, cost);
     }
 
     /**
@@ -435,7 +451,8 @@ public class NutritionPipelineService {
                                           GeminiAnalysisResult.DailyBudgetAnalysis budget,
                                           GeminiAnalysisResult.MealScore score,
                                           NarrativeResponse narrative,
-                                          boolean fullyCached) {
+                                          boolean fullyCached,
+                                          TokenUsage.Summary cost) {
 
         NutrientProfile t = n.getTotals();
 
@@ -562,8 +579,11 @@ public class NutritionPipelineService {
 
         List<String> dataQuality = new ArrayList<>();
         if (!n.getUnresolvedIngredients().isEmpty()) {
-            dataQuality.add("Not matched to a nutrient record, excluded from totals: "
-                    + String.join(", ", n.getUnresolvedIngredients()));
+            dataQuality.add(String.format(
+                    "Not matched to a nutrient record, excluded from totals (%.0f g, %.0f%% of "
+                    + "meal weight — protein is usually the most affected): %s",
+                    n.getUnresolvedGrams(), (1 - n.getMassCoverage()) * 100,
+                    String.join(", ", n.getUnresolvedIngredients())));
         }
         if (!n.getEstimatedIngredients().isEmpty()) {
             dataQuality.add("Composition estimated from regional tables rather than a measured "
@@ -594,9 +614,40 @@ public class NutritionPipelineService {
                 .nextMealGuidance(nextMeal)
                 .dataQualityFlags(dataQuality)
                 .dataConfidence(n.getDataConfidence())
+                .massCoverage(n.getMassCoverage())
                 .nutrientSource("USDA_DETERMINISTIC")
                 .servedFromCache(fullyCached)
+                .apiCost(cost)
                 .disclaimer(DISCLAIMER)
+                .build();
+    }
+
+    /**
+     * Rolls per-stage spend into one figure. A stage served from the repeat-meal cache
+     * contributes a zero-cost entry rather than being omitted, so the breakdown still shows
+     * what would otherwise have been paid.
+     */
+    private TokenUsage.Summary summariseCost(List<TokenUsage> usages,
+                                             boolean extractionCached, boolean narrativeCached) {
+        List<TokenUsage> stages = new ArrayList<>(usages);
+        if (extractionCached) {
+            stages.add(TokenUsage.builder().stage("extraction").fromCache(true).build());
+        }
+        if (narrativeCached) {
+            stages.add(TokenUsage.builder().stage("narrative").fromCache(true).build());
+        }
+
+        double usd = stages.stream().mapToDouble(TokenUsage::getCostUsd).sum();
+        return TokenUsage.Summary.builder()
+                .totalCostUsd(Math.round(usd * 1_000_000d) / 1_000_000d)
+                .totalCostInr(Math.round(usd * usdToInr * 100d) / 100d)
+                .totalInputTokens(stages.stream().mapToInt(TokenUsage::getInputTokens).sum())
+                .totalOutputTokens(stages.stream()
+                        .mapToInt(u -> u.getOutputTokens() + u.getThinkingTokens()).sum())
+                .totalCachedTokens(stages.stream().mapToInt(TokenUsage::getCachedInputTokens).sum())
+                .fullyCached(extractionCached && narrativeCached)
+                .usdToInr(usdToInr)
+                .stages(stages)
                 .build();
     }
 

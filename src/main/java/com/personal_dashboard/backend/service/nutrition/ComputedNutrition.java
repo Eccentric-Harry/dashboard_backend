@@ -48,6 +48,19 @@ public class ComputedNutrition {
     /** Share of meal energy backed by a measured USDA record, 0.0–1.0. */
     private double dataConfidence;
 
+    /**
+     * Share of meal <em>mass</em> that resolved, 0.0–1.0.
+     *
+     * <p>Reported alongside energy confidence because the two diverge exactly where it hurts
+     * most. An unmatched egg white or scoop of whey carries little energy, so energy-weighted
+     * confidence stays near 1.0 while the protein total silently loses a third of its value.
+     * Mass coverage catches that.</p>
+     */
+    private double massCoverage;
+
+    /** Total gram weight of ingredients that could not be matched. */
+    private double unresolvedGrams;
+
     @Data
     @Builder
     @NoArgsConstructor

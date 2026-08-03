@@ -2,6 +2,7 @@ package com.personal_dashboard.backend.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.personal_dashboard.backend.service.nutrition.TokenUsage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -31,6 +32,17 @@ public class GeminiVisionProvider implements VisionProvider {
 
     /** Hard ceiling on generated tokens, including Gemini's own thinking tokens. */
     private static final int MAX_OUTPUT_TOKENS = 8192;
+
+    // Published per-million-token rates, used to price each call. Kept in config rather
+    // than hard-coded so a provider price change is a deploy-time edit, not a code change.
+    @Value("${ai.providers.gemini.price.input-per-million:1.50}")
+    private double priceInputPerMillion;
+
+    @Value("${ai.providers.gemini.price.output-per-million:7.50}")
+    private double priceOutputPerMillion;
+
+    @Value("${ai.providers.gemini.price.cached-input-per-million:0.15}")
+    private double priceCachedInputPerMillion;
 
     private RestTemplate restTemplate;
     private ObjectMapper objectMapper;
@@ -131,6 +143,7 @@ public class GeminiVisionProvider implements VisionProvider {
 
             JsonNode root = objectMapper.readTree(response.getBody());
             logUsage(root, elapsedMs);
+            recordUsage(root, opts);
             return extractAndCleanJson(root);
         } catch (RuntimeException e) {
             throw e;
@@ -164,6 +177,41 @@ public class GeminiVisionProvider implements VisionProvider {
                 usage.path("thoughtsTokenCount").asInt(),
                 usage.path("candidatesTokenCount").asInt(),
                 usage.path("totalTokenCount").asInt());
+    }
+
+    /**
+     * Prices this call and hands the result to the caller's sink.
+     *
+     * <p>Thinking tokens bill at the output rate on Gemini 3.x, and cached prompt tokens bill
+     * at roughly a tenth of normal input, so both are separated out rather than folded into
+     * one number — otherwise the figure cannot be reconciled against the invoice.</p>
+     */
+    private void recordUsage(JsonNode root, GenerationOptions opts) {
+        if (opts.getUsageSink() == null) return;
+        JsonNode usage = root.path("usageMetadata");
+        if (usage.isMissingNode()) return;
+
+        int promptTokens = usage.path("promptTokenCount").asInt(0);
+        int cachedTokens = usage.path("cachedContentTokenCount").asInt(0);
+        int outputTokens = usage.path("candidatesTokenCount").asInt(0);
+        int thinkingTokens = usage.path("thoughtsTokenCount").asInt(0);
+
+        int billedInput = Math.max(promptTokens - cachedTokens, 0);
+        double usd = billedInput * priceInputPerMillion / 1_000_000.0
+                + cachedTokens * priceCachedInputPerMillion / 1_000_000.0
+                + (outputTokens + thinkingTokens) * priceOutputPerMillion / 1_000_000.0;
+
+        opts.getUsageSink().accept(TokenUsage.builder()
+                .stage(opts.getStageLabel())
+                .provider(getProviderName())
+                .model(model)
+                .inputTokens(promptTokens)
+                .cachedInputTokens(cachedTokens)
+                .outputTokens(outputTokens)
+                .thinkingTokens(thinkingTokens)
+                .costUsd(usd)
+                .fromCache(false)
+                .build());
     }
 
     private String extractAndCleanJson(JsonNode root) throws Exception {

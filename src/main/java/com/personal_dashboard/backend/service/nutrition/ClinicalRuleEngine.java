@@ -194,15 +194,24 @@ public class ClinicalRuleEngine {
 
         // ── Data quality is a clinical concern, not a footnote ──
         if (!n.getUnresolvedIngredients().isEmpty()) {
-            flags.add(flag("LOW", "GENERAL", "Data Quality",
+            // Severity keyed on unmatched MASS, not item count. One unmatched scoop of whey
+            // is a bigger hit to the protein total than three unmatched garnishes, and
+            // energy-weighted confidence would barely register either.
+            double missingShare = 1.0 - n.getMassCoverage();
+            String severity = missingShare >= 0.25 ? "HIGH"
+                    : missingShare >= 0.10 ? "MODERATE" : "LOW";
+            flags.add(flag(severity, "GENERAL", "Data Quality",
                     "Some Ingredients Not Matched to a Nutrient Record",
                     "Internal data-quality check",
-                    "These items are shown but contribute no nutrients to the totals, so the "
-                            + "figures below understate the meal.",
+                    "These items are shown but contribute no nutrients to the totals, so every "
+                            + "figure below understates the meal. Protein is usually the worst hit, "
+                            + "because protein-dense foods carry little energy and so slip past an "
+                            + "energy-based confidence check.",
                     n.getUnresolvedIngredients(),
-                    String.format("%d of %d ingredients unmatched.",
-                            n.getUnresolvedIngredients().size(), n.getItems().size()),
-                    "Monitor"));
+                    String.format("%d of %d ingredients unmatched, %.0f g (%.0f%% of meal weight).",
+                            n.getUnresolvedIngredients().size(), n.getItems().size(),
+                            n.getUnresolvedGrams(), missingShare * 100),
+                    missingShare >= 0.10 ? "Reduce" : "Monitor"));
         }
 
         flags.sort((a, b) -> rank(b.getSeverity()) - rank(a.getSeverity()));

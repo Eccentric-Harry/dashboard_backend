@@ -144,6 +144,7 @@ public class MealAnalysisJobService {
                     .acneImpactAssessment(medicalAnalysisMap)
                     .healthAnalysis(medicalAnalysisMap)
                     .dailyContext(dailyTargetProgressMap)
+                    .apiCost(buildApiCostMap(analysis))
                     .build();
 
             // ── Persist to MongoDB ───────────────────────────────────────────
@@ -418,5 +419,38 @@ public class MealAnalysisJobService {
     /** Best-effort target date: use the provided value or default to today. */
     public static String resolveTargetDate(String date) {
         return (date != null && !date.isBlank()) ? date : LocalDate.now().toString();
+    }
+
+    /**
+     * Flattens the analysis cost summary for storage. Kept as a Map so the shape can evolve
+     * with provider pricing without a schema migration on historical meals.
+     */
+    private static Map<String, Object> buildApiCostMap(GeminiAnalysisResult analysis) {
+        var cost = analysis.getApiCost();
+        if (cost == null) return null;
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("total_cost_usd", cost.getTotalCostUsd());
+        m.put("total_cost_inr", cost.getTotalCostInr());
+        m.put("total_input_tokens", cost.getTotalInputTokens());
+        m.put("total_output_tokens", cost.getTotalOutputTokens());
+        m.put("total_cached_tokens", cost.getTotalCachedTokens());
+        m.put("fully_cached", cost.isFullyCached());
+        m.put("usd_to_inr", cost.getUsdToInr());
+        List<Map<String, Object>> stages = new ArrayList<>();
+        for (var s : cost.getStages()) {
+            Map<String, Object> sm = new LinkedHashMap<>();
+            sm.put("stage", s.getStage());
+            sm.put("provider", s.getProvider());
+            sm.put("model", s.getModel());
+            sm.put("input_tokens", s.getInputTokens());
+            sm.put("cached_input_tokens", s.getCachedInputTokens());
+            sm.put("output_tokens", s.getOutputTokens());
+            sm.put("thinking_tokens", s.getThinkingTokens());
+            sm.put("cost_usd", s.getCostUsd());
+            sm.put("from_cache", s.isFromCache());
+            stages.add(sm);
+        }
+        m.put("stages", stages);
+        return m;
     }
 }

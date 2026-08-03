@@ -37,12 +37,17 @@ import java.util.concurrent.ConcurrentHashMap;
 public class UsdaNutrientRepository {
 
     /**
-     * Preparation-state tokens. A mismatch between query and candidate on these is heavily
-     * penalised: cooked white rice is 130 kcal/100 g while raw is 365, so silently matching
-     * across states is one of the largest error sources this class is meant to eliminate.
+     * Raw and cooked token families. The distinction that matters is raw versus cooked —
+     * 100 g of raw rice is 365 kcal and cooked is 130 — not which cooking method was used.
+     * An earlier version penalised any state disagreement, which made "tandoori chicken"
+     * and "grilled paneer" fail to match perfectly good records.
      */
-    private static final Set<String> COOK_STATES = Set.of(
-            "raw", "cooked", "boiled", "fried", "roasted", "steamed", "grilled", "baked", "dried");
+    private static final Set<String> RAW_STATES = Set.of("raw", "uncooked", "dry", "dried");
+    private static final Set<String> COOKED_STATES = Set.of(
+            "cooked", "boiled", "fried", "roasted", "steamed", "grilled", "baked", "tandoori");
+
+    /** IDF at or above which a shared token counts as genuinely discriminating. */
+    private static final double DISTINCTIVE_IDF = 1.6;
 
     /** Minimum match score below which we decline to guess and escalate to the API. */
     private static final double FUZZY_ACCEPT_THRESHOLD = 0.55;
@@ -69,6 +74,8 @@ public class UsdaNutrientRepository {
     private final List<UsdaFood> embedded = new ArrayList<>();
     /** Pre-tokenised embedded descriptions, index-aligned with {@link #embedded}. */
     private final List<Set<String>> embeddedTokens = new ArrayList<>();
+    /** How many table entries contain each token — the basis for IDF weighting. */
+    private final Map<String, Integer> documentFrequency = new ConcurrentHashMap<>();
 
     public UsdaNutrientRepository(NutrientCacheRepository cacheRepository, FdcClient fdcClient) {
         this.cacheRepository = cacheRepository;
@@ -89,8 +96,19 @@ public class UsdaNutrientRepository {
                     exactIndex.putIfAbsent(normalize(alias), food);
                 }
             }
-            log.info("[UsdaNutrientRepository] Loaded {} embedded foods, {} lookup keys",
-                    embedded.size(), exactIndex.size());
+            // Build the document-frequency index over descriptions and aliases together,
+            // since both are matched against.
+            for (int i = 0; i < embedded.size(); i++) {
+                Set<String> all = new LinkedHashSet<>(embeddedTokens.get(i));
+                for (String alias : embedded.get(i).getAliases()) {
+                    all.addAll(tokenize(alias));
+                }
+                for (String token : all) {
+                    documentFrequency.merge(token, 1, Integer::sum);
+                }
+            }
+            log.info("[UsdaNutrientRepository] Loaded {} embedded foods, {} lookup keys, {} tokens",
+                    embedded.size(), exactIndex.size(), documentFrequency.size());
         } catch (Exception e) {
             log.error("[UsdaNutrientRepository] Failed to load embedded USDA table — "
                     + "all lookups will fall back to the live API or the model estimate", e);
@@ -215,11 +233,14 @@ public class UsdaNutrientRepository {
     }
 
     /**
-     * Token-containment score with a preparation-state guard.
+     * IDF-weighted token overlap with a raw/cooked guard.
      *
-     * <p>Base score is the fraction of query tokens present in the candidate, which handles
-     * USDA's comma-qualified descriptions well ("Rice, white, long-grain, cooked" against
-     * "white rice cooked"). Alias tokens are folded in so colloquial names score too.</p>
+     * <p>Plain token counting made wrong-food matches easy, because USDA descriptions are full
+     * of low-information modifiers. "Milk, buffalo, fluid" matched "Yogurt, plain, whole milk"
+     * on {@code milk} and {@code whole} alone — two of the commonest words in the table —
+     * and buffalo milk was silently priced as yogurt. Weighting each token by how rare it is
+     * across the table fixes that without a hand-maintained stopword list: {@code buffalo}
+     * carries real weight, {@code whole} carries almost none.</p>
      */
     private double score(Set<String> query, Set<String> candidateTokens, UsdaFood food) {
         Set<String> candidate = new LinkedHashSet<>(candidateTokens);
@@ -227,15 +248,38 @@ public class UsdaNutrientRepository {
             candidate.addAll(tokenize(alias));
         }
 
-        long shared = query.stream().filter(candidate::contains).count();
-        if (shared == 0) return 0.0;
-        double base = (double) shared / query.size();
+        Boolean queryRawness = rawness(query);
+        Boolean candidateRawness = rawness(candidate);
+        // A record that states no preparation is state-agnostic, so a cooking method in the
+        // query is extra information rather than evidence against it. Counting it against
+        // the match is what made "grilled paneer" miss the paneer record entirely.
+        boolean ignoreStateTokens = candidateRawness == null;
 
-        // Penalise cooking-state disagreement — a raw/cooked mix-up is a large caloric error.
-        String queryState = firstState(query);
-        String candidateState = firstState(candidate);
-        if (queryState != null && candidateState != null && !queryState.equals(candidateState)) {
-            base *= 0.4;
+        double sharedWeight = 0;
+        double queryWeight = 0;
+        double sharedDistinctive = 0;
+        for (String t : query) {
+            if (ignoreStateTokens && isStateToken(t)) continue;
+            double w = idf(t);
+            queryWeight += w;
+            if (candidate.contains(t)) {
+                sharedWeight += w;
+                if (w >= DISTINCTIVE_IDF) sharedDistinctive += w;
+            }
+        }
+        if (queryWeight == 0 || sharedWeight == 0) return 0.0;
+
+        // A match resting entirely on generic modifiers is not a match.
+        if (sharedDistinctive == 0) return 0.0;
+
+        double base = sharedWeight / queryWeight;
+
+        // Guard the raw/cooked boundary, where energy density differs several-fold —
+        // but treat grilled, roasted and boiled as mutually compatible, since they are
+        // all simply "cooked" and penalising between them turned "tandoori chicken"
+        // into an outright miss.
+        if (queryRawness != null && candidateRawness != null && !queryRawness.equals(candidateRawness)) {
+            base *= 0.35;
         }
 
         // Slightly favour tighter candidates so "Salt, table" beats a long description
@@ -244,9 +288,27 @@ public class UsdaNutrientRepository {
         return base * (0.75 + 0.25 * specificity);
     }
 
-    private String firstState(Set<String> tokens) {
+    /**
+     * Inverse document frequency of a token across the embedded table. Rare tokens
+     * ({@code buffalo}, {@code besan}) discriminate; common ones ({@code whole}, {@code raw})
+     * barely do.
+     */
+    private double idf(String token) {
+        int df = documentFrequency.getOrDefault(token, 0);
+        // Unseen query tokens are maximally informative — they are what makes this
+        // ingredient different from everything we know about.
+        return Math.log((embedded.size() + 1.0) / (df + 1.0));
+    }
+
+    private static boolean isStateToken(String t) {
+        return RAW_STATES.contains(t) || COOKED_STATES.contains(t);
+    }
+
+    /** True if the token set says raw, false if it says cooked, null if it says neither. */
+    private Boolean rawness(Set<String> tokens) {
         for (String t : tokens) {
-            if (COOK_STATES.contains(t)) return t;
+            if (RAW_STATES.contains(t)) return Boolean.TRUE;
+            if (COOKED_STATES.contains(t)) return Boolean.FALSE;
         }
         return null;
     }
