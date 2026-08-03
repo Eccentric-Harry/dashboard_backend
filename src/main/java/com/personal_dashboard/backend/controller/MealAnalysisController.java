@@ -4,12 +4,15 @@ import com.personal_dashboard.backend.dto.ApiMeta;
 import com.personal_dashboard.backend.dto.ApiResponse;
 import com.personal_dashboard.backend.dto.GeminiAnalysisResult;
 import com.personal_dashboard.backend.dto.MealAnalysisResponse;
+import com.personal_dashboard.backend.model.DailyFoodLog;
 import com.personal_dashboard.backend.model.MealEntry;
 import com.personal_dashboard.backend.model.UserAccount;
 import com.personal_dashboard.backend.repository.UserAccountRepository;
 import com.personal_dashboard.backend.security.UserContext;
 import com.personal_dashboard.backend.service.DailyFoodLogService;
 import com.personal_dashboard.backend.service.NutritionPipelineService;
+import com.personal_dashboard.backend.service.nutrition.NutritionContext;
+import com.personal_dashboard.backend.service.nutrition.NutritionContextFactory;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +45,7 @@ public class MealAnalysisController {
     private final NutritionPipelineService nutritionPipelineService;
     private final DailyFoodLogService dailyFoodLogService;
     private final UserAccountRepository userAccountRepository;
+    private final NutritionContextFactory nutritionContextFactory;
 
     /**
      * Analyze a meal using the Gemini AI pipeline, persist, and return the full analysis.
@@ -80,17 +84,27 @@ public class MealAnalysisController {
 
         String targetDate = (date != null && !date.isBlank()) ? date : LocalDate.now().toString();
 
-        // ── Load User Profile ────────────────────────────────────────────
+        // ── Load User Profile and today's real intake ────────────────────
         String userId = UserContext.getRequiredUserId();
         UserAccount userProfile = userAccountRepository.findById(userId).orElse(null);
 
-        // ── Run Two-Stage Gemini Pipeline ────────────────────────────────
+        // Budget analysis is only meaningful against what has actually been eaten today.
+        DailyFoodLog todayLog = null;
+        try {
+            todayLog = dailyFoodLogService.getDailyLog(targetDate);
+        } catch (Exception e) {
+            log.warn("[MealAnalysis] Could not load today's log for user={}; "
+                    + "budget will be computed against a full day: {}", userId, e.getMessage());
+        }
+        NutritionContext context = nutritionContextFactory.build(userProfile, todayLog);
+
+        // ── Run the analysis pipeline ────────────────────────────────────
         GeminiAnalysisResult analysis;
         try {
-            analysis = nutritionPipelineService.analyzeWithTwoStage(
+            analysis = nutritionPipelineService.analyze(
                     hasImage ? file : null,
                     hasText ? description : null,
-                    userProfile);
+                    context);
         } catch (Exception e) {
             log.error("[MealAnalysis] Gemini pipeline failed for user={}: {}", userId, e.getMessage(), e);
             return ResponseEntity.internalServerError().body(ApiResponse.<MealAnalysisResponse>builder()

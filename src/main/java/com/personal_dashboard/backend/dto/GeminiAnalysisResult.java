@@ -68,6 +68,25 @@ public class GeminiAnalysisResult {
     @JsonProperty("data_quality_flags")
     private List<String> dataQualityFlags;
 
+    /**
+     * Share of meal energy backed by a measured USDA FoodData Central record, 0.0–1.0.
+     * Values below 1.0 mean some ingredients fell back to regional estimates or could not
+     * be matched at all.
+     */
+    @JsonProperty("data_confidence")
+    private double dataConfidence;
+
+    /**
+     * Whether the numbers came from the deterministic USDA path or, on fallback, from the
+     * model's own estimate: {@code USDA_DETERMINISTIC} or {@code MODEL_ESTIMATE}.
+     */
+    @JsonProperty("nutrient_source")
+    private String nutrientSource;
+
+    /** True when this result was served from the repeat-meal cache without any API call. */
+    @JsonProperty("served_from_cache")
+    private boolean servedFromCache;
+
     @JsonProperty("disclaimer")
     private String disclaimer;
 
@@ -117,6 +136,18 @@ public class GeminiAnalysisResult {
 
         @JsonProperty("cholesterol_mg")
         private double cholesterolMg;
+
+        /**
+         * Lower bound of meal energy implied by the vision stage's portion-confidence
+         * brackets. Portion estimation is the dominant error source in image-based dietary
+         * assessment, so the band is reported rather than a single false-precision figure.
+         */
+        @JsonProperty("calories_low_kcal")
+        private double caloriesLowKcal;
+
+        /** Upper bound of meal energy implied by portion-confidence brackets. */
+        @JsonProperty("calories_high_kcal")
+        private double caloriesHighKcal;
 
         @JsonProperty("math_verification")
         private MathVerification mathVerification;

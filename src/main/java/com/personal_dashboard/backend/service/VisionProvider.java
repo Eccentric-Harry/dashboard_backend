@@ -11,7 +11,19 @@ public interface VisionProvider {
      * @param prompt     Structured prompt/instructions
      * @return Extracted JSON response string
      */
-    String analyzeFoodImage(byte[] imageBytes, String prompt);
+    default String analyzeFoodImage(byte[] imageBytes, String prompt) {
+        return analyzeFoodImage(imageBytes, prompt, GenerationOptions.builder().build());
+    }
+
+    /**
+     * Analyzes a food image and/or text prompt using explicit generation settings.
+     *
+     * @param imageBytes Optional raw image bytes
+     * @param prompt     Structured prompt/instructions
+     * @param options    Per-call reasoning depth, image resolution, and output schema
+     * @return Extracted JSON response string
+     */
+    String analyzeFoodImage(byte[] imageBytes, String prompt, GenerationOptions options);
 
     /**
      * Returns the user-friendly name of the provider (e.g. "Gemini", "Groq").

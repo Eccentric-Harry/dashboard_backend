@@ -38,8 +38,9 @@ public class GroqVisionProvider implements VisionProvider {
     }
 
     @Override
-    public String analyzeFoodImage(byte[] imageBytes, String prompt) {
+    public String analyzeFoodImage(byte[] imageBytes, String prompt, GenerationOptions options) {
         try {
+            GenerationOptions opts = options != null ? options : GenerationOptions.builder().build();
             Map<String, Object> message = new LinkedHashMap<>();
             message.put("role", "user");
 
@@ -60,8 +61,10 @@ public class GroqVisionProvider implements VisionProvider {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("model", model);
             body.put("messages", List.of(message));
+            // Kept low deliberately: unlike Gemini 3.x, the Llama-family fallback model is
+            // well-behaved at low temperature for structured extraction.
             body.put("temperature", 0.1);
-            body.put("max_tokens", 8192);
+            body.put("max_tokens", opts.getMaxOutputTokens());
             body.put("response_format", Map.of("type", "json_object"));
 
             HttpHeaders headers = new HttpHeaders();
