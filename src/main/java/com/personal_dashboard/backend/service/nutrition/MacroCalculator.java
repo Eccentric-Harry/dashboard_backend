@@ -50,6 +50,7 @@ public class MacroCalculator {
         double gramsTotal = 0.0;
         double gramsUnresolved = 0.0;
 
+        Double dishEstimate = extraction != null ? extraction.getDishLevelEnergyEstimateKcal() : null;
         List<Stage1Extraction.Item> rawItems = safe(extraction);
         // Resolved as a batch so any network lookups overlap rather than queueing.
         List<UsdaNutrientRepository.Resolution> resolutions = nutrients.resolveAll(rawItems);
@@ -139,6 +140,9 @@ public class MacroCalculator {
                 .dataConfidence(round(confidence, 2))
                 .massCoverage(round(gramsTotal > 0 ? (gramsTotal - gramsUnresolved) / gramsTotal : 1.0, 2))
                 .unresolvedGrams(round(gramsUnresolved, 0))
+                .dishLevelEstimateKcal(dishEstimate)
+                .plausibilityRatio(dishEstimate != null && dishEstimate > 0
+                        ? round(totalKcal / dishEstimate, 2) : null)
                 .build();
     }
 

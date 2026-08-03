@@ -167,6 +167,13 @@ public class GeminiAnalysisResult {
         @JsonProperty("calories_high_kcal")
         private double caloriesHighKcal;
 
+        /**
+         * Micronutrient totals, present only where USDA measured them for the ingredients
+         * involved. A nutrient absent from this map was not measured — it is not zero.
+         */
+        @JsonProperty("micronutrients")
+        private java.util.Map<String, Double> micronutrients;
+
         @JsonProperty("math_verification")
         private MathVerification mathVerification;
     }

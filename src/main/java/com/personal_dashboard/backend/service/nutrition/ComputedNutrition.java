@@ -61,6 +61,20 @@ public class ComputedNutrition {
     /** Total gram weight of ingredients that could not be matched. */
     private double unresolvedGrams;
 
+    /**
+     * The vision model's holistic energy estimate for the dish, made independently of its own
+     * ingredient list. Null when not supplied.
+     */
+    private Double dishLevelEstimateKcal;
+
+    /**
+     * Ratio of the ingredient sum to the holistic estimate, or null when there is nothing to
+     * compare. Well below 1.0 means the decomposition probably missed something — oil absorbed
+     * during frying, a second roti, sugar in the chai — which is the failure mode that
+     * summing a visible ingredient list is most prone to.
+     */
+    private Double plausibilityRatio;
+
     @Data
     @Builder
     @NoArgsConstructor

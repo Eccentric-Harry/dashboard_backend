@@ -214,6 +214,39 @@ public class ClinicalRuleEngine {
                     missingShare >= 0.10 ? "Reduce" : "Monitor"));
         }
 
+        // ── Ingredient decomposition vs the model's holistic read of the dish ──
+        // Summing a visible ingredient list systematically misses what the camera cannot
+        // see: oil absorbed during frying, sugar dissolved in chai, ghee brushed on a roti.
+        // The model's whole-dish estimate is a poor number to report but a good detector,
+        // because it draws on knowing what this dish usually weighs in at.
+        if (n.getPlausibilityRatio() != null) {
+            double ratio = n.getPlausibilityRatio();
+            if (ratio < 0.65) {
+                flags.add(flag("MODERATE", "GENERAL", "Data Quality",
+                        "Ingredient Total Well Below the Expected Range for This Dish",
+                        "Internal cross-check against the vision model's whole-dish estimate",
+                        "Ingredient-level decomposition tends to miss what is not visible — "
+                                + "absorbed cooking oil, dissolved sugar, ghee on bread. The figures "
+                                + "below are more likely to understate this meal than overstate it.",
+                        List.of(),
+                        String.format("Ingredients sum to %.0f kcal against a whole-dish estimate "
+                                + "of %.0f kcal (%.0f%%).",
+                                n.getTotals().getKcal(), n.getDishLevelEstimateKcal(), ratio * 100),
+                        "Monitor"));
+            } else if (ratio > 1.5) {
+                flags.add(flag("LOW", "GENERAL", "Data Quality",
+                        "Ingredient Total Above the Expected Range for This Dish",
+                        "Internal cross-check against the vision model's whole-dish estimate",
+                        "Portions may have been over-estimated, or an ingredient double-counted "
+                                + "across multiple photographs of the same plate.",
+                        List.of(),
+                        String.format("Ingredients sum to %.0f kcal against a whole-dish estimate "
+                                + "of %.0f kcal (%.0f%%).",
+                                n.getTotals().getKcal(), n.getDishLevelEstimateKcal(), ratio * 100),
+                        "Monitor"));
+            }
+        }
+
         flags.sort((a, b) -> rank(b.getSeverity()) - rank(a.getSeverity()));
         for (int i = 0; i < flags.size(); i++) {
             flags.get(i).setFlagId(String.format("FLAG_%03d", i + 1));

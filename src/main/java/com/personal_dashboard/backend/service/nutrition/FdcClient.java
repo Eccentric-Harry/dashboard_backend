@@ -39,6 +39,21 @@ public class FdcClient {
     private static final String N_CHOLESTEROL = "601";
 
     /**
+     * Micronutrients, captured on every live lookup because they arrive in the same response
+     * and cost nothing extra. Keys are USDA nutrient numbers.
+     */
+    private static final Map<String, String> MICRONUTRIENTS = Map.of(
+            "303", "iron_mg",
+            "301", "calcium_mg",
+            "304", "magnesium_mg",
+            "309", "zinc_mg",
+            "401", "vitamin_c_mg",
+            "320", "vitamin_a_mcg_rae",
+            "328", "vitamin_d_mcg",
+            "418", "vitamin_b12_mcg",
+            "417", "folate_mcg");
+
+    /**
      * Dataset preference. Foundation and SR Legacy are analytically measured single foods;
      * Survey (FNDDS) covers prepared and mixed dishes, which matters for composite meals.
      * Lower index wins ties on relevance.
@@ -306,6 +321,16 @@ public class FdcClient {
         return true;
     }
 
+    /** Only nutrients FDC actually reported — an absent key means unmeasured, not zero. */
+    private static Map<String, Double> extractMicros(Map<String, Double> byNumber) {
+        Map<String, Double> out = new LinkedHashMap<>();
+        MICRONUTRIENTS.forEach((number, key) -> {
+            Double v = byNumber.get(number);
+            if (v != null) out.put(key, v);
+        });
+        return out;
+    }
+
     private NutrientProfile parseNutrients(JsonNode food) {
         Map<String, Double> byNumber = new HashMap<>();
         for (JsonNode n : food.path("foodNutrients")) {
@@ -330,6 +355,7 @@ public class FdcClient {
                 .sodium(byNumber.getOrDefault(N_SODIUM, 0.0))
                 .potassium(byNumber.getOrDefault(N_POTASSIUM, 0.0))
                 .cholesterol(byNumber.getOrDefault(N_CHOLESTEROL, 0.0))
+                .micros(extractMicros(byNumber))
                 .build();
     }
 }

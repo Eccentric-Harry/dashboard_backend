@@ -141,11 +141,17 @@ public class NutritionPipelineService {
                     STAGE1_STATIC_PROMPT, buildStage1Context(textDescription),
                     GenerationOptions.builder()
                             .stageLabel("extraction")
-                            // Perception, not deliberation. Thinking tokens bill at the
-                            // output rate, so depth here is a direct cost.
-                            .thinkingLevel("low")
-                            .mediaResolution("media_resolution_medium")
-                            .maxOutputTokens(2048)
+                            // Recognition and portion estimation are the binding constraint on
+                            // the accuracy of everything downstream, and "high" is the API
+                            // default for 3.x Flash. An earlier version cut this to "low" to
+                            // save output tokens, which economised on precisely the step whose
+                            // errors the rest of the pipeline cannot recover from.
+                            .thinkingLevel("high")
+                            // Likewise: ~1120 image tokens against ~560 costs about 0.08 rupees
+                            // per image, and fine detail is what distinguishes ingredients and
+                            // reveals the scale references portion estimates depend on.
+                            .mediaResolution("media_resolution_high")
+                            .maxOutputTokens(4096)
                             .responseSchema(GeminiSchemas.extraction())
                             .usageSink(usages::add)
                             .build()));
@@ -251,6 +257,20 @@ public class NutritionPipelineService {
             Your only job is to identify every ingredient in a meal and estimate its weight.
             You do NOT compute calories or macros — that happens downstream from a nutrient
             database, so an invented number here would corrupt a real health record.
+
+            HOW TO WORK
+            Start with visual_assessment: look at the photograph and describe what is actually
+            there before you commit to any list — the dish, the vessels, the reference objects
+            you can use for scale, how full everything is, and what you cannot see. Think about
+            it as a whole meal first.
+
+            Then give dish_level_energy_estimate_kcal: what a portion of this dish, at the size
+            shown, usually comes to. Base it on knowing the dish, NOT on adding up the list you
+            are about to write. It is never shown to the user — it is checked against the
+            ingredient sum to catch things the decomposition missed, so an honest independent
+            number is worth far more than one reverse-engineered to agree.
+
+            Only then enumerate the ingredients.
 
             NAMING
             Map every ingredient to its closest USDA FoodData Central description, using FDC
@@ -470,6 +490,7 @@ public class NutritionPipelineService {
                 .sodiumMg(r(t.getSodium(), 0))
                 .potassiumMg(r(t.getPotassium(), 0))
                 .cholesterolMg(r(t.getCholesterol(), 0))
+                .micronutrients(t.getMicros())
                 .caloriesLowKcal(n.getCaloriesLow())
                 .caloriesHighKcal(n.getCaloriesHigh())
                 // Retained for response-shape compatibility. The gate is now trivially

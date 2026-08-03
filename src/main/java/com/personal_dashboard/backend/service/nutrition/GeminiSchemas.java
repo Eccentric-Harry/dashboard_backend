@@ -104,6 +104,20 @@ public final class GeminiSchemas {
                 "is_hidden", "cooking_method"));
 
         return obj(props(
+                // Deliberately FIRST. Constrained decoding degrades reasoning when the model
+                // must commit to structured fields before articulating what it sees; giving it
+                // a free-text field to look at the photograph first recovers most of that loss
+                // at a cost of ~100 tokens. This is not the old arithmetic scratchpad — there is
+                // no arithmetic left to transcribe, only observation.
+                "visual_assessment", str("Before listing anything: describe what you actually see. "
+                        + "What dish is this, what is on the plate, what vessels and reference "
+                        + "objects are visible for scale, how full are they, and what is ambiguous "
+                        + "or hidden from view? 3-5 sentences."),
+                "dish_level_energy_estimate_kcal", num("Holistic estimate of the whole meal's "
+                        + "energy from your knowledge of this dish and the portion shown, made "
+                        + "BEFORE and INDEPENDENTLY of the ingredient list. Used only as a "
+                        + "plausibility cross-check against the sum of the ingredients, never "
+                        + "as the reported figure."),
                 "meal_label", str("Short human-readable meal name"),
                 "cuisine_type", str("e.g. 'South Indian', 'North Indian', 'Continental', 'Unknown'"),
                 "meal_type_guess", enumOf(List.of("Breakfast", "Lunch", "Dinner", "Snack", "Unknown")),
@@ -111,7 +125,8 @@ public final class GeminiSchemas {
                 "extraction_confidence", enumOf(List.of("High", "Medium", "Low")),
                 "extraction_notes", str("Ambiguities, image/text conflicts, or quality issues"),
                 "ingredients", arr(ingredient)
-        ), List.of("meal_label", "cuisine_type", "meal_type_guess", "image_quality",
+        ), List.of("visual_assessment", "dish_level_energy_estimate_kcal", "meal_label",
+                "cuisine_type", "meal_type_guess", "image_quality",
                 "extraction_confidence", "ingredients"));
     }
 

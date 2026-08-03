@@ -23,6 +23,22 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Stage1Extraction {
 
+    /**
+     * Free-text observation the model writes before filling any structured field.
+     * Exists because constrained decoding measurably degrades reasoning when the model has
+     * to commit to schema fields before describing what it is looking at.
+     */
+    @JsonProperty("visual_assessment")
+    private String visualAssessment;
+
+    /**
+     * The model's holistic energy estimate for the dish, made independently of its own
+     * ingredient list. Never reported as the answer — used only to detect when ingredient
+     * decomposition has missed something large.
+     */
+    @JsonProperty("dish_level_energy_estimate_kcal")
+    private Double dishLevelEnergyEstimateKcal;
+
     @JsonProperty("meal_label")
     private String mealLabel;
 

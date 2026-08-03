@@ -25,7 +25,13 @@
         "sugar": 0.05,
         "sodium": 1,
         "potassium": 35,
-        "cholesterol": 0
+        "cholesterol": 0,
+        "micros": {
+          "iron_mg": 1.2,
+          "magnesium_mg": 12,
+          "zinc_mg": 0.49,
+          "folate_mcg": 58
+        }
       }
     },
     {
@@ -90,7 +96,14 @@
         "sugar": 0.41,
         "sodium": 2,
         "potassium": 363,
-        "cholesterol": 0
+        "cholesterol": 0,
+        "micros": {
+          "iron_mg": 3.6,
+          "calcium_mg": 34,
+          "magnesium_mg": 137,
+          "zinc_mg": 2.6,
+          "folate_mcg": 44
+        }
       }
     },
     {
@@ -294,7 +307,12 @@
         "sugar": 0.4,
         "sodium": 11,
         "potassium": 408,
-        "cholesterol": 0
+        "cholesterol": 0,
+        "micros": {
+          "iron_mg": 3.9,
+          "calcium_mg": 344,
+          "magnesium_mg": 137
+        }
       }
     },
     {
@@ -452,7 +470,14 @@
         "sugar": 1.8,
         "sodium": 2,
         "potassium": 369,
-        "cholesterol": 0
+        "cholesterol": 0,
+        "micros": {
+          "iron_mg": 3.33,
+          "calcium_mg": 19,
+          "magnesium_mg": 36,
+          "zinc_mg": 1.27,
+          "folate_mcg": 181
+        }
       }
     },
     {
@@ -543,7 +568,14 @@
         "sugar": 4.8,
         "sodium": 7,
         "potassium": 291,
-        "cholesterol": 0
+        "cholesterol": 0,
+        "micros": {
+          "iron_mg": 2.89,
+          "calcium_mg": 49,
+          "magnesium_mg": 48,
+          "zinc_mg": 1.53,
+          "folate_mcg": 172
+        }
       }
     },
     {
@@ -565,7 +597,14 @@
         "sugar": 0.32,
         "sodium": 2,
         "potassium": 403,
-        "cholesterol": 0
+        "cholesterol": 0,
+        "micros": {
+          "iron_mg": 2.94,
+          "calcium_mg": 28,
+          "magnesium_mg": 45,
+          "zinc_mg": 1.07,
+          "folate_mcg": 130
+        }
       }
     },
     {
@@ -629,7 +668,14 @@
         "sugar": 5.05,
         "sodium": 43,
         "potassium": 132,
-        "cholesterol": 10
+        "cholesterol": 10,
+        "micros": {
+          "calcium_mg": 113,
+          "magnesium_mg": 10,
+          "zinc_mg": 0.37,
+          "vitamin_b12_mcg": 0.45,
+          "vitamin_d_mcg": 1.3
+        }
       }
     },
     {
@@ -676,7 +722,13 @@
         "sugar": 4.66,
         "sodium": 46,
         "potassium": 155,
-        "cholesterol": 13
+        "cholesterol": 13,
+        "micros": {
+          "calcium_mg": 121,
+          "magnesium_mg": 12,
+          "zinc_mg": 0.59,
+          "vitamin_b12_mcg": 0.37
+        }
       }
     },
     {
@@ -698,7 +750,13 @@
         "sugar": 3.6,
         "sodium": 22,
         "potassium": 110,
-        "cholesterol": 68
+        "cholesterol": 68,
+        "micros": {
+          "calcium_mg": 480,
+          "magnesium_mg": 22,
+          "zinc_mg": 2.4,
+          "vitamin_b12_mcg": 1.1
+        }
       }
     },
     {
@@ -833,7 +891,16 @@
         "sugar": 0.37,
         "sodium": 142,
         "potassium": 138,
-        "cholesterol": 372
+        "cholesterol": 372,
+        "micros": {
+          "iron_mg": 1.75,
+          "calcium_mg": 56,
+          "zinc_mg": 1.29,
+          "vitamin_b12_mcg": 0.89,
+          "vitamin_d_mcg": 2.0,
+          "vitamin_a_mcg_rae": 160,
+          "folate_mcg": 47
+        }
       }
     },
     {
@@ -856,7 +923,13 @@
         "sugar": 0.0,
         "sodium": 74,
         "potassium": 256,
-        "cholesterol": 85
+        "cholesterol": 85,
+        "micros": {
+          "iron_mg": 1.04,
+          "zinc_mg": 1.0,
+          "vitamin_b12_mcg": 0.34,
+          "magnesium_mg": 29
+        }
       }
     },
     {
@@ -1279,7 +1352,13 @@
         "sugar": 2.63,
         "sodium": 5,
         "potassium": 237,
-        "cholesterol": 0
+        "cholesterol": 0,
+        "micros": {
+          "vitamin_c_mg": 13.7,
+          "vitamin_a_mcg_rae": 42,
+          "folate_mcg": 15,
+          "magnesium_mg": 11
+        }
       }
     },
     {
@@ -1324,7 +1403,15 @@
         "sugar": 0.42,
         "sodium": 79,
         "potassium": 558,
-        "cholesterol": 0
+        "cholesterol": 0,
+        "micros": {
+          "iron_mg": 2.71,
+          "calcium_mg": 99,
+          "magnesium_mg": 79,
+          "vitamin_c_mg": 28.1,
+          "folate_mcg": 194,
+          "vitamin_a_mcg_rae": 469
+        }
       }
     },
     {
@@ -1346,7 +1433,12 @@
         "sugar": 1.91,
         "sodium": 30,
         "potassium": 299,
-        "cholesterol": 0
+        "cholesterol": 0,
+        "micros": {
+          "vitamin_c_mg": 48.2,
+          "folate_mcg": 57,
+          "magnesium_mg": 15
+        }
       }
     },
     {
@@ -1368,7 +1460,12 @@
         "sugar": 4.74,
         "sodium": 69,
         "potassium": 320,
-        "cholesterol": 0
+        "cholesterol": 0,
+        "micros": {
+          "vitamin_a_mcg_rae": 835,
+          "vitamin_c_mg": 5.9,
+          "magnesium_mg": 12
+        }
       }
     },
     {
@@ -1883,7 +1980,13 @@
         "sugar": 4.35,
         "sodium": 1,
         "potassium": 733,
-        "cholesterol": 0
+        "cholesterol": 0,
+        "micros": {
+          "iron_mg": 3.71,
+          "calcium_mg": 269,
+          "magnesium_mg": 270,
+          "zinc_mg": 3.12
+        }
       }
     },
     {
@@ -1927,7 +2030,14 @@
         "sugar": 4.72,
         "sodium": 18,
         "potassium": 705,
-        "cholesterol": 0
+        "cholesterol": 0,
+        "micros": {
+          "iron_mg": 4.58,
+          "calcium_mg": 92,
+          "magnesium_mg": 168,
+          "zinc_mg": 3.27,
+          "folate_mcg": 240
+        }
       }
     },
     {
@@ -1971,7 +2081,13 @@
         "sugar": 0.3,
         "sodium": 11,
         "potassium": 468,
-        "cholesterol": 0
+        "cholesterol": 0,
+        "micros": {
+          "iron_mg": 14.55,
+          "calcium_mg": 975,
+          "magnesium_mg": 351,
+          "zinc_mg": 7.75
+        }
       }
     },
     {
@@ -2015,7 +2131,12 @@
         "sugar": 12.23,
         "sodium": 1,
         "potassium": 358,
-        "cholesterol": 0
+        "cholesterol": 0,
+        "micros": {
+          "vitamin_c_mg": 8.7,
+          "magnesium_mg": 27,
+          "folate_mcg": 20
+        }
       }
     },
     {
@@ -2079,7 +2200,12 @@
         "sugar": 9.35,
         "sodium": 0,
         "potassium": 181,
-        "cholesterol": 0
+        "cholesterol": 0,
+        "micros": {
+          "vitamin_c_mg": 53.2,
+          "calcium_mg": 40,
+          "folate_mcg": 30
+        }
       }
     },
     {
@@ -2164,7 +2290,12 @@
         "sugar": 8.92,
         "sodium": 2,
         "potassium": 417,
-        "cholesterol": 0
+        "cholesterol": 0,
+        "micros": {
+          "vitamin_c_mg": 228.3,
+          "folate_mcg": 49,
+          "magnesium_mg": 22
+        }
       }
     },
     {
@@ -2321,7 +2452,13 @@
         "sugar": 3.24,
         "sodium": 36,
         "potassium": 141,
-        "cholesterol": 5
+        "cholesterol": 5,
+        "micros": {
+          "calcium_mg": 110,
+          "magnesium_mg": 11,
+          "zinc_mg": 0.52,
+          "vitamin_b12_mcg": 0.75
+        }
       }
     },
     {
@@ -2391,7 +2528,13 @@
         "sugar": 3.0,
         "sodium": 20,
         "potassium": 2200,
-        "cholesterol": 0
+        "cholesterol": 0,
+        "micros": {
+          "iron_mg": 10.8,
+          "calcium_mg": 240,
+          "magnesium_mg": 315,
+          "zinc_mg": 4.4
+        }
       }
     },
     {
@@ -2548,7 +2691,14 @@
         "sugar": 2.03,
         "sodium": 6,
         "potassium": 955,
-        "cholesterol": 0
+        "cholesterol": 0,
+        "micros": {
+          "iron_mg": 7.54,
+          "calcium_mg": 35,
+          "magnesium_mg": 47,
+          "zinc_mg": 3.27,
+          "folate_mcg": 479
+        }
       }
     },
     {
@@ -2571,7 +2721,14 @@
         "sugar": 10.85,
         "sodium": 64,
         "potassium": 846,
-        "cholesterol": 0
+        "cholesterol": 0,
+        "micros": {
+          "iron_mg": 4.86,
+          "calcium_mg": 45,
+          "magnesium_mg": 166,
+          "zinc_mg": 2.81,
+          "folate_mcg": 437
+        }
       }
     },
     {
@@ -2614,7 +2771,13 @@
         "sugar": 0,
         "sodium": 247,
         "potassium": 237,
-        "cholesterol": 30
+        "cholesterol": 30,
+        "micros": {
+          "vitamin_d_mcg": 1.7,
+          "vitamin_b12_mcg": 2.55,
+          "iron_mg": 1.63,
+          "magnesium_mg": 27
+        }
       }
     },
     {
@@ -2635,7 +2798,13 @@
         "sugar": 0,
         "sodium": 61,
         "potassium": 384,
-        "cholesterol": 63
+        "cholesterol": 63,
+        "micros": {
+          "vitamin_d_mcg": 13.1,
+          "vitamin_b12_mcg": 3.18,
+          "zinc_mg": 0.43,
+          "magnesium_mg": 29
+        }
       }
     },
     {
@@ -2742,7 +2911,13 @@
         "sugar": 0,
         "sodium": 16,
         "potassium": 407,
-        "cholesterol": 0
+        "cholesterol": 0,
+        "micros": {
+          "iron_mg": 7.72,
+          "calcium_mg": 631,
+          "magnesium_mg": 335,
+          "zinc_mg": 4.58
+        }
       }
     },
     {
@@ -2763,7 +2938,12 @@
         "sugar": 1.29,
         "sodium": 18,
         "potassium": 809,
-        "cholesterol": 0
+        "cholesterol": 0,
+        "micros": {
+          "iron_mg": 8.82,
+          "magnesium_mg": 550,
+          "zinc_mg": 7.81
+        }
       }
     },
     {
@@ -2787,5 +2967,6 @@
         "cholesterol": 0
       }
     }
-  ]
+  ],
+  "micronutrientNote": "Micronutrients are present only where USDA measured them. An absent key means unmeasured, not zero — reporting an unmeasured nutrient as 0 would tell a user their meal contains no iron when in fact nobody looked. Live FoodData Central lookups capture these automatically, so coverage grows as the cache fills."
 }

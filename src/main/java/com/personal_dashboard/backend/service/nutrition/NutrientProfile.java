@@ -6,6 +6,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 /**
  * Nutrient composition of a food, expressed per 100 g of edible portion.
  *
@@ -46,6 +49,17 @@ public class NutrientProfile {
     @Builder.Default private double cholesterol = 0.0;
 
     /**
+     * Micronutrients per 100 g, keyed {@code iron_mg}, {@code calcium_mg}, {@code vitamin_c_mg}
+     * and so on.
+     *
+     * <p>A map rather than fixed fields for one reason that matters clinically: <b>absent must
+     * not read as zero</b>. USDA does not measure every nutrient for every food, and reporting
+     * an unmeasured value as 0 mg would tell a user their meal contains no iron when the truth
+     * is that nobody looked. A missing key is missing; a present key is measured.</p>
+     */
+    @Builder.Default private Map<String, Double> micros = Map.of();
+
+    /**
      * Scales this per-100 g profile to an arbitrary gram weight.
      *
      * @param grams edible weight in grams; negative values are clamped to zero
@@ -53,7 +67,10 @@ public class NutrientProfile {
      */
     public NutrientProfile scaleTo(double grams) {
         double f = Math.max(grams, 0.0) / 100.0;
+        Map<String, Double> scaledMicros = new LinkedHashMap<>();
+        micros.forEach((k, v) -> scaledMicros.put(k, v * f));
         return NutrientProfile.builder()
+                .micros(scaledMicros)
                 .kcal(kcal * f)
                 .protein(protein * f)
                 .carbs(carbs * f)
@@ -72,7 +89,12 @@ public class NutrientProfile {
      */
     public NutrientProfile plus(NutrientProfile o) {
         if (o == null) return this;
+        // Union, not intersection: a nutrient measured for one ingredient and not another
+        // still contributes what is known, and the total is flagged as partial elsewhere.
+        Map<String, Double> merged = new LinkedHashMap<>(micros);
+        o.micros.forEach((k, v) -> merged.merge(k, v, Double::sum));
         return NutrientProfile.builder()
+                .micros(merged)
                 .kcal(kcal + o.kcal)
                 .protein(protein + o.protein)
                 .carbs(carbs + o.carbs)
