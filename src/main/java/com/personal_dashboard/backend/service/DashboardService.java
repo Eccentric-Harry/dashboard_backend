@@ -385,6 +385,22 @@ public class DashboardService {
                 int calorieGoal = todayLog != null && todayLog.getCalorieGoal() != null ? todayLog.getCalorieGoal() : CALORIE_GOAL;
                 int proteinGoal = todayLog != null && todayLog.getProteinGoal() != null ? todayLog.getProteinGoal() : PROTEIN_GOAL;
 
+                // How well each day was eaten, from the meals already in hand. /home's day
+                // loop scores food on quality rather than on the calorie target, so it needs
+                // grades per day — and getting them from this response costs nothing, while
+                // a separate /health/food read would add a round trip to every Home load.
+                Map<String, Object> dailyMealQuality = new LinkedHashMap<>();
+                for (LocalDate date = sevenDaysAgo; !date.isAfter(targetDate); date = date.plusDays(1)) {
+                        dailyMealQuality.put(date.format(DATE_FORMATTER), mealQualityOf(null));
+                }
+                for (DailyFoodLog dailyLog : dailyLogs) {
+                        dailyMealQuality.put(dailyLog.getDateString(), mealQualityOf(dailyLog));
+                }
+                // todayLog is re-read above when the projected range missed it; keep the two in step.
+                if (todayLog != null) {
+                        dailyMealQuality.put(todayKey, mealQualityOf(todayLog));
+                }
+
                 // Build response
                 Map<String, Object> response = new LinkedHashMap<>();
                 response.put("date", targetDate.format(DATE_FORMATTER));
@@ -395,8 +411,22 @@ public class DashboardService {
                 response.put("todayTotalProtein", dailyProtein.getOrDefault(todayKey, 0));
                 response.put("calorieGoal", calorieGoal);
                 response.put("proteinGoal", proteinGoal);
+                response.put("dailyMealQuality", dailyMealQuality);
+                response.put("todayMealQuality", dailyMealQuality.get(todayKey));
 
                 return response;
+        }
+
+        /** Every meal a day's log holds, flattened out of its meal-type grouping. */
+        private static Map<String, Object> mealQualityOf(DailyFoodLog dailyLog) {
+                if (dailyLog == null || dailyLog.getMeals() == null) {
+                        return com.personal_dashboard.backend.util.MealGrades.dayAggregate(java.util.List.of());
+                }
+                java.util.List<MealEntry> meals = dailyLog.getMeals().values().stream()
+                                .filter(Objects::nonNull)
+                                .flatMap(java.util.Collection::stream)
+                                .toList();
+                return com.personal_dashboard.backend.util.MealGrades.dayAggregate(meals);
         }
 
         /**
