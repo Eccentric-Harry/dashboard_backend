@@ -2,10 +2,17 @@ package com.personal_dashboard.backend.controller;
 
 import com.personal_dashboard.backend.dto.ApiMeta;
 import com.personal_dashboard.backend.dto.ApiResponse;
+import com.personal_dashboard.backend.dto.LoopRadarDay;
 import com.personal_dashboard.backend.dto.MindSummaryResponse;
+import com.personal_dashboard.backend.dto.WorryLedgerResponse;
 import com.personal_dashboard.backend.dto.request.MindEntryRequest;
+import com.personal_dashboard.backend.dto.request.MindLaneRequest;
 import com.personal_dashboard.backend.dto.request.MindMoodRequest;
+import com.personal_dashboard.backend.dto.request.MindNoticedRequest;
+import com.personal_dashboard.backend.dto.request.MindPredictionRequest;
+import com.personal_dashboard.backend.dto.request.MindSpiralRequest;
 import com.personal_dashboard.backend.dto.request.MindStatusRequest;
+import com.personal_dashboard.backend.dto.request.MindVerdictRequest;
 import com.personal_dashboard.backend.model.DailyLog;
 import com.personal_dashboard.backend.model.MindEntry;
 import com.personal_dashboard.backend.service.MindService;
@@ -98,6 +105,103 @@ public class MindController {
         return ResponseEntity.ok(ApiResponse.<Void>builder()
                 .data(null)
                 .meta(buildMeta("delete"))
+                .build());
+    }
+
+    @PostMapping("/noticed")
+    @Operation(summary = "Notice an intrusive thought",
+            description = "One-tap 'noticed, moving on'. Body is optional; any text supplied is sealed "
+                    + "and never returned by a normal read.")
+    public ResponseEntity<ApiResponse<MindEntry>> noticed(@Valid @RequestBody(required = false) MindNoticedRequest request) {
+        MindEntry created = mindService.noticed(request != null ? request : new MindNoticedRequest());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.<MindEntry>builder()
+                .data(created)
+                .meta(buildMeta("noticed"))
+                .build());
+    }
+
+    @PatchMapping("/entries/{id}/lane")
+    @Operation(summary = "Triage into a handling lane",
+            description = "Answer 'what is this?' — PROBLEM, WORRY or INTRUSIVE — before any action is offered")
+    public ResponseEntity<ApiResponse<MindEntry>> setLane(
+            @PathVariable String id,
+            @Valid @RequestBody MindLaneRequest request) {
+        MindEntry updated = mindService.setLane(id, request);
+        return ResponseEntity.ok(ApiResponse.<MindEntry>builder()
+                .data(updated)
+                .meta(buildMeta("lane"))
+                .build());
+    }
+
+    @PutMapping("/entries/{id}/prediction")
+    @Operation(summary = "Attach a prediction to a worry",
+            description = "What is feared, and how likely it feels at park time")
+    public ResponseEntity<ApiResponse<MindEntry>> savePrediction(
+            @PathVariable String id,
+            @Valid @RequestBody MindPredictionRequest request) {
+        MindEntry updated = mindService.savePrediction(id, request);
+        return ResponseEntity.ok(ApiResponse.<MindEntry>builder()
+                .data(updated)
+                .meta(buildMeta("prediction"))
+                .build());
+    }
+
+    @PutMapping("/entries/{id}/verdict")
+    @Operation(summary = "Record what actually happened",
+            description = "The verdict on a parked worry once its review date has arrived")
+    public ResponseEntity<ApiResponse<MindEntry>> saveVerdict(
+            @PathVariable String id,
+            @Valid @RequestBody MindVerdictRequest request) {
+        MindEntry updated = mindService.saveVerdict(id, request);
+        return ResponseEntity.ok(ApiResponse.<MindEntry>builder()
+                .data(updated)
+                .meta(buildMeta("verdict"))
+                .build());
+    }
+
+    @GetMapping("/worry-ledger")
+    @Operation(summary = "Worry ledger statistics",
+            description = "Predicted likelihood against what actually happened, across all logged worries")
+    public ResponseEntity<ApiResponse<WorryLedgerResponse>> getWorryLedger() {
+        WorryLedgerResponse ledger = mindService.getWorryLedger();
+        return ResponseEntity.ok(ApiResponse.<WorryLedgerResponse>builder()
+                .data(ledger)
+                .meta(buildMeta("worry-ledger"))
+                .build());
+    }
+
+    @GetMapping("/sealed")
+    @Operation(summary = "Sealed archive",
+            description = "The only endpoint that returns sealed entry text. Intended to sit behind a "
+                    + "deliberate confirm step in the UI, never linked from the inbox.")
+    public ResponseEntity<ApiResponse<List<MindEntry>>> getSealed() {
+        List<MindEntry> sealed = mindService.getSealedEntries();
+        return ResponseEntity.ok(ApiResponse.<List<MindEntry>>builder()
+                .data(sealed)
+                .meta(buildMeta("sealed"))
+                .build());
+    }
+
+    @PostMapping("/spiral")
+    @Operation(summary = "Log a Spiral Breaker session")
+    public ResponseEntity<ApiResponse<MindEntry>> logSpiral(@Valid @RequestBody MindSpiralRequest request) {
+        MindEntry created = mindService.logSpiral(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.<MindEntry>builder()
+                .data(created)
+                .meta(buildMeta("spiral"))
+                .build());
+    }
+
+    @GetMapping("/loop-radar")
+    @Operation(summary = "Loop radar series",
+            description = "Per-day mind activity alongside sleep, focus, tasks, workouts and mood. "
+                    + "Flat data — all interpretation happens client-side.")
+    public ResponseEntity<ApiResponse<List<LoopRadarDay>>> getLoopRadar(
+            @RequestParam(name = "days", required = false) Integer days) {
+        List<LoopRadarDay> series = mindService.getLoopRadar(days);
+        return ResponseEntity.ok(ApiResponse.<List<LoopRadarDay>>builder()
+                .data(series)
+                .meta(buildMeta("loop-radar"))
                 .build());
     }
 
