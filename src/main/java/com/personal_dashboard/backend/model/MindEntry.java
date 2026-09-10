@@ -90,6 +90,18 @@ public class MindEntry implements UserOwnedDocument {
     private LocalDate reviewDate;
 
     /**
+     * INTENTION (the Home "Today's anchor") only — freeform notes the user keeps
+     * against the day's one thing: extra context, or how it actually went.
+     */
+    private String note;
+
+    /**
+     * INTENTION only — how the anchor landed: ACHIEVED | PARTIAL | MISSED.
+     * Null until the user records an outcome.
+     */
+    private String outcome;
+
+    /**
      * True once this entry has ever been PARKED. Unlike reviewDate (cleared when a
      * parked worry resurfaces to OPEN), this never resets — it's the only durable
      * signal that a resolved/released/converted thought passed through the worry

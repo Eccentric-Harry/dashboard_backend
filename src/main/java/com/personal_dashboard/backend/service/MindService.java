@@ -164,6 +164,8 @@ public class MindService {
                 .status("OPEN")
                 .valueTag(request.getValueTag())
                 .pinned(request.getPinned())
+                .note(request.getNote() != null ? request.getNote().trim() : null)
+                .outcome(normalizeOutcome(request.getOutcome()))
                 .date(date)
                 .build();
         MindEntry saved = mindEntryRepository.save(entry);
@@ -185,7 +187,21 @@ public class MindService {
         if (request.getPinned() != null) {
             entry.setPinned(request.getPinned());
         }
+        if (request.getNote() != null) {
+            entry.setNote(request.getNote().isBlank() ? null : request.getNote().trim());
+        }
+        if (request.getOutcome() != null) {
+            entry.setOutcome(normalizeOutcome(request.getOutcome()));
+        }
         return mindEntryRepository.save(entry);
+    }
+
+    /** "" / blank → null; otherwise the trimmed, upper-cased outcome token. */
+    private String normalizeOutcome(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return raw.trim().toUpperCase();
     }
 
     public MindEntry updateStatus(String id, MindStatusRequest request) {

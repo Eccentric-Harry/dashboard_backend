@@ -28,4 +28,11 @@ public class MindEntryRequest {
 
     @Pattern(regexp = "\\d{4}-\\d{2}-\\d{2}", message = "Date must be in format YYYY-MM-DD")
     private String date;
+
+    // INTENTION (Home anchor) only — freeform notes / outcome journal.
+    private String note;
+
+    // INTENTION only — ACHIEVED | PARTIAL | MISSED. Blank clears it.
+    @Pattern(regexp = "^(ACHIEVED|PARTIAL|MISSED)?$", message = "Outcome must be ACHIEVED, PARTIAL, or MISSED")
+    private String outcome;
 }
