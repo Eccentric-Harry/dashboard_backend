@@ -16,8 +16,14 @@ public class DailyTaskRequest {
     @NotBlank(message = "Title is required")
     private String title;
 
-    @NotBlank(message = "Date is required")
-    @Pattern(regexp = "\\d{4}-\\d{2}-\\d{2}", message = "Date must be in format YYYY-MM-DD")
+    /**
+     * Not required at the DTO level: an edit that doesn't touch the date (e.g. toggling a
+     * tag or a subtask on an already-overdue task) must not be forced to resend one just to
+     * pass validation. {@link DailyTaskService#updateTask} keeps the task's existing date
+     * when this is blank; {@link DailyTaskService#createTask} still requires one explicitly,
+     * since a brand-new task has no existing date to fall back to.
+     */
+    @Pattern(regexp = "^$|\\d{4}-\\d{2}-\\d{2}", message = "Date must be in format YYYY-MM-DD")
     private String date;
 
     private String scheduledTime;

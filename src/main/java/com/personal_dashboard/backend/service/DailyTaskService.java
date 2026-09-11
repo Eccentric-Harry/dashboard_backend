@@ -67,6 +67,9 @@ public class DailyTaskService {
     }
 
     public DailyTask createTask(DailyTaskRequest request) {
+        if (request.getDate() == null || request.getDate().isBlank()) {
+            throw new IllegalArgumentException("Date is required");
+        }
         log.info("Creating task '{}' on {}", request.getTitle(), request.getDate());
         LocalDate taskDate = LocalDate.parse(request.getDate());
         String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
@@ -111,7 +114,12 @@ public class DailyTaskService {
                 .orElseThrow(() -> new IllegalArgumentException("Task not found with id: " + id));
 
         existing.setTitle(request.getTitle());
-        existing.setDate(LocalDate.parse(request.getDate()));
+        // A date is no longer mandatory on every edit — an update that doesn't touch it
+        // (toggling a tag, a subtask, status) keeps the task's existing date instead of
+        // being rejected for not resending one. Only overwrite when a real date arrives.
+        if (request.getDate() != null && !request.getDate().isBlank()) {
+            existing.setDate(LocalDate.parse(request.getDate()));
+        }
         existing.setScheduledTime(request.getScheduledTime());
         existing.setStartTime(normalizeTime(request.getScheduledTime()));
         existing.setAllDay(normalizeTime(request.getScheduledTime()) == null);
