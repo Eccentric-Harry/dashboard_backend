@@ -27,7 +27,7 @@ public class HealthController {
         private final DailyFoodLogService dailyFoodLogService;
 
         private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
-        private static final double DEFAULT_TARGET_ML = 4000.0;
+        private static final double DEFAULT_TARGET_ML = 3000.0;
 
         // ─── Food Endpoints ────────────────────────────────────────────────
 

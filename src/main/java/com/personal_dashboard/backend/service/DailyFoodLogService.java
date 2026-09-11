@@ -485,7 +485,7 @@ public class DailyFoodLogService {
             return HydrationRecordDTO.builder()
                     .date(dateStr)
                     .waterIntakeMl(0.0)
-                    .targetMl(4000.0)
+                    .targetMl(3000.0)
                     .progress(0.0)
                     .build();
         }

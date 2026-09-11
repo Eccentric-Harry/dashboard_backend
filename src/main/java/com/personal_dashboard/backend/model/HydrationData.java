@@ -18,7 +18,7 @@ public class HydrationData {
     private Double waterIntakeMl = 0.0;
 
     @Builder.Default
-    private Double targetMl = 4000.0;
+    private Double targetMl = 3000.0;
 
     private String notes;
 }
