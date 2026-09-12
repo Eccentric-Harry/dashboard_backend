@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -125,7 +126,7 @@ public class FinanceService {
     public TransactionDTO createTransaction(TransactionRequest request) {
         log.info("Creating {} transaction '{}' amount={} category={} date={}",
                 request.getType(), request.getDescription(), request.getAmount(), request.getCategory(), request.getDate());
-        Instant timestamp = toInstant(request.getDate());
+        Instant timestamp = combineDateWithNow(request.getDate());
         FinancialTransaction tx = FinancialTransaction.builder()
                 .id(UUID.randomUUID().toString())
                 .description(request.getDescription())
@@ -144,9 +145,14 @@ public class FinanceService {
         // Remove the old copy wherever it currently lives, then re-insert with new values.
         DailyFinancialLog oldLog = findLogContaining(id)
                 .orElseThrow(() -> new IllegalArgumentException("Transaction not found: " + id));
+        FinancialTransaction oldTx = findTransactionInLog(oldLog, id)
+                .orElseThrow(() -> new IllegalArgumentException("Transaction not found: " + id));
         removeFromLog(oldLog, id);
 
-        Instant timestamp = toInstant(request.getDate());
+        // Preserve the originally logged time-of-day (only the date picker is editable
+        // here) — carrying it onto the new date if that's what changed, so fixing an
+        // amount or category never silently resets a correct time back to midnight.
+        Instant timestamp = combineDateWithTime(request.getDate(), oldTx.getTimestamp());
         FinancialTransaction tx = FinancialTransaction.builder()
                 .id(id) // keep the stable id across edits
                 .description(request.getDescription())
@@ -279,9 +285,35 @@ public class FinanceService {
                 .findFirst();
     }
 
-    private Instant toInstant(String dateString) {
+    /** Finds a transaction with {@code id} within an already-located day's log. */
+    private Optional<FinancialTransaction> findTransactionInLog(DailyFinancialLog dailyLog, String id) {
+        return dailyLog.getTransactions().values().stream()
+                .flatMap(List::stream)
+                .filter(t -> id.equals(t.getId()))
+                .findFirst();
+    }
+
+    /**
+     * The add-transaction form only has a date picker, no time input, so a new
+     * transaction is stamped with the current wall-clock time rather than midnight —
+     * "now" is the closest available approximation of when the money actually moved,
+     * including for a backdated entry (its time becomes when it was logged).
+     */
+    private Instant combineDateWithNow(String dateString) {
+        ZoneId zone = ZoneId.systemDefault();
         return LocalDate.parse(dateString, DATE_FORMATTER)
-                .atStartOfDay(ZoneId.systemDefault())
+                .atTime(LocalTime.now(zone))
+                .atZone(zone)
+                .toInstant();
+    }
+
+    /** Re-dates {@code originalTimestamp} onto {@code dateString} while keeping its time-of-day. */
+    private Instant combineDateWithTime(String dateString, Instant originalTimestamp) {
+        ZoneId zone = ZoneId.systemDefault();
+        LocalTime time = originalTimestamp.atZone(zone).toLocalTime();
+        return LocalDate.parse(dateString, DATE_FORMATTER)
+                .atTime(time)
+                .atZone(zone)
                 .toInstant();
     }
 
