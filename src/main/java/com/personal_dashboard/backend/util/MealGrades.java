@@ -102,7 +102,7 @@ public final class MealGrades {
         if (averagePoints == null) {
             return null;
         }
-        long rounded = Math.round(Math.max(POINTS_D, Math.min(POINTS_A, averagePoints)));
+        long rounded = Math.round(Math.clamp(averagePoints, POINTS_D, POINTS_A));
         return switch ((int) rounded) {
             case 4 -> "A";
             case 3 -> "B";
