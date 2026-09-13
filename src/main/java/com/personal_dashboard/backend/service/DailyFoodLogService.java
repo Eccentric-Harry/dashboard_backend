@@ -208,23 +208,46 @@ public class DailyFoodLogService {
         return dailyFoodLogRepository.save(dailyLog);
     }
 
+    /**
+     * Resolves a log's calorie/protein goals.
+     *
+     * <p>Today and future days always follow the profile's current targets. Goals used
+     * to be copied onto a log once, when it was first created, and never refreshed — so
+     * after a biometrics change /nutrition kept showing the old snapshot (2,125 kcal)
+     * while /profile showed the recalculated target (2,411 kcal). The profile save only
+     * patched a log that already existed for "today", which missed every other path.
+     * Past days keep the goal they were actually logged against.
+     */
     private void ensureGoalsInitialized(DailyFoodLog dailyLog, UserAccount user) {
-        if (dailyLog.getCalorieGoal() == null || dailyLog.getProteinGoal() == null) {
-            if (user == null && userAccountRepository != null) {
-                user = userAccountRepository.findById(dailyLog.getUserId()).orElse(null);
-            }
-            if (user != null) {
-                if (dailyLog.getCalorieGoal() == null) {
-                    dailyLog.setCalorieGoal(user.getTargetCalories() != null ? user.getTargetCalories() : 2000);
-                }
-                if (dailyLog.getProteinGoal() == null) {
-                    dailyLog.setProteinGoal(user.getTargetProtein() != null ? user.getTargetProtein() : 100);
-                }
-            } else {
-                if (dailyLog.getCalorieGoal() == null) dailyLog.setCalorieGoal(2000);
-                if (dailyLog.getProteinGoal() == null) dailyLog.setProteinGoal(100);
+        boolean followsProfile = isTodayOrLater(dailyLog);
+        if (!followsProfile && dailyLog.getCalorieGoal() != null && dailyLog.getProteinGoal() != null) {
+            return;
+        }
+        if (user == null && userAccountRepository != null) {
+            user = userAccountRepository.findById(dailyLog.getUserId()).orElse(null);
+        }
+        Integer calories = user != null ? user.getTargetCalories() : null;
+        Integer protein = user != null ? user.getTargetProtein() : null;
+
+        if (followsProfile) {
+            if (calories != null) dailyLog.setCalorieGoal(calories);
+            if (protein != null) dailyLog.setProteinGoal(protein);
+        }
+        if (dailyLog.getCalorieGoal() == null) dailyLog.setCalorieGoal(calories != null ? calories : 2000);
+        if (dailyLog.getProteinGoal() == null) dailyLog.setProteinGoal(protein != null ? protein : 100);
+    }
+
+    private boolean isTodayOrLater(DailyFoodLog dailyLog) {
+        LocalDate date = dailyLog.getDate();
+        if (date == null && dailyLog.getDateString() != null) {
+            try {
+                date = LocalDate.parse(dailyLog.getDateString(), DATE_FORMATTER);
+            } catch (java.time.format.DateTimeParseException e) {
+                return false;
             }
         }
+        // JVM default zone is Asia/Kolkata (DashboardApplication), matching how day keys are cut.
+        return date != null && !date.isBefore(LocalDate.now());
     }
 
     /**
