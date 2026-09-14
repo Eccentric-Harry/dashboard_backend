@@ -112,6 +112,34 @@ public class UserController {
         );
     }
 
+    /** Separate from PUT /profile, which replaces fields wholesale and would wipe this one. */
+    @PutMapping("/profile/learner")
+    public ResponseEntity<ApiResponse<UserAccount>> updateLearnerProfile(
+            @jakarta.validation.Valid @RequestBody com.personal_dashboard.backend.dto.request.UpdateLearnerProfileRequest request) {
+        String userId = UserContext.getRequiredUserId();
+        log.info("Updating learner profile for user: {}", userId);
+        Optional<UserAccount> userOpt = userAccountRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(
+                    ApiResponse.<UserAccount>builder()
+                            .meta(createMeta("update-learner-profile-failed"))
+                            .build()
+            );
+        }
+
+        UserAccount existing = userOpt.get();
+        String value = request.getLearnerProfile();
+        existing.setLearnerProfile(value == null || value.isBlank() ? null : value.trim());
+        existing.setUpdatedAt(Instant.now());
+
+        return ResponseEntity.ok(
+                ApiResponse.<UserAccount>builder()
+                        .data(userAccountRepository.save(existing))
+                        .meta(createMeta("update-learner-profile-success"))
+                        .build()
+        );
+    }
+
     private ApiMeta createMeta(String source) {
         return ApiMeta.builder()
                 .requestId(UUID.randomUUID().toString())

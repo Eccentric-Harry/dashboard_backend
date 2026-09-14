@@ -114,9 +114,11 @@ public class FocusSessionController {
         String activeUserId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
         String pursuit = (String) body.getOrDefault("activePursuit", "Coding");
         int duration = body.containsKey("durationMinutes") ? ((Number) body.get("durationMinutes")).intValue() : 25;
+        String pursuitId = body.get("pursuitId") instanceof String s ? s : null;
+        String stepId = body.get("stepId") instanceof String s ? s : null;
 
-        log.info("REST request to start focus session: pursuit={}, duration={}m, userId={}", pursuit, duration, activeUserId);
-        FocusSession session = service.startSession(pursuit, duration, activeUserId);
+        log.info("REST request to start focus session: pursuit={}, duration={}m, step={}, userId={}", pursuit, duration, stepId, activeUserId);
+        FocusSession session = service.startSession(pursuit, duration, pursuitId, stepId, activeUserId);
         ApiResponse<FocusSession> response = ApiResponse.<FocusSession>builder()
                 .data(session)
                 .meta(buildMeta("start"))
@@ -167,12 +169,15 @@ public class FocusSessionController {
     }
 
     @PostMapping("/complete")
-    @Operation(summary = "Complete focus session", description = "Mark the running session as completed")
+    @Operation(summary = "Complete focus session",
+            description = "Mark the running or paused session completed; optional body { minutes } records an early end at its real length")
     public ResponseEntity<ApiResponse<FocusSession>> completeSession(
+            @RequestBody(required = false) Map<String, Object> body,
             @RequestParam(required = false, defaultValue = "default") String userId) {
         String activeUserId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
-        log.info("REST request to complete focus session for userId={}", activeUserId);
-        FocusSession session = service.completeSession(activeUserId);
+        Integer minutes = body != null && body.get("minutes") instanceof Number n ? n.intValue() : null;
+        log.info("REST request to complete focus session for userId={}, minutes={}", activeUserId, minutes);
+        FocusSession session = service.completeSession(activeUserId, minutes);
         ApiResponse<FocusSession> response = ApiResponse.<FocusSession>builder()
                 .data(session)
                 .meta(buildMeta("complete"))

@@ -25,6 +25,11 @@ public class FocusSession implements UserOwnedDocument {
 
     private String activePursuit;
 
+    /** Set when the session was started on a specific pursuit step; its minutes are credited there. */
+    private String pursuitId;
+
+    private String stepId;
+
     private int durationMinutes;
 
     @Builder.Default

@@ -21,6 +21,9 @@ public class PursuitStepInput {
 
     private String note;
 
+    /** Planned minutes for a leaf step; clamped server-side, ignored on parents. */
+    private Integer estimateMinutes;
+
     @Valid
     @JsonAlias({"steps", "subSteps"})
     private List<PursuitStepInput> children;

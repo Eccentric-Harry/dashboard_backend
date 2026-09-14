@@ -40,6 +40,7 @@ public class FocusSessionService {
     private final FocusSessionRepository repository;
     private final CalendarItemService calendarItemService;
     private final com.personal_dashboard.backend.repository.DailyTaskRepository dailyTaskRepository;
+    private final LearningPursuitService learningPursuitService;
 
     public Optional<FocusSession> getCurrentSession(String userId) {
         if (userId != null && !userId.isBlank()) {
@@ -234,12 +235,20 @@ public class FocusSessionService {
     }
 
     public FocusSession startSession(String activePursuit, int durationMinutes, String userId) {
+        return startSession(activePursuit, durationMinutes, null, null, userId);
+    }
+
+    /** pursuitId/stepId (both or neither) link the session to a pursuit step for time credit. */
+    public FocusSession startSession(String activePursuit, int durationMinutes, String pursuitId, String stepId, String userId) {
         cancelExistingSession(userId);
+        boolean linked = pursuitId != null && !pursuitId.isBlank() && stepId != null && !stepId.isBlank();
 
         Instant now = Instant.now();
         FocusSession session = FocusSession.builder()
                 .userId(userId)
                 .activePursuit(activePursuit)
+                .pursuitId(linked ? pursuitId : null)
+                .stepId(linked ? stepId : null)
                 .durationMinutes(durationMinutes)
                 .status(FocusSessionStatus.RUNNING)
                 .startTime(now)
@@ -297,6 +306,16 @@ public class FocusSessionService {
     }
 
     public FocusSession completeSession(String userId) {
+        return completeSession(userId, null);
+    }
+
+    /**
+     * Completes the running or paused session. {@code elapsedMinutes} records a session
+     * ended early ("End & save") at its real length, capped at the planned duration;
+     * null means it ran its full course. A step-linked session credits its minutes to
+     * that step exactly once, since a COMPLETED session is no longer "current".
+     */
+    public FocusSession completeSession(String userId, Integer elapsedMinutes) {
         Optional<FocusSession> current = getCurrentSession(userId);
         if (current.isEmpty()) {
             log.warn("No active session to complete for userId={}", userId);
@@ -304,6 +323,16 @@ public class FocusSessionService {
         }
 
         FocusSession session = current.get();
+        if (session.getStatus() != FocusSessionStatus.RUNNING && session.getStatus() != FocusSessionStatus.PAUSED) {
+            log.warn("Session {} is {}, not completing", session.getId(), session.getStatus());
+            return null;
+        }
+        if (elapsedMinutes != null) {
+            session.setDurationMinutes(Math.max(1, Math.min(elapsedMinutes, session.getDurationMinutes())));
+        }
+        if (session.getPursuitId() != null && session.getStepId() != null) {
+            learningPursuitService.creditStepTime(userId, session.getPursuitId(), session.getStepId(), session.getDurationMinutes());
+        }
         session.setStatus(FocusSessionStatus.COMPLETED);
         session.setEndTime(null);
         session.setRemainingSecondsOnPause(null);

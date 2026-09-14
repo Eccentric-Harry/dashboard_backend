@@ -3,6 +3,7 @@ package com.personal_dashboard.backend.service;
 import com.personal_dashboard.backend.dto.request.AddPursuitStepRequest;
 import com.personal_dashboard.backend.dto.request.PursuitRequest;
 import com.personal_dashboard.backend.dto.request.PursuitStepInput;
+import com.personal_dashboard.backend.dto.request.UpdatePursuitStepRequest;
 import com.personal_dashboard.backend.model.Learning;
 import com.personal_dashboard.backend.model.LearningPursuit;
 import com.personal_dashboard.backend.model.LearningPursuit.PursuitStep;
@@ -20,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -164,6 +166,126 @@ class LearningPursuitServiceTest {
         assertEquals(2, result.getSteps().size());
         assertTrue(result.getSteps().get(0).getChildren().isEmpty());
         assertNotNull(result.getSteps().get(1).getChildren());
+    }
+
+    @Test
+    void createClampsLeafEstimatesDropsParentEstimatesAndMakesFirstPursuitPrimary() {
+        PursuitStepInput parent = input("Parent", input("Leaf"));
+        parent.setEstimateMinutes(90);
+        parent.getChildren().get(0).setEstimateMinutes(900);
+        PursuitRequest request = new PursuitRequest();
+        request.setTitle("JS");
+        request.setCategory("Development");
+        request.setGoal("  Read library source  ");
+        request.setSteps(List.of(parent));
+
+        LearningPursuit created = service.createPursuit(request);
+
+        assertNull(created.getSteps().get(0).getEstimateMinutes());
+        assertEquals(600, created.getSteps().get(0).getChildren().get(0).getEstimateMinutes());
+        assertEquals("Read library source", created.getGoal());
+        assertTrue(created.isPrimary());
+    }
+
+    @Test
+    void createDoesNotStealPrimaryFromExistingPursuit() {
+        LearningPursuit existing = LearningPursuit.builder().id("p0").userId(USER).primary(true).build();
+        when(repository.findByUserId(USER)).thenReturn(List.of(existing));
+        PursuitRequest request = new PursuitRequest();
+        request.setTitle("JS");
+        request.setCategory("Development");
+
+        assertFalse(service.createPursuit(request).isPrimary());
+    }
+
+    @Test
+    void togglingStampsAndClearsCompletedAt() {
+        stored(step("a", false), step("b", false));
+
+        PursuitStep a = service.toggleStep("p1", "a").getSteps().get(0);
+        assertNotNull(a.getCompletedAt());
+
+        assertNull(service.toggleStep("p1", "a").getSteps().get(0).getCompletedAt());
+    }
+
+    @Test
+    void updateStepAppliesOnlyProvidedFields() {
+        PursuitStep leaf = step("a", false);
+        leaf.setEstimateMinutes(45);
+        leaf.setResumeNote("old note");
+        stored(leaf);
+
+        UpdatePursuitStepRequest request = new UpdatePursuitStepRequest();
+        request.setResumeNote("Stopped at selectors");
+        request.setTakeaways("- Sets dedupe listeners");
+        PursuitStep updated = service.updateStep("p1", "a", request).getSteps().get(0);
+
+        assertEquals("a", updated.getText());
+        assertEquals(45, updated.getEstimateMinutes());
+        assertEquals("Stopped at selectors", updated.getResumeNote());
+        assertEquals("- Sets dedupe listeners", updated.getTakeaways());
+
+        UpdatePursuitStepRequest clear = new UpdatePursuitStepRequest();
+        clear.setEstimateMinutes(0);
+        clear.setResumeNote(" ");
+        PursuitStep cleared = service.updateStep("p1", "a", clear).getSteps().get(0);
+        assertNull(cleared.getEstimateMinutes());
+        assertNull(cleared.getResumeNote());
+    }
+
+    @Test
+    void setPrimaryIsExclusive() {
+        LearningPursuit target = stored(step("a", false));
+        LearningPursuit other = LearningPursuit.builder().id("p2").userId(USER).primary(true).build();
+        target.setPrimary(false);
+        when(repository.findByUserId(USER)).thenReturn(List.of(target, other));
+
+        LearningPursuit result = service.setPrimary("p1");
+
+        assertTrue(result.isPrimary());
+        assertFalse(other.isPrimary());
+        verify(repository).saveAll(any());
+    }
+
+    @Test
+    void finishingPrimaryPursuitPromotesOldestRemaining() {
+        LearningPursuit pursuit = stored(step("a", false));
+        pursuit.setPrimary(true);
+        LearningPursuit newer = LearningPursuit.builder().id("p3").userId(USER).createdAt(Instant.parse("2026-09-10T00:00:00Z")).build();
+        LearningPursuit older = LearningPursuit.builder().id("p2").userId(USER).createdAt(Instant.parse("2026-09-01T00:00:00Z")).build();
+        when(repository.findByUserId(USER)).thenReturn(List.of(newer, older));
+
+        service.toggleStep("p1", "a");
+
+        assertTrue(older.isPrimary());
+        assertFalse(newer.isPrimary());
+    }
+
+    @Test
+    void creditStepTimeAddsMinutesAndIgnoresMissingStep() {
+        PursuitStep leaf = step("a", false);
+        leaf.setSpentMinutes(20);
+        stored(leaf);
+
+        service.creditStepTime(USER, "p1", "a", 25);
+        service.creditStepTime(USER, "p1", "gone", 25);
+
+        assertEquals(45, leaf.getSpentMinutes());
+        verify(repository, times(1)).save(any(LearningPursuit.class));
+    }
+
+    @Test
+    void learningDescriptionCarriesTakeaways() {
+        PursuitStep leaf = step("a", false);
+        leaf.setTakeaways("Closures capture bindings\nNot values");
+        stored(leaf);
+
+        service.toggleStep("p1", "a");
+
+        ArgumentCaptor<Learning> learning = ArgumentCaptor.forClass(Learning.class);
+        verify(learningRepository).save(learning.capture());
+        assertTrue(learning.getValue().getDescription().contains("    > Closures capture bindings"));
+        assertTrue(learning.getValue().getDescription().contains("    > Not values"));
     }
 
     private static AddPursuitStepRequest addRequest(String parentId, String text) {

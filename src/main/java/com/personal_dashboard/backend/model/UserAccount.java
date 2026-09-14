@@ -43,6 +43,12 @@ public class UserAccount {
     private Double bmr;
     private Double tdee;
 
+    /**
+     * Free-text "about me as a learner" (stack, level, how they like to learn). Only
+     * written through PUT /users/profile/learner so full-profile saves can't wipe it.
+     */
+    private String learnerProfile;
+
     private String timezone;
     private String workingHours;
     private String title;

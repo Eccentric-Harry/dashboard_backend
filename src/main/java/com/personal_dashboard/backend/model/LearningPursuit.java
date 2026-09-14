@@ -29,6 +29,16 @@ public class LearningPursuit implements UserOwnedDocument {
     private String title;
     private String category;
     private String notionUrl;
+
+    /** Optional: what finishing this pursuit should let the learner do. Fed into tutor prompts. */
+    private String goal;
+
+    /**
+     * The one "main" pursuit the Next-up panel and scheduling work from. At most one
+     * per user; LearningPursuitService keeps that invariant.
+     */
+    @JsonProperty("isPrimary")
+    private boolean primary;
     
     @Builder.Default
     private String status = "ACTIVE"; // "ACTIVE" or "COMPLETED"
@@ -53,6 +63,22 @@ public class LearningPursuit implements UserOwnedDocument {
          */
         @JsonProperty("isCompleted")
         private boolean isCompleted;
+
+        /** When a leaf was ticked; cleared when un-ticked. */
+        private Instant completedAt;
+
+        /** Planned minutes for a leaf (AI-suggested or edited). Parents sum their leaves client-side. */
+        private Integer estimateMinutes;
+
+        /** Minutes actually logged against this step through step-linked focus sessions. */
+        @Builder.Default
+        private int spentMinutes = 0;
+
+        /** One line on where the learner stopped, shown when they pick the step up again. */
+        private String resumeNote;
+
+        /** Key takeaways captured from a study session; carried into the learnings log. */
+        private String takeaways;
 
         /** Sub-steps; documents written before nesting existed have none. */
         @Builder.Default

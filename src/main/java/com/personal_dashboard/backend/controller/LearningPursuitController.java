@@ -4,6 +4,7 @@ import com.personal_dashboard.backend.dto.ApiMeta;
 import com.personal_dashboard.backend.dto.ApiResponse;
 import com.personal_dashboard.backend.dto.request.AddPursuitStepRequest;
 import com.personal_dashboard.backend.dto.request.PursuitRequest;
+import com.personal_dashboard.backend.dto.request.UpdatePursuitStepRequest;
 import com.personal_dashboard.backend.model.LearningPursuit;
 import com.personal_dashboard.backend.service.LearningPursuitService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -122,15 +123,26 @@ public class LearningPursuitController {
         return ResponseEntity.ok(response);
     }
 
+    @PutMapping("/{id}/primary")
+    @Operation(summary = "Set the main pursuit", description = "Make this the user's only primary pursuit")
+    public ResponseEntity<ApiResponse<LearningPursuit>> setPrimary(@PathVariable String id) {
+        log.info("REST request to set primary pursuit {}", id);
+        LearningPursuit updated = service.setPrimary(id);
+        ApiResponse<LearningPursuit> response = ApiResponse.<LearningPursuit>builder()
+                .data(updated)
+                .meta(buildMeta("set-primary"))
+                .build();
+        return ResponseEntity.ok(response);
+    }
+
     @PutMapping("/{id}/steps/{stepId}")
-    @Operation(summary = "Update a subtask step text", description = "Update the text of a subtask step")
+    @Operation(summary = "Update a step", description = "Partially update a step's text, estimate, resume note or takeaways")
     public ResponseEntity<ApiResponse<LearningPursuit>> updateStep(
             @PathVariable String id,
             @PathVariable String stepId,
-            @RequestBody Map<String, String> body) {
-        String newText = body.get("text");
-        log.info("REST request to update step {} text to '{}' in pursuit {}", stepId, newText, id);
-        LearningPursuit updated = service.updateStep(id, stepId, newText);
+            @Valid @RequestBody UpdatePursuitStepRequest body) {
+        log.info("REST request to update step {} in pursuit {}", stepId, id);
+        LearningPursuit updated = service.updateStep(id, stepId, body);
         ApiResponse<LearningPursuit> response = ApiResponse.<LearningPursuit>builder()
                 .data(updated)
                 .meta(buildMeta("update-step"))

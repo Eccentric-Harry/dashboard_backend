@@ -1,8 +1,9 @@
 package com.personal_dashboard.backend.service;
 
- import com.personal_dashboard.backend.dto.request.AddPursuitStepRequest;
+import com.personal_dashboard.backend.dto.request.AddPursuitStepRequest;
 import com.personal_dashboard.backend.dto.request.PursuitRequest;
 import com.personal_dashboard.backend.dto.request.PursuitStepInput;
+import com.personal_dashboard.backend.dto.request.UpdatePursuitStepRequest;
 import com.personal_dashboard.backend.model.Learning;
 import com.personal_dashboard.backend.model.LearningPursuit;
 import com.personal_dashboard.backend.model.LearningPursuit.PursuitStep;
@@ -13,8 +14,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -23,6 +26,10 @@ import java.util.UUID;
  * Only leaves are ticked directly; a parent's isCompleted is derived from its children
  * and re-derived after every mutation. Ticking a parent sets its whole subtree. When
  * every leaf is complete the pursuit is migrated into the learnings log and deleted.
+ *
+ * Each user has at most one primary ("main") pursuit — the one the Next-up panel works
+ * from. The first pursuit becomes primary, and when the primary pursuit is completed or
+ * deleted the oldest remaining one takes over.
  */
 @Service
 @RequiredArgsConstructor
@@ -35,6 +42,8 @@ public class LearningPursuitService {
     public static final int MAX_TOTAL_STEPS = 150;
     private static final int MAX_TEXT_LENGTH = 200;
     private static final int MAX_NOTE_LENGTH = 300;
+    private static final int MIN_ESTIMATE = 5;
+    private static final int MAX_ESTIMATE = 600;
 
     private final LearningPursuitRepository repository;
     private final LearningRepository learningRepository;
@@ -48,11 +57,14 @@ public class LearningPursuitService {
 
     public LearningPursuit createPursuit(PursuitRequest request) {
         log.info("Creating pursuit model for: {}", request.getTitle());
+        String userId = UserContext.getRequiredUserId();
 
         List<PursuitStep> steps = buildSteps(request.getSteps(), 1);
         if (countSteps(steps) > MAX_TOTAL_STEPS) {
             throw new IllegalArgumentException("A pursuit can have at most " + MAX_TOTAL_STEPS + " steps");
         }
+
+        boolean hasPrimary = repository.findByUserId(userId).stream().anyMatch(LearningPursuit::isPrimary);
 
         // Create the Notion page dynamically
         String notionUrl = notionService.createNotionPage(request.getTitle());
@@ -60,8 +72,10 @@ public class LearningPursuitService {
         LearningPursuit pursuit = LearningPursuit.builder()
                 .title(request.getTitle().trim())
                 .category(request.getCategory().trim())
+                .goal(blankToNull(request.getGoal()))
                 .notionUrl(notionUrl)
                 .status("ACTIVE")
+                .primary(!hasPrimary)
                 .steps(steps)
                 .build();
 
@@ -77,7 +91,7 @@ public class LearningPursuitService {
             throw new IllegalArgumentException("Step not found with id: " + stepId);
         }
         // For a parent the current value is derived, so flipping it ticks (or un-ticks) the subtree.
-        setCompletedDeep(step, !step.isCompleted());
+        setCompletedDeep(step, !step.isCompleted(), Instant.now());
 
         return saveOrComplete(pursuit);
     }
@@ -120,6 +134,9 @@ public class LearningPursuitService {
         log.info("Deleting learning pursuit: {}", id);
         LearningPursuit existing = findOwned(id);
         repository.delete(existing);
+        if (existing.isPrimary()) {
+            promoteNextPrimary(existing.getUserId() != null ? existing.getUserId() : UserContext.getRequiredUserId());
+        }
     }
 
     public LearningPursuit updatePursuit(String id, PursuitRequest request) {
@@ -128,8 +145,32 @@ public class LearningPursuitService {
 
         existing.setTitle(request.getTitle().trim());
         existing.setCategory(request.getCategory());
+        if (request.getGoal() != null) {
+            existing.setGoal(blankToNull(request.getGoal()));
+        }
 
         return repository.save(existing);
+    }
+
+    /** Makes this pursuit the user's only primary pursuit. */
+    public LearningPursuit setPrimary(String id) {
+        log.info("Setting primary learning pursuit: {}", id);
+        LearningPursuit target = findOwned(id);
+        String userId = UserContext.getRequiredUserId();
+
+        List<LearningPursuit> changed = new ArrayList<>();
+        for (LearningPursuit pursuit : repository.findByUserId(userId)) {
+            boolean shouldBePrimary = pursuit.getId().equals(target.getId());
+            if (pursuit.isPrimary() != shouldBePrimary) {
+                pursuit.setPrimary(shouldBePrimary);
+                changed.add(pursuit);
+            }
+        }
+        if (!changed.isEmpty()) {
+            repository.saveAll(changed);
+        }
+        target.setPrimary(true);
+        return target;
     }
 
     public LearningPursuit deleteStep(String pursuitId, String stepId) {
@@ -143,9 +184,10 @@ public class LearningPursuitService {
         return saveOrComplete(pursuit);
     }
 
-    public LearningPursuit updateStep(String pursuitId, String stepId, String newText) {
-        log.info("Updating step {} text to '{}' in pursuit {}", stepId, newText, pursuitId);
-        if (newText == null || newText.isBlank()) {
+    /** Partial update: null fields are left alone (see UpdatePursuitStepRequest). */
+    public LearningPursuit updateStep(String pursuitId, String stepId, UpdatePursuitStepRequest request) {
+        log.info("Updating step {} in pursuit {}", stepId, pursuitId);
+        if (request.getText() != null && request.getText().isBlank()) {
             throw new IllegalArgumentException("Step text cannot be blank");
         }
 
@@ -154,9 +196,42 @@ public class LearningPursuitService {
         if (step == null) {
             throw new IllegalArgumentException("Step not found with id: " + stepId);
         }
-        step.setText(truncate(newText.trim(), MAX_TEXT_LENGTH));
+
+        if (request.getText() != null) {
+            step.setText(truncate(request.getText().trim(), MAX_TEXT_LENGTH));
+        }
+        if (request.getEstimateMinutes() != null) {
+            step.setEstimateMinutes(clampEstimate(request.getEstimateMinutes()));
+        }
+        if (request.getResumeNote() != null) {
+            String note = blankToNull(request.getResumeNote());
+            step.setResumeNote(note == null ? null : truncate(note, MAX_NOTE_LENGTH));
+        }
+        if (request.getTakeaways() != null) {
+            step.setTakeaways(blankToNull(request.getTakeaways()));
+        }
 
         return repository.save(pursuit);
+    }
+
+    /**
+     * Adds focused minutes to a step. Called when a step-linked focus session completes;
+     * a missing pursuit or step (deleted mid-session) is logged and skipped, never fatal.
+     */
+    public void creditStepTime(String userId, String pursuitId, String stepId, int minutes) {
+        if (minutes <= 0) {
+            return;
+        }
+        repository.findByIdAndUserId(pursuitId, userId).ifPresentOrElse(pursuit -> {
+            PursuitStep step = findStep(pursuit.getSteps(), stepId);
+            if (step == null) {
+                log.warn("Focus credit skipped: step {} no longer in pursuit {}", stepId, pursuitId);
+                return;
+            }
+            step.setSpentMinutes(step.getSpentMinutes() + minutes);
+            repository.save(pursuit);
+            log.info("Credited {}m to step {} in pursuit {}", minutes, stepId, pursuitId);
+        }, () -> log.warn("Focus credit skipped: pursuit {} not found", pursuitId));
     }
 
     // ── Tree helpers ────────────────────────────────────────────────────────
@@ -165,6 +240,17 @@ public class LearningPursuitService {
         String userId = UserContext.getRequiredUserId();
         return repository.findByIdAndUserId(pursuitId, userId)
                 .orElseThrow(() -> new IllegalArgumentException("Pursuit not found with id: " + pursuitId));
+    }
+
+    private void promoteNextPrimary(String userId) {
+        repository.findByUserId(userId).stream()
+                .filter(p -> !p.isPrimary())
+                .min(Comparator.comparing(LearningPursuit::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
+                .ifPresent(next -> {
+                    next.setPrimary(true);
+                    repository.save(next);
+                    log.info("Promoted pursuit {} to primary", next.getId());
+                });
     }
 
     private List<PursuitStep> buildSteps(List<PursuitStepInput> inputs, int depth) {
@@ -181,13 +267,15 @@ public class LearningPursuitService {
             if (hasChildren && depth >= MAX_DEPTH) {
                 throw new IllegalArgumentException("Steps can only be nested " + MAX_DEPTH + " levels deep");
             }
-            String note = input.getNote() == null || input.getNote().isBlank()
-                    ? null
-                    : truncate(input.getNote().trim(), MAX_NOTE_LENGTH);
+            String note = blankToNull(input.getNote());
             steps.add(PursuitStep.builder()
                     .id(UUID.randomUUID().toString())
                     .text(truncate(input.getText().trim(), MAX_TEXT_LENGTH))
-                    .note(note)
+                    .note(note == null ? null : truncate(note, MAX_NOTE_LENGTH))
+                    // Estimates live on leaves; a parent's time is the sum of its children.
+                    .estimateMinutes(hasChildren || input.getEstimateMinutes() == null
+                            ? null
+                            : clampEstimate(input.getEstimateMinutes()))
                     .isCompleted(false)
                     .children(hasChildren ? buildSteps(input.getChildren(), depth + 1) : new ArrayList<>())
                     .build());
@@ -206,9 +294,10 @@ public class LearningPursuitService {
             return repository.save(pursuit);
         }
 
+        String userId = pursuit.getUserId() != null ? pursuit.getUserId() : UserContext.getRequiredUserId();
         log.info("All steps completed for pursuit: {}. Moving to All Learnings log.", pursuit.getTitle());
         Learning learning = Learning.builder()
-                .userId(pursuit.getUserId() != null ? pursuit.getUserId() : UserContext.getRequiredUserId())
+                .userId(userId)
                 .title(pursuit.getTitle())
                 .category(pursuit.getCategory())
                 .date(LocalDate.now())
@@ -217,6 +306,9 @@ public class LearningPursuitService {
                 .build();
         learningRepository.save(learning);
         repository.delete(pursuit);
+        if (pursuit.isPrimary()) {
+            promoteNextPrimary(userId);
+        }
 
         // Return the final representation so the client can announce the completion.
         pursuit.setStatus("COMPLETED");
@@ -233,10 +325,11 @@ public class LearningPursuitService {
         }
     }
 
-    private static void setCompletedDeep(PursuitStep step, boolean completed) {
+    private static void setCompletedDeep(PursuitStep step, boolean completed, Instant now) {
         step.setCompleted(completed);
+        step.setCompletedAt(completed ? now : null);
         for (PursuitStep child : childrenOf(step)) {
-            setCompletedDeep(child, completed);
+            setCompletedDeep(child, completed, now);
         }
     }
 
@@ -295,6 +388,18 @@ public class LearningPursuitService {
         return step.getChildren();
     }
 
+    /** 0 (or less) clears; anything else lands on [MIN_ESTIMATE, MAX_ESTIMATE]. */
+    private static Integer clampEstimate(int minutes) {
+        if (minutes <= 0) {
+            return null;
+        }
+        return Math.max(MIN_ESTIMATE, Math.min(MAX_ESTIMATE, minutes));
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
     private static String truncate(String value, int max) {
         return value.length() <= max ? value : value.substring(0, max);
     }
@@ -311,7 +416,15 @@ public class LearningPursuitService {
 
     private static void appendSteps(StringBuilder sb, List<PursuitStep> steps, int indent) {
         for (PursuitStep step : steps) {
-            sb.append("  ".repeat(indent)).append("- ").append(step.getText()).append("\n");
+            String pad = "  ".repeat(indent);
+            sb.append(pad).append("- ").append(step.getText()).append("\n");
+            if (step.getTakeaways() != null && !step.getTakeaways().isBlank()) {
+                for (String line : step.getTakeaways().split("\\R")) {
+                    if (!line.isBlank()) {
+                        sb.append(pad).append("    > ").append(line.trim()).append("\n");
+                    }
+                }
+            }
             appendSteps(sb, childrenOf(step), indent + 1);
         }
     }
