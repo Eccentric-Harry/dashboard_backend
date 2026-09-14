@@ -1,5 +1,6 @@
 package com.personal_dashboard.backend.dto.request;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import java.util.List;
@@ -13,5 +14,7 @@ public class PursuitRequest {
     @NotBlank(message = "Category is required")
     private String category;
 
-    private List<String> steps;
+    /** Only read on create; nested up to LearningPursuitService.MAX_DEPTH levels. */
+    @Valid
+    private List<PursuitStepInput> steps;
 }

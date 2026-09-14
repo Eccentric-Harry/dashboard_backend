@@ -44,8 +44,19 @@ public class LearningPursuit implements UserOwnedDocument {
         private String id; // Generated UUID
         private String text;
 
+        /** Optional one-liner: why the step matters or what "done" looks like. */
+        private String note;
+
+        /**
+         * For a step with children this is derived — true only when every child is
+         * complete — and kept in sync by LearningPursuitService after each mutation.
+         */
         @JsonProperty("isCompleted")
         private boolean isCompleted;
+
+        /** Sub-steps; documents written before nesting existed have none. */
+        @Builder.Default
+        private List<PursuitStep> children = new ArrayList<>();
     }
 
     @CreatedDate

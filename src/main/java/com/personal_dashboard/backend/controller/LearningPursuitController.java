@@ -2,6 +2,7 @@ package com.personal_dashboard.backend.controller;
 
 import com.personal_dashboard.backend.dto.ApiMeta;
 import com.personal_dashboard.backend.dto.ApiResponse;
+import com.personal_dashboard.backend.dto.request.AddPursuitStepRequest;
 import com.personal_dashboard.backend.dto.request.PursuitRequest;
 import com.personal_dashboard.backend.model.LearningPursuit;
 import com.personal_dashboard.backend.service.LearningPursuitService;
@@ -53,8 +54,22 @@ public class LearningPursuitController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @PostMapping("/{id}/steps")
+    @Operation(summary = "Add a step", description = "Append a step, or a sub-step when parentId is given (max 3 levels)")
+    public ResponseEntity<ApiResponse<LearningPursuit>> addStep(
+            @PathVariable String id,
+            @Valid @RequestBody AddPursuitStepRequest request) {
+        log.info("REST request to add step to pursuit {}", id);
+        LearningPursuit updated = service.addStep(id, request);
+        ApiResponse<LearningPursuit> response = ApiResponse.<LearningPursuit>builder()
+                .data(updated)
+                .meta(buildMeta("add-step"))
+                .build();
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
     @PatchMapping("/{id}/steps/{stepId}")
-    @Operation(summary = "Toggle a step status", description = "Toggle the completed state of a specific subtask step")
+    @Operation(summary = "Toggle a step status", description = "Toggle a step; toggling a parent step sets its whole subtree")
     public ResponseEntity<ApiResponse<LearningPursuit>> toggleStep(
             @PathVariable String id,
             @PathVariable String stepId) {
