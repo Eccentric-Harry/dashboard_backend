@@ -140,6 +140,52 @@ public class UserController {
         );
     }
 
+    /**
+     * Sets (or, with a null body value, clears) the explicit daily protein target.
+     * Separate from PUT /profile for the same reason as the learner profile: that
+     * endpoint replaces fields wholesale and would wipe it.
+     */
+    @PutMapping("/profile/protein-target")
+    public ResponseEntity<ApiResponse<UserAccount>> updateProteinTarget(
+            @jakarta.validation.Valid @RequestBody com.personal_dashboard.backend.dto.request.UpdateProteinTargetRequest request) {
+        String userId = UserContext.getRequiredUserId();
+        log.info("Updating protein target for user: {} -> {}", userId, request.getGrams());
+        Optional<UserAccount> userOpt = userAccountRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(
+                    ApiResponse.<UserAccount>builder()
+                            .meta(createMeta("update-protein-target-failed"))
+                            .build()
+            );
+        }
+
+        UserAccount existing = userOpt.get();
+        existing.setProteinTargetOverride(request.getGrams());
+        // The engine skips users without complete biometrics, so set the legacy field
+        // directly too; with biometrics it recomputes the same value plus the carb split.
+        if (request.getGrams() != null) {
+            existing.setTargetProtein(request.getGrams());
+        }
+        healthEngineService.calculateHealthMetrics(existing);
+        existing.setUpdatedAt(Instant.now());
+
+        UserAccount saved = userAccountRepository.save(existing);
+
+        // Today's food log follows the profile's current targets.
+        String todayStr = java.time.LocalDate.now().toString();
+        dailyFoodLogRepository.findByUserIdAndDateString(userId, todayStr).ifPresent(log -> {
+            log.setProteinGoal(saved.getTargetProtein());
+            dailyFoodLogRepository.save(log);
+        });
+
+        return ResponseEntity.ok(
+                ApiResponse.<UserAccount>builder()
+                        .data(saved)
+                        .meta(createMeta("update-protein-target-success"))
+                        .build()
+        );
+    }
+
     private ApiMeta createMeta(String source) {
         return ApiMeta.builder()
                 .requestId(UUID.randomUUID().toString())

@@ -33,6 +33,14 @@ public class UserAccount {
     private Integer targetCalories;
     private Integer targetProtein;
 
+    /**
+     * Protein target the user set by hand, in grams/day. Null means "calculate it"
+     * (2 g per kg of body weight). When set, HealthEngineService uses it in place of the
+     * calculated value and carbs absorb the difference. Only written through
+     * PUT /users/profile/protein-target so full-profile saves can't wipe it.
+     */
+    private Integer proteinTargetOverride;
+
     // Enhanced Health Biometrics
     private PhysicalMetrics physicalMetrics;
     private ActivityLevel activityLevel;

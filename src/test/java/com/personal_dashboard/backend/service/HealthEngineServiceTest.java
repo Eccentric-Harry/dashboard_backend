@@ -96,4 +96,46 @@ class HealthEngineServiceTest {
         // Carbs = Remaining = 2129 - (120 * 4) - (59 * 9) = 2129 - 480 - 531 = 1118 kcal / 4 = 279.5g -> 280
         assertEquals(280, user.getDynamicTargets().getCalculatedCarbs());
     }
+
+    @Test
+    void explicitProteinTargetReplacesTheCalculatedOneAndCarbsAbsorbTheDifference() {
+        UserAccount user = UserAccount.builder()
+                .physicalMetrics(UserAccount.PhysicalMetrics.builder()
+                        .age(28)
+                        .gender("MALE")
+                        .height(180.0)
+                        .weight(80.0)
+                        .build())
+                .activityLevel(ActivityLevel.MODERATELY_ACTIVE)
+                .fitnessGoal(FitnessGoal.LOSE_WEIGHT)
+                .proteinTargetOverride(100)
+                .build();
+
+        healthEngineService.calculateHealthMetrics(user);
+
+        assertEquals(100, user.getDynamicTargets().getCalculatedProtein());
+        assertEquals(100, user.getTargetProtein());
+        // Calories and fat are unchanged by the override (2275 kcal, 63 g fat)...
+        assertEquals(2275, user.getTargetCalories());
+        assertEquals(63, user.getDynamicTargets().getCalculatedFat());
+        // ...so carbs take the freed-up protein kcal: (2275 - 100*4 - 63*9) / 4 = 327
+        assertEquals(327, user.getDynamicTargets().getCalculatedCarbs());
+    }
+
+    @Test
+    void clearedProteinTargetFallsBackToTwoGramsPerKilo() {
+        UserAccount user = UserAccount.builder()
+                .physicalMetrics(UserAccount.PhysicalMetrics.builder()
+                        .age(28)
+                        .gender("MALE")
+                        .height(180.0)
+                        .weight(80.0)
+                        .build())
+                .proteinTargetOverride(null)
+                .build();
+
+        healthEngineService.calculateHealthMetrics(user);
+
+        assertEquals(160, user.getTargetProtein());
+    }
 }

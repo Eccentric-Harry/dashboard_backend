@@ -82,8 +82,11 @@ public class HealthEngineService {
         }
 
         // 5. Daily Macro Split
-        // Protein: 2.0g per kg of body weight
-        int calculatedProtein = (int) Math.round(2.0 * weight);
+        // Protein: the user's explicit target if they set one, else 2.0g per kg of body weight
+        Integer proteinOverride = user.getProteinTargetOverride();
+        int calculatedProtein = proteinOverride != null && proteinOverride > 0
+                ? proteinOverride
+                : (int) Math.round(2.0 * weight);
         if (calculatedProtein < 0) {
             calculatedProtein = 0;
         }
