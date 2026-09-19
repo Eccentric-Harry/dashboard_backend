@@ -3,6 +3,7 @@ package com.personal_dashboard.backend.security;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Optional;
+import java.util.function.Supplier;
 
 @Slf4j
 public final class UserContext {
@@ -33,5 +34,23 @@ public final class UserContext {
     public static void clear() {
         log.debug("Clearing userId binding from current request thread");
         CURRENT_USER_ID.remove();
+    }
+
+    /**
+     * Wraps a task so it runs with the <em>calling</em> thread's user bound — for handing
+     * work to another thread without losing the isolation the ThreadLocal provides. The
+     * user is captured now (so this must be called on the request thread) and the binding
+     * is removed when the task finishes.
+     */
+    public static <T> Supplier<T> propagate(Supplier<T> task) {
+        String userId = getRequiredUserId();
+        return () -> {
+            CURRENT_USER_ID.set(userId);
+            try {
+                return task.get();
+            } finally {
+                CURRENT_USER_ID.remove();
+            }
+        };
     }
 }

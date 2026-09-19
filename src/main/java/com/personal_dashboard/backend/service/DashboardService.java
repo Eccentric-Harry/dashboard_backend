@@ -3,6 +3,7 @@ package com.personal_dashboard.backend.service;
 import com.personal_dashboard.backend.dto.*;
 import com.personal_dashboard.backend.model.*;
 import com.personal_dashboard.backend.repository.*;
+import com.personal_dashboard.backend.util.ParallelReads;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -493,25 +494,39 @@ public class DashboardService {
         /**
          * Learnings hub summary: today stats, 7-day timeline, coding counters.
          */
-        @SuppressWarnings("unused")
         public LearningsSummaryResponse getLearningsSummary(LocalDate targetDate) {
                 log.debug("Building learnings summary for {} (14-day window)", targetDate);
                 LocalDate startDate = targetDate.minusDays(13); // 14 days total
 
                 String userId = com.personal_dashboard.backend.security.UserContext.getRequiredUserId();
-                List<Learning> rangeLearnings = learningRepository.findByUserIdAndDateRange(userId, startDate, targetDate);
-                List<DailyTask> rangeTasks = dailyTaskRepository.findByUserIdAndDateRange(userId, startDate, targetDate.plusDays(1))
+                LocalDateTime activeTasksThreshold = LocalDateTime.now().minusHours(48);
+
+                // Independent reads, forked: this endpoint gates /home and /learnings, and run
+                // one after another they cost a cross-region round trip each. The all-time task
+                // totals are counted in the database — they used to load every task ever
+                // created (~700 documents) just to count them.
+                var rangeLearningsRead = ParallelReads.fork(
+                                () -> learningRepository.findByUserIdAndDateRange(userId, startDate, targetDate));
+                var rangeTasksRead = ParallelReads.fork(
+                                () -> dailyTaskRepository.findByUserIdAndDateRange(userId, startDate, targetDate.plusDays(1)));
+                var activeTasksRead = ParallelReads.fork(
+                                () -> dailyTaskRepository.findActiveTasks(userId, activeTasksThreshold));
+                var totalTasksRead = ParallelReads.fork(() -> dailyTaskRepository.countTasksByUserId(userId));
+                var totalTasksCompletedRead = ParallelReads.fork(
+                                () -> dailyTaskRepository.countCompletedTasksByUserId(userId));
+                var totalLearningsRead = ParallelReads.fork(() -> learningRepository.countByUserId(userId));
+                var totalPursuitsRead = ParallelReads.fork(() -> learningPursuitRepository.countByUserId(userId));
+
+                List<Learning> rangeLearnings = ParallelReads.join(rangeLearningsRead);
+                List<DailyTask> rangeTasks = ParallelReads.join(rangeTasksRead)
                                 .stream()
                                 .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
                                 .toList();
-                List<DailyLog> rangeLogs = dailyLogRepository.findByUserIdAndDateRange(userId, startDate, targetDate);
 
                 Map<LocalDate, List<Learning>> learningsByDate = rangeLearnings.stream()
                                 .collect(Collectors.groupingBy(Learning::getDate));
                 Map<LocalDate, List<DailyTask>> tasksByDate = rangeTasks.stream()
                                 .collect(Collectors.groupingBy(DailyTask::getDate));
-                Map<LocalDate, DailyLog> logsByDate = rangeLogs.stream()
-                                .collect(Collectors.toMap(DailyLog::getDate, entry -> entry, (a, b) -> a));
 
                 List<LearningsTimelineDay> timeline = new ArrayList<>();
                 for (LocalDate date = startDate; !date.isAfter(targetDate); date = date.plusDays(1)) {
@@ -541,7 +556,7 @@ public class DashboardService {
                 }
 
                 List<Learning> todayLearnings = learningsByDate.getOrDefault(targetDate, List.of());
-                List<DailyTask> todayTasks = dailyTaskRepository.findActiveTasks(userId, LocalDateTime.now().minusHours(48))
+                List<DailyTask> todayTasks = ParallelReads.join(activeTasksRead)
                                 .stream()
                                 .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
                                 .filter(t -> t.getExcludedDates() == null || !t.getExcludedDates().contains(targetDate))
@@ -570,16 +585,11 @@ public class DashboardService {
                 int weeklyLearningCount = rangeLearnings.size();
                 int streakDays = calculateActivityStreak(timeline);
 
-                List<DailyTask> allTasks = dailyTaskRepository.findByUserId(userId).stream()
-                                .filter(t -> t.getItemType() == null || "TASK".equalsIgnoreCase(t.getItemType()))
-                                .toList();
-                long totalTasksCompleted = allTasks.stream()
-                                .filter(t -> Boolean.TRUE.equals(t.getCompleted()))
-                                .count();
-                long totalTasksCount = allTasks.size();
+                long totalTasksCompleted = ParallelReads.join(totalTasksCompletedRead);
+                long totalTasksCount = ParallelReads.join(totalTasksRead);
 
-                long totalLearningsCount = learningRepository.countByUserId(userId);
-                long totalPursuitsCount = learningPursuitRepository.countByUserId(userId);
+                long totalLearningsCount = ParallelReads.join(totalLearningsRead);
+                long totalPursuitsCount = ParallelReads.join(totalPursuitsRead);
 
                 LearningsTodaySummary today = LearningsTodaySummary.builder()
                                 .learningsCount(todayLearnings.size())

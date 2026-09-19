@@ -2,7 +2,13 @@ package com.personal_dashboard.backend.exception;
 
 import com.personal_dashboard.backend.dto.ApiMeta;
 import com.personal_dashboard.backend.dto.ApiResponse;
+import com.mongodb.MongoSocketException;
+import com.mongodb.MongoTimeoutException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.QueryTimeoutException;
+import org.springframework.dao.TransientDataAccessResourceException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -12,6 +18,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -73,6 +80,48 @@ public class GlobalExceptionHandler {
                         .data(errorDetails)
                         .meta(meta)
                         .build());
+    }
+
+    /** A malformed {@code ?date=} (or similar) is the caller's mistake, not a server fault. */
+    @ExceptionHandler(DateTimeParseException.class)
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleDateTimeParse(DateTimeParseException ex) {
+        log.warn("Unparseable date/time '{}': {}", ex.getParsedString(), ex.getMessage());
+        return errorResponse(HttpStatus.BAD_REQUEST, "Invalid date or time format (expected ISO, e.g. 2026-09-19)", null);
+    }
+
+    /**
+     * The database was unreachable or too slow (see MongoClientConfig's bounds). This is
+     * transient, so answer 503 + Retry-After — the client retries GETs on it — instead of
+     * a generic 500, and keep driver internals out of the response body.
+     */
+    @ExceptionHandler({DataAccessResourceFailureException.class, TransientDataAccessResourceException.class,
+            QueryTimeoutException.class, MongoTimeoutException.class, MongoSocketException.class})
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleDatabaseUnavailable(Exception ex) {
+        String requestId = UUID.randomUUID().toString();
+        log.error("Database unavailable [requestId={}]: {}", requestId, ex.getMessage(), ex);
+        return errorResponse(HttpStatus.SERVICE_UNAVAILABLE,
+                "The database is temporarily unavailable. Please retry.", requestId);
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, String>>> errorResponse(
+            HttpStatus status, String message, String requestId) {
+        Map<String, String> errorDetails = new HashMap<>();
+        errorDetails.put("message", message);
+
+        ApiMeta meta = ApiMeta.builder()
+                .requestId(requestId != null ? requestId : UUID.randomUUID().toString())
+                .timestamp(Instant.now().toString())
+                .source("api")
+                .build();
+
+        var builder = ResponseEntity.status(status);
+        if (status == HttpStatus.SERVICE_UNAVAILABLE) {
+            builder.header(HttpHeaders.RETRY_AFTER, "2");
+        }
+        return builder.body(ApiResponse.<Map<String, String>>builder()
+                .data(errorDetails)
+                .meta(meta)
+                .build());
     }
 
     @ExceptionHandler(NoHandlerFoundException.class)

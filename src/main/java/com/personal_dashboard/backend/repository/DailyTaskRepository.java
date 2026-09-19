@@ -14,6 +14,15 @@ public interface DailyTaskRepository extends MongoRepository<DailyTask, String> 
 
     List<DailyTask> findByUserId(String userId);
 
+    /** Planner tasks only (itemType unset or TASK in any case) — calendar events are excluded. */
+    @Query(value = "{ 'userId': ?0, $or: [ { 'itemType': null }, { 'itemType': { $regex: '^TASK$', $options: 'i' } } ] }",
+            count = true)
+    long countTasksByUserId(String userId);
+
+    @Query(value = "{ 'userId': ?0, 'completed': true, $or: [ { 'itemType': null }, { 'itemType': { $regex: '^TASK$', $options: 'i' } } ] }",
+            count = true)
+    long countCompletedTasksByUserId(String userId);
+
     java.util.Optional<DailyTask> findByIdAndUserId(String id, String userId);
 
     java.util.Optional<DailyTask> findByGoogleEventIdAndUserId(String googleEventId, String userId);

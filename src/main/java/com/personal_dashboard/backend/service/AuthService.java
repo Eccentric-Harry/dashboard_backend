@@ -13,20 +13,28 @@ import org.springframework.stereotype.Service;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class AuthService {
 
+    private static final Duration TOKEN_CACHE_TTL = Duration.ofMinutes(5);
+    private static final int TOKEN_CACHE_MAX_ENTRIES = 1_000;
+
     private final PasscodeRepository passcodeRepository;
     private final AuthTokenRepository authTokenRepository;
     private final UserAccountRepository userAccountRepository;
+
+    private final Map<String, CachedToken> validatedTokens = new ConcurrentHashMap<>();
 
     public Optional<String> verifyPasscode(String rawPasscode) {
         log.warn("Legacy verifyPasscode endpoint is disabled.");
@@ -128,10 +136,44 @@ public class AuthService {
         return Optional.of(token);
     }
 
+    /**
+     * Every authenticated request validates its bearer token, and each lookup is a full
+     * round trip to Atlas (~55 ms from the Render region, measured). A validated token is
+     * remembered briefly — never past its own expiry — so a route that fans out a dozen
+     * calls pays for one lookup instead of twelve. Only hits are cached: an unknown token
+     * always goes to the database. There is no logout/revocation path today; if one is
+     * added it must evict from {@link #validatedTokens}, or a revoked token keeps working
+     * for up to {@link #TOKEN_CACHE_TTL}.
+     */
     public Optional<AuthToken> validateToken(String token) {
-        return authTokenRepository.findByToken(token)
-                .filter(t -> t.getExpiresAt() != null && t.getExpiresAt().isAfter(Instant.now()))
+        Instant now = Instant.now();
+        CachedToken cached = validatedTokens.get(token);
+        if (cached != null) {
+            if (cached.cachedUntil().isAfter(now)) {
+                return Optional.of(cached.authToken());
+            }
+            validatedTokens.remove(token, cached);
+        }
+
+        Optional<AuthToken> valid = authTokenRepository.findByToken(token)
+                .filter(t -> t.getExpiresAt() != null && t.getExpiresAt().isAfter(now))
                 .filter(t -> t.getUserId() != null && !t.getUserId().isBlank());
+        valid.ifPresent(t -> rememberValidToken(token, t, now));
+        return valid;
+    }
+
+    private void rememberValidToken(String token, AuthToken authToken, Instant now) {
+        if (validatedTokens.size() >= TOKEN_CACHE_MAX_ENTRIES) {
+            // Crude bound — a personal dashboard has a handful of live sessions, so hitting
+            // this means something is minting tokens; starting over is the safe response.
+            validatedTokens.clear();
+        }
+        Instant ttlEnd = now.plus(TOKEN_CACHE_TTL);
+        Instant cachedUntil = authToken.getExpiresAt().isBefore(ttlEnd) ? authToken.getExpiresAt() : ttlEnd;
+        validatedTokens.put(token, new CachedToken(authToken, cachedUntil));
+    }
+
+    private record CachedToken(AuthToken authToken, Instant cachedUntil) {
     }
 
     private String resolveUserId(Passcode passcode) {

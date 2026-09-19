@@ -30,6 +30,7 @@ import com.personal_dashboard.backend.repository.MindEntryRepository;
 import com.personal_dashboard.backend.repository.SleepLogRepository;
 import com.personal_dashboard.backend.repository.StravaActivityRepository;
 import com.personal_dashboard.backend.security.UserContext;
+import com.personal_dashboard.backend.util.ParallelReads;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -455,43 +456,57 @@ public class MindService {
         LocalDate today = date != null ? date : LocalDate.now(ZONE);
         LocalDate windowStart = today.minusDays(EVIDENCE_WINDOW_DAYS - 1L);
 
-        long focusMinutes = focusSessionRepository
+        // Every read below is independent; forked, the summary costs about two database
+        // round trips (the streak's two chained reads) instead of eight.
+        var focusMinutesRead = ParallelReads.fork(() -> focusSessionRepository
                 .findByUserIdAndStatusAndStartTimeBetween(
                         userId, FocusSessionStatus.COMPLETED, instantAtStart(windowStart), instantAtEnd(today))
                 .stream()
                 .mapToLong(s -> Math.max(0, s.getDurationMinutes()))
-                .sum();
+                .sum());
 
-        long tasksCompleted = dailyTaskRepository
+        var tasksCompletedRead = ParallelReads.fork(() -> dailyTaskRepository
                 .findByUserIdAndDateRange(userId, windowStart, today.plusDays(1))
                 .stream()
                 .filter(t -> Boolean.TRUE.equals(t.getCompleted()))
-                .count();
+                .count());
 
-        long workouts = stravaActivityRepository
+        var workoutsRead = ParallelReads.fork(() -> stravaActivityRepository
                 .findByUserIdAndDateBetween(userId, windowStart, today)
                 .stream()
-                .count();
+                .count());
 
-        long learnings = learningRepository
+        var learningsRead = ParallelReads.fork(() -> learningRepository
                 .findByUserIdAndDateRange(userId, windowStart, today)
                 .stream()
-                .count();
+                .count());
 
         // Loop-closing stats over the window's captured thoughts.
-        List<MindEntry> windowThoughts = mindEntryRepository
+        var windowThoughtsRead = ParallelReads.fork(() -> mindEntryRepository
                 .findByUserIdAndDateRange(userId, windowStart, today)
                 .stream()
                 .filter(e -> "THOUGHT".equalsIgnoreCase(e.getType()))
-                .toList();
+                .toList());
+
+        var streakDaysRead = ParallelReads.fork(() -> computeStreak(userId, today));
+
+        var moodScoreRead = ParallelReads.fork(
+                () -> dailyLogService.findByDate(today).map(DailyLog::getMoodScore).orElse(null));
+
+        long focusMinutes = ParallelReads.join(focusMinutesRead);
+        long tasksCompleted = ParallelReads.join(tasksCompletedRead);
+        long workouts = ParallelReads.join(workoutsRead);
+        long learnings = ParallelReads.join(learningsRead);
+
+        List<MindEntry> windowThoughts = ParallelReads.join(windowThoughtsRead);
         long captured = windowThoughts.size();
         long converted = windowThoughts.stream().filter(e -> "CONVERTED".equalsIgnoreCase(e.getStatus())).count();
         long reframed = windowThoughts.stream().filter(e -> e.getReframedText() != null && !e.getReframedText().isBlank()).count();
         long released = windowThoughts.stream().filter(e -> "RELEASED".equalsIgnoreCase(e.getStatus())).count();
 
-        long streakDays = computeStreak(userId, today);
+        long streakDays = ParallelReads.join(streakDaysRead);
 
-        Integer moodScore = dailyLogService.findByDate(today).map(DailyLog::getMoodScore).orElse(null);
+        Integer moodScore = ParallelReads.join(moodScoreRead);
 
         return MindSummaryResponse.builder()
                 .focusMinutes(focusMinutes)
