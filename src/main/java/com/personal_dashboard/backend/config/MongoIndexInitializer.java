@@ -4,6 +4,8 @@ import com.personal_dashboard.backend.model.AuthToken;
 import com.personal_dashboard.backend.model.CalendarSyncMapping;
 import com.personal_dashboard.backend.model.DailyTask;
 import com.personal_dashboard.backend.model.MindEntry;
+import com.personal_dashboard.backend.model.PushSubscription;
+import com.personal_dashboard.backend.model.ScheduledNotification;
 import com.personal_dashboard.backend.model.SyncOutboxEntry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,7 +28,10 @@ import java.time.Duration;
  * them, so anything a hot path needs has to be repeated here. That flag is deliberately
  * left off — several models declare <em>unique</em> compound indexes, and creating one of
  * those over a collection that already holds a duplicate fails the build and takes the
- * whole application down with it. Every index below is non-unique for the same reason.
+ * whole application down with it. The two unique indexes below ({@code auth_tokens.token} and
+ * {@code push_subscriptions.endpoint}) are deliberate exceptions: both are over values that are
+ * unique by construction, and a duplicate there is a correctness bug worth surfacing. Creation
+ * stays fail-soft, so even then startup is not blocked.
  *
  * <ul>
  *   <li>{@code auth_tokens.token} — looked up by every request whose token isn't cached.</li>
@@ -43,6 +48,16 @@ import java.time.Duration;
  *       in the same sync loop.</li>
  *   <li>{@code sync_outbox (status, nextAttemptAt)} — scanned by OutboxDrainJob every 15s.</li>
  *   <li>{@code mind_entries (userId, date)} — every /mind read.</li>
+ *   <li>{@code push_subscriptions.endpoint} <em>unique</em> — an endpoint identifies one device,
+ *       so this is what stops two tabs subscribing at once from creating two rows and pushing
+ *       the same alert twice. The uniqueness is the mechanism, not a nicety.</li>
+ *   <li>{@code push_subscriptions (userId, active)} — read for every dispatch.</li>
+ *   <li>{@code scheduled_notifications (status, fireAt, nextAttemptAt)} — the dispatcher's claim
+ *       query, which runs every 15s.</li>
+ *   <li>{@code scheduled_notifications (userId, fireAt)} — the notification-centre feed.</li>
+ *   <li>{@code scheduled_notifications.actionToken} — the service worker's snooze lookup.</li>
+ *   <li>{@code scheduled_notifications.expiresAt} TTL — records self-purge, so the collection
+ *       cannot grow without bound the way the old per-push log did.</li>
  * </ul>
  *
  * Creation is idempotent and fail-soft: an existing index with a conflicting definition
@@ -66,6 +81,12 @@ public class MongoIndexInitializer {
         ensure(CalendarSyncMapping.class, new Index().on("googleEventId", Sort.Direction.ASC).on("userId", Sort.Direction.ASC).named("google_event_user_idx"));
         ensure(SyncOutboxEntry.class, new Index().on("status", Sort.Direction.ASC).on("nextAttemptAt", Sort.Direction.ASC).named("status_next_attempt_idx"));
         ensure(MindEntry.class, new Index().on("userId", Sort.Direction.ASC).on("date", Sort.Direction.ASC).named("user_date_idx"));
+        ensure(PushSubscription.class, new Index().on("endpoint", Sort.Direction.ASC).unique().named("endpoint_unique"));
+        ensure(PushSubscription.class, new Index().on("userId", Sort.Direction.ASC).on("active", Sort.Direction.ASC).named("user_active_idx"));
+        ensure(ScheduledNotification.class, new Index().on("status", Sort.Direction.ASC).on("fireAt", Sort.Direction.ASC).on("nextAttemptAt", Sort.Direction.ASC).named("status_fire_attempt_idx"));
+        ensure(ScheduledNotification.class, new Index().on("userId", Sort.Direction.ASC).on("fireAt", Sort.Direction.DESC).named("user_fire_idx"));
+        ensure(ScheduledNotification.class, new Index().on("actionToken", Sort.Direction.ASC).sparse().named("action_token_idx"));
+        ensure(ScheduledNotification.class, new Index().on("expiresAt", Sort.Direction.ASC).expire(Duration.ZERO).named("expiresAt_ttl"));
     }
 
     private void ensure(Class<?> entity, Index index) {

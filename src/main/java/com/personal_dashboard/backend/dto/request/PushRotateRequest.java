@@ -6,13 +6,22 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Sent by the service worker when the browser rotates a push subscription
+ * ({@code pushsubscriptionchange}). The service worker has no user session, so the old
+ * endpoint — itself an unguessable capability URL minted by the push service — is what
+ * authorises the swap.
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class PushSubscriptionRequest {
+public class PushRotateRequest {
 
-    @NotBlank(message = "Endpoint is required")
+    @NotBlank(message = "Old endpoint is required")
+    private String oldEndpoint;
+
+    @NotBlank(message = "New endpoint is required")
     private String endpoint;
 
     @NotBlank(message = "p256dh key is required")
@@ -21,9 +30,5 @@ public class PushSubscriptionRequest {
     @NotBlank(message = "Auth key is required")
     private String auth;
 
-    @NotBlank(message = "Timezone string is required")
     private String timezone;
-
-    /** Stable per-browser id, so an endpoint rotation is recognisable as the same install. */
-    private String deviceId;
 }
