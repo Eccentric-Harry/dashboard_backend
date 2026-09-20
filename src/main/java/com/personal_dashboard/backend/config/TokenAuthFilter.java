@@ -39,8 +39,14 @@ public class TokenAuthFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
 
+        // Service-worker callbacks carry no user session by construction: a service worker
+        // cannot read the token. Each one is authorised inside the controller by a secret it
+        // could only have received through an encrypted push (the action token) or from the
+        // push service itself (the previous endpoint URL).
         if (path.startsWith("/api/v1/auth/")
                 || path.equals("/api/v1/google-calendar/auth/callback")
+                || path.equals("/api/v1/push/rotate")
+                || path.startsWith("/api/v1/push/actions/")
                 || path.startsWith("/api/webhooks/")) {
             filterChain.doFilter(request, response);
             return;
