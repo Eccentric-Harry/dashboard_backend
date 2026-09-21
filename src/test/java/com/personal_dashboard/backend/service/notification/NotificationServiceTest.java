@@ -8,8 +8,12 @@ import com.personal_dashboard.backend.model.NotificationStatus;
 import com.personal_dashboard.backend.model.PushSubscription;
 import com.personal_dashboard.backend.model.ScheduledNotification;
 import com.personal_dashboard.backend.repository.PushSubscriptionRepository;
+import com.personal_dashboard.backend.dto.PushTestResult;
 import com.personal_dashboard.backend.repository.ScheduledNotificationRepository;
 import com.personal_dashboard.backend.security.UserContext;
+import com.personal_dashboard.backend.service.PushNotificationService;
+import com.personal_dashboard.backend.service.PushNotificationService.Kind;
+import com.personal_dashboard.backend.service.PushNotificationService.PushOutcome;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,6 +46,7 @@ class NotificationServiceTest {
     @Mock private PushSubscriptionRepository pushSubscriptionRepository;
     @Mock private ScheduledNotificationRepository notificationRepository;
     @Mock private NotificationPlanner notificationPlanner;
+    @Mock private PushNotificationService pushNotificationService;
 
     @InjectMocks private NotificationService service;
 
@@ -52,6 +57,7 @@ class NotificationServiceTest {
         when(pushSubscriptionRepository.save(any(PushSubscription.class))).thenAnswer(inv -> inv.getArgument(0));
         when(notificationRepository.save(any(ScheduledNotification.class))).thenAnswer(inv -> inv.getArgument(0));
         when(pushSubscriptionRepository.findByUserIdAndActiveTrue(anyString())).thenReturn(List.of());
+        when(pushNotificationService.buildPayload(any())).thenReturn("{}");
     }
 
     @AfterEach
@@ -216,6 +222,72 @@ class NotificationServiceTest {
     }
 
     // ── Feed state ───────────────────────────────────────────────────────────
+
+    // ── Test push ────────────────────────────────────────────────────────────
+
+    /**
+     * The point of a test push is telling "the transport is broken" apart from "your OS is
+     * hiding it". Those look identical from the browser and need completely different fixes.
+     */
+    @Test
+    void testPush_reportsPerDeviceOutcomes() {
+        PushSubscription phone = PushSubscription.builder()
+                .id("sub-phone").userId(USER).endpoint("https://fcm.googleapis.com/x").active(true).build();
+        PushSubscription laptop = PushSubscription.builder()
+                .id("sub-laptop").userId(USER).endpoint("https://web.push.apple.com/y").active(true).build();
+        when(pushSubscriptionRepository.findByUserIdAndActiveTrue(USER)).thenReturn(List.of(phone, laptop));
+        when(pushNotificationService.send(eq(phone), anyString())).thenReturn(new PushOutcome(Kind.ACCEPTED, 201, null));
+        when(pushNotificationService.send(eq(laptop), anyString()))
+                .thenReturn(new PushOutcome(Kind.PERMANENT, 403, "vapid mismatch"));
+
+        PushTestResult result = service.sendTestPush();
+
+        assertEquals(2, result.getDeviceCount());
+        assertEquals(1, result.getAccepted());
+        assertEquals("ACCEPTED", result.getOutcomes().get(0).getKind());
+        assertEquals("PERMANENT", result.getOutcomes().get(1).getKind());
+        assertEquals(403, result.getOutcomes().get(1).getStatusCode());
+        assertEquals("vapid mismatch", result.getOutcomes().get(1).getMessage());
+    }
+
+    @Test
+    void testPush_neverLeaksTheEndpointCapabilityUrl() {
+        PushSubscription phone = PushSubscription.builder()
+                .id("sub-phone").userId(USER)
+                .endpoint("https://fcm.googleapis.com/fcm/send/SECRET-TOKEN").active(true).build();
+        when(pushSubscriptionRepository.findByUserIdAndActiveTrue(USER)).thenReturn(List.of(phone));
+        when(pushNotificationService.send(any(), anyString())).thenReturn(new PushOutcome(Kind.ACCEPTED, 201, null));
+
+        PushTestResult result = service.sendTestPush();
+
+        assertEquals("https://fcm.googleapis.com", result.getOutcomes().get(0).getEndpointOrigin());
+        assertFalse(result.getOutcomes().get(0).getEndpointOrigin().contains("SECRET"));
+    }
+
+    @Test
+    void testPush_deactivatesAnEndpointThePushServiceSaysIsGone() {
+        PushSubscription phone = PushSubscription.builder()
+                .id("sub-phone").userId(USER).endpoint("https://fcm.googleapis.com/x").active(true).build();
+        when(pushSubscriptionRepository.findByUserIdAndActiveTrue(USER)).thenReturn(List.of(phone));
+        when(pushNotificationService.send(any(), anyString()))
+                .thenReturn(new PushOutcome(Kind.EXPIRED, 410, "gone"));
+
+        service.sendTestPush();
+
+        assertFalse(phone.isActive());
+        verify(pushSubscriptionRepository).save(phone);
+    }
+
+    @Test
+    void testPush_withNoDevicesReportsZeroRatherThanFailing() {
+        when(pushSubscriptionRepository.findByUserIdAndActiveTrue(USER)).thenReturn(List.of());
+
+        PushTestResult result = service.sendTestPush();
+
+        assertEquals(0, result.getDeviceCount());
+        assertEquals(0, result.getAccepted());
+        assertTrue(result.getOutcomes().isEmpty());
+    }
 
     private ScheduledNotification sent(String id) {
         return ScheduledNotification.builder()

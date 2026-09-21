@@ -1,7 +1,9 @@
 package com.personal_dashboard.backend.service.notification;
 
+import com.personal_dashboard.backend.dto.NotificationDiagnostics;
 import com.personal_dashboard.backend.dto.NotificationView;
 import com.personal_dashboard.backend.dto.PushSubscriptionStatus;
+import com.personal_dashboard.backend.dto.PushTestResult;
 import com.personal_dashboard.backend.dto.request.PushRotateRequest;
 import com.personal_dashboard.backend.dto.request.PushSubscriptionRequest;
 import com.personal_dashboard.backend.model.NotificationStatus;
@@ -10,6 +12,7 @@ import com.personal_dashboard.backend.model.ScheduledNotification;
 import com.personal_dashboard.backend.repository.PushSubscriptionRepository;
 import com.personal_dashboard.backend.repository.ScheduledNotificationRepository;
 import com.personal_dashboard.backend.security.UserContext;
+import com.personal_dashboard.backend.service.PushNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,7 +22,12 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -37,6 +45,9 @@ public class NotificationService {
     private final PushSubscriptionRepository pushSubscriptionRepository;
     private final ScheduledNotificationRepository notificationRepository;
     private final NotificationPlanner notificationPlanner;
+    private final PushNotificationService pushNotificationService;
+
+    private static final DateTimeFormatter LOCAL_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Value("${notifications.feed-days:14}")
     private long feedDays;
@@ -269,7 +280,7 @@ public class NotificationService {
         Instant now = Instant.now();
         Instant fireAt = now.plus(Duration.ofMinutes(minutes));
 
-        String snoozeId = origin.getId() + "|snooze|" + (now.getEpochSecond() / 60);
+        String snoozeId = origin.getId() + ".snooze." + (now.getEpochSecond() / 60);
         ScheduledNotification snoozed = ScheduledNotification.builder()
                 .id(snoozeId)
                 .userId(origin.getUserId())
@@ -297,6 +308,142 @@ public class NotificationService {
             return notificationRepository.findById(snoozeId).map(NotificationView::from);
         }
         return Optional.of(NotificationView.from(snoozed));
+    }
+
+    // ── Diagnostics ──────────────────────────────────────────────────────────
+
+    /**
+     * A read-only snapshot of this user's notification plumbing: registered devices, what is
+     * scheduled next, and how the last few attempts actually ended per device. Nothing here
+     * sends anything.
+     */
+    public NotificationDiagnostics diagnostics() {
+        String userId = UserContext.getRequiredUserId();
+        Instant now = Instant.now();
+        List<PushSubscription> devices = pushSubscriptionRepository.findByUserId(userId);
+        ZoneId zone = notificationPlanner.resolveUserZone(userId, devices);
+
+        List<NotificationDiagnostics.ScheduledInfo> upcoming = notificationRepository
+                .findByUserIdAndStatusAndFireAtBetween(userId, NotificationStatus.SCHEDULED,
+                        now.minus(Duration.ofHours(1)), now.plus(Duration.ofDays(2)))
+                .stream()
+                .sorted(Comparator.comparing(ScheduledNotification::getFireAt))
+                .limit(20)
+                .map(row -> NotificationDiagnostics.ScheduledInfo.builder()
+                        .id(row.getId())
+                        .title(row.getTitle())
+                        .fireAt(row.getFireAt())
+                        .fireAtLocal(row.getFireAt().atZone(zone).format(LOCAL_FORMAT))
+                        .status(String.valueOf(row.getStatus()))
+                        .zoneId(row.getZoneId())
+                        .build())
+                .toList();
+
+        List<NotificationDiagnostics.AttemptInfo> recent = notificationRepository
+                .findRecentAttempts(userId, now.minus(Duration.ofDays(3)),
+                        Sort.by(Sort.Direction.DESC, "fireAt"))
+                .stream()
+                .limit(20)
+                .map(row -> NotificationDiagnostics.AttemptInfo.builder()
+                        .id(row.getId())
+                        .title(row.getTitle())
+                        .fireAt(row.getFireAt())
+                        .status(String.valueOf(row.getStatus()))
+                        .attempts(row.getAttempts())
+                        .lastError(row.getLastError())
+                        .sentAt(row.getSentAt())
+                        .acknowledgedAt(row.getAcknowledgedAt())
+                        .deliveries(describeDeliveries(row))
+                        .build())
+                .toList();
+
+        return NotificationDiagnostics.builder()
+                .enabled(true)
+                .serverTime(now)
+                .resolvedTimezone(zone.getId())
+                .serverTimeLocal(now.atZone(zone).format(LOCAL_FORMAT))
+                .devices(devices.stream().map(this::describeDevice).toList())
+                .upcoming(upcoming)
+                .recent(recent)
+                .build();
+    }
+
+    private List<String> describeDeliveries(ScheduledNotification row) {
+        if (row.getDeliveries() == null) return List.of();
+        return row.getDeliveries().stream()
+                .map(d -> String.join(" ",
+                        d.getStatus(),
+                        d.getStatusCode() == null ? "-" : String.valueOf(d.getStatusCode()),
+                        d.getEndpointOrigin() == null ? "" : d.getEndpointOrigin(),
+                        d.getLastError() == null ? "" : d.getLastError()).trim())
+                .toList();
+    }
+
+    private NotificationDiagnostics.DeviceInfo describeDevice(PushSubscription sub) {
+        return NotificationDiagnostics.DeviceInfo.builder()
+                .id(sub.getId())
+                .endpointOrigin(sub.endpointOrigin())
+                .active(sub.isActive())
+                .inactiveReason(sub.getInactiveReason())
+                .timezone(sub.getTimezone())
+                .userAgent(sub.getUserAgent())
+                .failureCount(sub.getFailureCount())
+                .lastSeenAt(sub.getLastSeenAt())
+                .lastSuccessAt(sub.getLastSuccessAt())
+                .lastFailureAt(sub.getLastFailureAt())
+                .build();
+    }
+
+    /**
+     * Pushes a test notification to every registered device <em>now</em> and reports what each
+     * push service said. This is the difference between "alerts do not work" and "Apple
+     * rejected the payload with 403" — the second is actionable in seconds.
+     *
+     * <p>It deliberately bypasses the scheduler: it proves the transport, not the timing.
+     */
+    public PushTestResult sendTestPush() {
+        String userId = UserContext.getRequiredUserId();
+        List<PushSubscription> devices = pushSubscriptionRepository.findByUserIdAndActiveTrue(userId);
+        Instant now = Instant.now();
+
+        String payload = pushNotificationService.buildPayload(Map.of(
+                "id", "test." + now.toEpochMilli(),
+                "title", "Test alert",
+                "body", "If you can see this, push delivery is working on this device.",
+                "url", "/home",
+                "tag", "test-alert",
+                "sourceType", "TEST"));
+
+        List<PushTestResult.DeviceOutcome> outcomes = new ArrayList<>();
+        int accepted = 0;
+        for (PushSubscription sub : devices) {
+            PushNotificationService.PushOutcome outcome = pushNotificationService.send(sub, payload);
+            if (outcome.accepted()) {
+                accepted++;
+                sub.setFailureCount(0);
+                sub.setLastSuccessAt(now);
+                pushSubscriptionRepository.save(sub);
+            } else if (outcome.kind() == PushNotificationService.Kind.EXPIRED) {
+                sub.setActive(false);
+                sub.setInactiveReason("endpoint gone (" + outcome.statusCode() + ")");
+                pushSubscriptionRepository.save(sub);
+            }
+            log.info("Test push to device {} ({}) -> {} {} {}", sub.getId(), sub.endpointOrigin(),
+                    outcome.kind(), outcome.statusCode(), outcome.message() == null ? "" : outcome.message());
+            outcomes.add(PushTestResult.DeviceOutcome.builder()
+                    .subscriptionId(sub.getId())
+                    .endpointOrigin(sub.endpointOrigin())
+                    .kind(outcome.kind().name())
+                    .statusCode(outcome.statusCode())
+                    .message(outcome.message())
+                    .build());
+        }
+
+        return PushTestResult.builder()
+                .deviceCount(devices.size())
+                .accepted(accepted)
+                .outcomes(outcomes)
+                .build();
     }
 
     private ScheduledNotification requireOwned(String id) {

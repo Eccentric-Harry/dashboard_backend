@@ -34,4 +34,9 @@ public interface ScheduledNotificationRepository extends MongoRepository<Schedul
 
     @Query("{ 'userId': ?0, 'dismissedAt': null, 'readAt': null, 'status': { $in: ['SENT', 'DELIVERED'] } }")
     List<ScheduledNotification> findUnread(String userId);
+
+    /** Everything that reached the dispatcher, whatever the outcome — the diagnostics view. */
+    @Query("{ 'userId': ?0, 'fireAt': { $gte: ?1 }, 'status': { $in: ['PROCESSING', 'SENT', 'DELIVERED', 'FAILED', 'MISSED', 'CANCELLED'] } }")
+    List<ScheduledNotification> findRecentAttempts(String userId, Instant since,
+                                                   org.springframework.data.domain.Sort sort);
 }

@@ -4,6 +4,7 @@ import com.personal_dashboard.backend.dto.ApiMeta;
 import com.personal_dashboard.backend.dto.ApiResponse;
 import com.personal_dashboard.backend.dto.NotificationView;
 import com.personal_dashboard.backend.dto.PushSubscriptionStatus;
+import com.personal_dashboard.backend.dto.PushTestResult;
 import com.personal_dashboard.backend.dto.request.NotificationActionRequest;
 import com.personal_dashboard.backend.dto.request.PushRotateRequest;
 import com.personal_dashboard.backend.dto.request.PushSubscriptionRequest;
@@ -119,6 +120,16 @@ public class PushNotificationController {
                                 .data(null)
                                 .meta(buildMeta("snooze-unknown-token"))
                                 .build()));
+    }
+
+    @PostMapping("/test")
+    @Operation(summary = "Send a test push now",
+            description = "Bypasses the scheduler and reports what each push service said — proves the transport")
+    public ResponseEntity<ApiResponse<PushTestResult>> test() {
+        return ResponseEntity.ok(ApiResponse.<PushTestResult>builder()
+                .data(notificationService.sendTestPush())
+                .meta(buildMeta("test"))
+                .build());
     }
 
     private ApiMeta buildMeta(String action) {

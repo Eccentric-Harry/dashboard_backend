@@ -2,6 +2,7 @@ package com.personal_dashboard.backend.controller;
 
 import com.personal_dashboard.backend.dto.ApiMeta;
 import com.personal_dashboard.backend.dto.ApiResponse;
+import com.personal_dashboard.backend.dto.NotificationDiagnostics;
 import com.personal_dashboard.backend.dto.NotificationView;
 import com.personal_dashboard.backend.service.notification.NotificationService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -90,6 +91,16 @@ public class NotificationController {
         return ResponseEntity.ok(ApiResponse.<Map<String, Integer>>builder()
                 .data(Map.of("dismissed", notificationService.dismissAll()))
                 .meta(buildMeta("dismiss-all"))
+                .build());
+    }
+
+    @GetMapping("/diagnostics")
+    @Operation(summary = "Why did my alert not arrive?",
+            description = "Registered devices, what is scheduled next, and the per-device outcome of recent attempts")
+    public ResponseEntity<ApiResponse<NotificationDiagnostics>> diagnostics() {
+        return ResponseEntity.ok(ApiResponse.<NotificationDiagnostics>builder()
+                .data(notificationService.diagnostics())
+                .meta(buildMeta("diagnostics"))
                 .build());
     }
 

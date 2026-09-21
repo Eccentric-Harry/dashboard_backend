@@ -120,10 +120,26 @@ public class ScheduledNotification implements UserOwnedDocument {
     /**
      * Stable id for one occurrence. Two planner runs (or two instances racing) produce
      * the same value, which is what makes "plan often" free of duplicates.
+     *
+     * <p>The separator is a dot, and every component is restricted to unreserved URI
+     * characters, because this id travels as a <em>path segment</em> on
+     * {@code /notifications/{id}/ack}. An earlier version joined with {@code '|'}, which
+     * Tomcat rejects outright with a 400 before the request ever reaches a controller —
+     * so acknowledging or reading a notification failed for every record.
      */
     public static String deterministicId(String userId, String sourceType, String sourceId,
                                          LocalDate occurrenceDate, String kind) {
-        return userId + "|" + sourceType + "|" + sourceId + "|" + occurrenceDate + "|" + kind;
+        return String.join(".",
+                urlSafe(userId), urlSafe(sourceType), urlSafe(sourceId),
+                urlSafe(String.valueOf(occurrenceDate)), urlSafe(kind));
+    }
+
+    /** Keeps id components inside the unreserved set so the id is always a legal path segment. */
+    static String urlSafe(String value) {
+        if (value == null || value.isBlank()) {
+            return "_";
+        }
+        return value.replaceAll("[^A-Za-z0-9_~-]", "_");
     }
 
     public boolean isTerminal() {
