@@ -38,8 +38,10 @@ import java.util.List;
  * </ul>
  *
  * <p>And one field-level trap: {@code due} is documented as an RFC 3339 timestamp but
- * <em>only the date survives</em> — Google discards the time of day. Time therefore stays
- * a local-only concept and is never read back from Google.
+ * <em>only the date survives</em> — Google discards the time of day, and the API has no
+ * other field for it. The time is therefore carried in the title as a {@code HH:mm · }
+ * prefix (see {@link GoogleTaskTitle}), which is the only position a phone widget
+ * reliably shows, and is decoded back on the way in so it round-trips.
  */
 @Service
 @RequiredArgsConstructor
@@ -86,6 +88,61 @@ public class GoogleTasksClient {
             throw new RuntimeException("Failed to create Google task list '" + title + "': " + response.body());
         }
         return objectMapper.readTree(response.body()).get("id").asText();
+    }
+
+    /**
+     * Fetch one task list. Pass {@code "@default"} to resolve the user's primary list —
+     * the one the widget opens on — into its real id. Resolving it matters: storing the
+     * literal "@default" in a mapping would never compare equal to the concrete id the
+     * list endpoint returns, and every push would then think the list had changed and
+     * delete-and-reinsert the task. Returns null when the list is gone.
+     */
+    public JsonNode getTaskList(String storeId, String taskListId) throws Exception {
+        HttpRequest.Builder rb = HttpRequest.newBuilder()
+                .uri(URI.create(BASE + "/users/@me/lists/" + encode(taskListId)))
+                .GET();
+        HttpResponse<String> response = executor.execute(storeId, rb);
+        if (response.statusCode() == 404 || response.statusCode() == 410) {
+            return null;
+        }
+        if (!isOk(response)) {
+            throw new RuntimeException("Google tasklists.get failed for " + taskListId + ": " + response.body());
+        }
+        return objectMapper.readTree(response.body());
+    }
+
+    /**
+     * Delete a task list. Destructive and irreversible in Google, so callers must have
+     * checked the list is empty and is not the user's default list.
+     */
+    public void deleteTaskList(String storeId, String taskListId) throws Exception {
+        HttpRequest.Builder rb = HttpRequest.newBuilder()
+                .uri(URI.create(BASE + "/users/@me/lists/" + encode(taskListId)))
+                .DELETE();
+        HttpResponse<String> response = executor.execute(storeId, rb);
+        int code = response.statusCode();
+        if (!isOk(response) && code != 404 && code != 410) {
+            throw new RuntimeException("Google tasklists.delete failed for " + taskListId + ": " + response.body());
+        }
+    }
+
+    /** Count the live (not deleted) tasks in a list — the emptiness check before deleting it. */
+    public int countLiveTasks(String storeId, String taskListId) throws Exception {
+        int count = 0;
+        String pageToken = null;
+        do {
+            TaskPage page = listTasks(storeId, taskListId, null, pageToken);
+            if (page.isListMissing()) {
+                return 0;
+            }
+            for (JsonNode item : page.getItems()) {
+                if (!item.path("deleted").asBoolean(false)) {
+                    count++;
+                }
+            }
+            pageToken = page.getNextPageToken();
+        } while (pageToken != null);
+        return count;
     }
 
     /** Rename a task list. Best-effort: a failure here never blocks a sync. */
@@ -243,14 +300,19 @@ public class GoogleTasksClient {
      */
     ObjectNode buildTaskNode(DailyTask task) {
         ObjectNode node = objectMapper.createObjectNode();
-        node.put("title", task.getTitle() == null ? "Untitled" : task.getTitle());
+        // The time of day rides in the title (see GoogleTaskTitle): the API has no field
+        // for it, and the title prefix is the only position a phone widget reliably shows.
+        // Driven by whether a time exists, not by the allDay flag: the two are redundant,
+        // and trusting the flag would silently drop the time on any row where it is stale.
+        // GoogleTaskTitle.encode already omits the prefix for a null or unparseable time.
+        String time = task.getScheduledTime() != null ? task.getScheduledTime() : task.getStartTime();
+        node.put("title", GoogleTaskTitle.encode(time, task.getTitle()));
         node.put("notes", task.getNotes() == null ? "" : task.getNotes());
 
         LocalDate date = task.getDate();
         if (date != null) {
-            // Google records the date and discards the time, so the time of day is
-            // deliberately not encoded here — it stays local. Midnight UTC is the
-            // canonical form Google's own clients send.
+            // `due` carries the date only — Google discards the time portion on write.
+            // Midnight UTC is the canonical form Google's own clients send.
             node.put("due", date.atStartOfDay().toInstant(ZoneOffset.UTC).toString());
         }
         node.put("status", Boolean.TRUE.equals(task.getCompleted()) ? "completed" : "needsAction");

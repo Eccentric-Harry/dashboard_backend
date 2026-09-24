@@ -40,7 +40,7 @@ class GoogleTasksClientTest {
     @Test
     void buildsTheFourWritableFields() {
         ObjectNode node = client.buildTaskNode(task());
-        assertEquals("Book Tickets to Vijayawada", node.get("title").asText());
+        assertEquals("13:00 · Book Tickets to Vijayawada", node.get("title").asText());
         assertEquals("aisle seat", node.get("notes").asText());
         assertEquals("needsAction", node.get("status").asText());
         assertTrue(node.has("due"));
@@ -53,13 +53,31 @@ class GoogleTasksClientTest {
     }
 
     @Test
-    void timeOfDayIsNeverSent() {
-        // The Tasks API documents that it discards the time portion of `due`. Sending a
-        // real time would not round-trip, so time stays a local-only concept.
+    void timeOfDayRidesInTheTitleNotInDue() {
+        // `due` keeps the date and drops the time, and the API has no other time field —
+        // so the time goes in the title, which is what a phone widget actually shows.
         ObjectNode node = client.buildTaskNode(task());
-        assertFalse(node.get("due").asText().contains("13:00"));
+        assertEquals("2026-09-24T00:00:00Z", node.get("due").asText());
+        assertTrue(node.get("title").asText().startsWith("13:00 · "));
         assertFalse(node.has("scheduledTime"));
         assertFalse(node.has("startTime"));
+    }
+
+    @Test
+    void anUntimedTaskGetsNoPrefix() {
+        DailyTask untimed = task();
+        untimed.setScheduledTime(null);
+        untimed.setStartTime(null);
+        assertEquals("Book Tickets to Vijayawada", client.buildTaskNode(untimed).get("title").asText());
+    }
+
+    @Test
+    void aStaleAllDayFlagDoesNotSwallowTheTime() {
+        // allDay and "has a time" are redundant; the time wins, so a bad flag on a legacy
+        // row cannot make the time disappear from the widget.
+        DailyTask contradictory = task();
+        contradictory.setAllDay(true);
+        assertTrue(client.buildTaskNode(contradictory).get("title").asText().startsWith("13:00 · "));
     }
 
     @Test
@@ -86,6 +104,7 @@ class GoogleTasksClientTest {
         DailyTask bare = DailyTask.builder().id("x").date(LocalDate.of(2026, 1, 1)).build();
         ObjectNode node = client.buildTaskNode(bare);
         assertEquals("Untitled", node.get("title").asText());
+        assertFalse(node.get("title").asText().contains("·"));
         assertEquals("", node.get("notes").asText());
         assertEquals("needsAction", node.get("status").asText());
     }

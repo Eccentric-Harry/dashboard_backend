@@ -43,8 +43,16 @@ import java.util.concurrent.locks.ReentrantLock;
  * reverts a change the user just made in the dashboard.
  *
  * <h2>Category ↔ list</h2>
- * Each dashboard category is mirrored as its own Google task list, so a phone widget
- * (which pins exactly one list) can show just "Personal" or just "Learning".
+ * By default ({@code google.tasks.list-strategy=SINGLE}) every task goes to one shared
+ * list — Google's own default list unless a title is configured. Google's widget shows
+ * exactly one list at a time and cannot merge them, so one list is the only arrangement
+ * where nothing is hidden behind a list switch. {@code PER_CATEGORY} restores one list
+ * per category, which is better only if you want to pin a single area to the home screen.
+ *
+ * <h2>Time of day</h2>
+ * The API has no field for it — {@code due} keeps the date and drops the time. The time
+ * rides in the title as a {@code HH:mm · } prefix ({@link GoogleTaskTitle}) and is decoded
+ * on the way back in, so it shows on the widget and edits made there flow home.
  */
 @Service
 @RequiredArgsConstructor
@@ -73,6 +81,28 @@ public class GoogleTasksSyncService {
 
     @Value("${google.tasks.default-category:General}")
     private String defaultCategory;
+
+    /**
+     * SINGLE  — every task shares one list (default). Google's own widget shows exactly one
+     *           list at a time and cannot combine them, so one list is the only arrangement
+     *           where nothing is hidden behind a list switch.
+     * PER_CATEGORY — one list per dashboard category. Better if you want to pin one area to
+     *           the home screen, worse if you want to see everything at a glance.
+     */
+    @Value("${google.tasks.list-strategy:SINGLE}")
+    private String listStrategy;
+
+    /**
+     * Title of the shared list under the SINGLE strategy. Blank means Google's own default
+     * list ({@code @default}) — the one the widget opens on when nothing else is chosen,
+     * which is exactly where "show me everything" belongs.
+     */
+    @Value("${google.tasks.single-list-title:}")
+    private String singleListTitle;
+
+    boolean isSingleList() {
+        return !"PER_CATEGORY".equalsIgnoreCase(listStrategy);
+    }
 
     /** Tasks work is serialised per account, separately from calendar work on the same account. */
     private ReentrantLock lockFor(String storeId) {
@@ -206,8 +236,12 @@ public class GoogleTasksSyncService {
 
             List<GoogleTaskListMapping> lists = listMappingRepository.findByUserIdAndAccountEmail(userId, email);
             int applied = 0;
+            // Two bindings can legitimately point at the same Google list — switching to the
+            // SINGLE strategy leaves the old per-category binding for whichever list becomes
+            // the shared one. Reading it twice would double every call for no new data.
+            java.util.Set<String> visited = new java.util.HashSet<>();
             for (GoogleTaskListMapping list : lists) {
-                if (Boolean.TRUE.equals(list.getMissing())) {
+                if (Boolean.TRUE.equals(list.getMissing()) || !visited.add(list.getGoogleTaskListId())) {
                     continue;
                 }
                 applied += pollList(userId, store, list, updatedMin);
@@ -333,7 +367,12 @@ public class GoogleTasksSyncService {
         task.setUserId(userId);
         // Google *Tasks* is the one inbound source allowed to mint a planner task.
         task.setItemType("TASK");
-        task.setCategory(list.getCategory());
+        // Under SINGLE the list name says nothing about the task, so incoming items land in
+        // the catch-all category for the user to file, rather than all being labelled after
+        // the shared list.
+        task.setCategory(GoogleTaskListMapping.ALL_CATEGORIES.equals(list.getCategory())
+                ? defaultCategory
+                : list.getCategory());
         task.setColor("#c9bff6");
         task.setAllDay(true);
         task.setRecurrenceFrequency("NONE");
@@ -364,14 +403,30 @@ public class GoogleTasksSyncService {
     /**
      * Copy the fields Google actually owns onto the local task.
      *
-     * <p>Deliberately does <em>not</em> touch {@code scheduledTime}/{@code startTime}:
-     * the Tasks API discards the time of day on write, so Google has no opinion about it
-     * and reading one back would erase a time the user set in the dashboard.
+     * <p>Includes the time of day, which is carried in the title rather than in {@code due}
+     * (the API discards the time portion of {@code due} on write).
      */
     private void applyRemoteFields(JsonNode node, DailyTask task) {
-        String title = GoogleTasksClient.text(node, "title");
-        task.setTitle(title != null ? title : "Untitled");
+        // The title carries the time of day as a "HH:mm · " prefix, so it has to be split
+        // back off — otherwise the stored title grows a prefix on every round trip. The
+        // split is also what makes the time two-way: editing "13:00 · X" to "14:00 · X"
+        // on the phone reschedules the task here.
+        GoogleTaskTitle.Decoded decoded = GoogleTaskTitle.decode(GoogleTasksClient.text(node, "title"));
+        task.setTitle(decoded.title() != null ? decoded.title() : "Untitled");
         task.setNotes(GoogleTasksClient.text(node, "notes"));
+
+        if (decoded.time() != null) {
+            task.setScheduledTime(decoded.time());
+            task.setStartTime(decoded.time());
+            task.setAllDay(false);
+        } else {
+            // No prefix means no time — either it was never set, or it was removed on the
+            // phone. Both are the same instruction. Our own writes always carry the prefix
+            // when a time exists, so this cannot silently drop one we just pushed.
+            task.setScheduledTime(null);
+            task.setStartTime(null);
+            task.setAllDay(true);
+        }
 
         String due = GoogleTasksClient.text(node, "due");
         if (due != null) {
@@ -411,12 +466,88 @@ public class GoogleTasksSyncService {
     // ─── Task lists ──────────────────────────────────────────────────────────────
 
     /**
+     * The one list every task goes to under the SINGLE strategy.
+     *
+     * <p>When no title is configured this resolves Google's {@code @default} list to its
+     * concrete id. Resolving is not optional: storing the literal "@default" would never
+     * compare equal to the id {@code tasklists.list} returns, so every push would decide
+     * the list had changed and delete-and-reinsert the task — an infinite churn that also
+     * loses the task's id on each pass.
+     *
+     * <p>If a binding already points at that same list under another category (the
+     * "My Tasks"→General binding the per-category strategy created), it is reused rather
+     * than duplicated, so the two strategies can't end up polling one list twice.
+     */
+    private GoogleTaskListMapping resolveSingleList(String userId, GoogleSyncStore store) throws Exception {
+        String id = GoogleTaskListMapping.compositeId(userId, store.getEmail(), GoogleTaskListMapping.ALL_CATEGORIES);
+        GoogleTaskListMapping existing = listMappingRepository.findById(id).orElse(null);
+        if (existing != null && !Boolean.TRUE.equals(existing.getMissing())) {
+            return existing;
+        }
+
+        String remoteId;
+        String title;
+        boolean created = false;
+
+        if (singleListTitle == null || singleListTitle.isBlank()) {
+            JsonNode def = tasksClient.getTaskList(store.getId(), "@default");
+            if (def == null) {
+                throw new IllegalStateException("Google returned no default task list for " + store.getEmail());
+            }
+            remoteId = GoogleTasksClient.text(def, "id");
+            title = GoogleTasksClient.text(def, "title");
+        } else {
+            title = singleListTitle.trim();
+            remoteId = null;
+            for (JsonNode remote : tasksClient.listTaskLists(store.getId())) {
+                if (title.equalsIgnoreCase(GoogleTasksClient.text(remote, "title"))) {
+                    remoteId = GoogleTasksClient.text(remote, "id");
+                    break;
+                }
+            }
+            if (remoteId == null) {
+                remoteId = tasksClient.insertTaskList(store.getId(), title);
+                created = true;
+                log.info("Google Tasks: created shared list '{}' on {}", title, store.getEmail());
+            }
+        }
+
+        // Reuse a binding that already points at this list instead of adding a second one.
+        GoogleTaskListMapping sameList = listMappingRepository
+                .findByUserIdAndAccountEmailAndGoogleTaskListId(userId, store.getEmail(), remoteId)
+                .orElse(null);
+        if (sameList != null && !GoogleTaskListMapping.ALL_CATEGORIES.equals(sameList.getCategory())) {
+            log.info("Google Tasks: reusing existing binding for list '{}' as the shared list ({})",
+                    title, store.getEmail());
+            return sameList;
+        }
+
+        GoogleTaskListMapping mapping = existing != null ? existing : GoogleTaskListMapping.builder()
+                .id(id)
+                .userId(userId)
+                .accountEmail(store.getEmail())
+                .category(GoogleTaskListMapping.ALL_CATEGORIES)
+                .createdAt(Instant.now())
+                .build();
+        mapping.setGoogleTaskListId(remoteId);
+        mapping.setGoogleTaskListTitle(title);
+        mapping.setCreatedByUs(created);
+        mapping.setMissing(false);
+        mapping.setLastSyncedAt(Instant.now());
+        listMappingRepository.save(mapping);
+        return mapping;
+    }
+
+    /**
      * Find or create the Google task list mirroring a dashboard category.
      * An existing Google list whose title already matches is adopted rather than
      * duplicated — connecting the dashboard should not leave the user with two
      * "Personal" lists.
      */
     GoogleTaskListMapping resolveTaskList(String userId, GoogleSyncStore store, String category) throws Exception {
+        if (isSingleList()) {
+            return resolveSingleList(userId, store);
+        }
         String effective = (category == null || category.isBlank()) ? defaultCategory : category.trim();
         String id = GoogleTaskListMapping.compositeId(userId, store.getEmail(), effective);
 
@@ -433,8 +564,10 @@ public class GoogleTasksSyncService {
                 break;
             }
         }
+        boolean created = false;
         if (remoteId == null) {
             remoteId = tasksClient.insertTaskList(store.getId(), title);
+            created = true;
             log.info("Google Tasks: created list '{}' on {}", title, store.getEmail());
         }
 
@@ -448,6 +581,7 @@ public class GoogleTasksSyncService {
         mapping.setCategory(effective);
         mapping.setGoogleTaskListId(remoteId);
         mapping.setGoogleTaskListTitle(title);
+        mapping.setCreatedByUs(created);
         mapping.setMissing(false);
         mapping.setLastSyncedAt(Instant.now());
         listMappingRepository.save(mapping);
@@ -501,6 +635,73 @@ public class GoogleTasksSyncService {
         }
         String trimmed = title.trim();
         return trimmed.toLowerCase(Locale.ROOT).equals("my tasks") ? defaultCategory : trimmed;
+    }
+
+    // ─── List cleanup ────────────────────────────────────────────────────────────
+
+    /** What a cleanup pass did (or would do, in dry-run). */
+    public record ListCleanupResult(List<String> removed, List<String> keptNotEmpty, List<String> keptNotOurs) {}
+
+    /**
+     * Remove the per-category lists left behind after switching to the SINGLE strategy.
+     *
+     * <p>Three guards, because deleting a list in someone's Google account cannot be undone:
+     * the shared list is never a candidate; a list this dashboard did not create is never
+     * touched; and a list is re-counted against Google immediately before deletion, so one
+     * holding anything the user added on their phone is kept. Nothing here deletes a task —
+     * tasks are consolidated into the shared list by a push first, which is what empties
+     * these lists in the first place.
+     *
+     * @param dryRun when true, report what would be removed and change nothing.
+     * @param includeAdopted also consider lists whose provenance is unknown — bindings written
+     *        before {@code createdByUs} was tracked. They are almost certainly ours, but
+     *        "almost certainly" is not enough to delete something from a Google account
+     *        unasked, so it takes an explicit opt-in. The empty check still applies.
+     */
+    public ListCleanupResult cleanupEmptyLists(String userId, GoogleSyncStore store, boolean dryRun,
+                                               boolean includeAdopted) throws Exception {
+        List<String> removed = new ArrayList<>();
+        List<String> keptNotEmpty = new ArrayList<>();
+        List<String> keptNotOurs = new ArrayList<>();
+
+        GoogleTaskListMapping shared = isSingleList() ? resolveSingleList(userId, store) : null;
+        String sharedId = shared == null ? null : shared.getGoogleTaskListId();
+
+        ReentrantLock lock = lockFor(store.getId());
+        lock.lock();
+        try {
+            for (GoogleTaskListMapping list : listMappingRepository.findByUserIdAndAccountEmail(userId, store.getEmail())) {
+                String label = list.getGoogleTaskListTitle() != null ? list.getGoogleTaskListTitle() : list.getCategory();
+                if (list.getGoogleTaskListId() == null || list.getGoogleTaskListId().equals(sharedId)) {
+                    continue;
+                }
+                boolean ours = Boolean.TRUE.equals(list.getCreatedByUs());
+                boolean unknown = list.getCreatedByUs() == null;
+                if (!ours && !(unknown && includeAdopted)) {
+                    keptNotOurs.add(label);
+                    continue;
+                }
+                if (Boolean.TRUE.equals(list.getMissing())) {
+                    listMappingRepository.delete(list);
+                    removed.add(label);
+                    continue;
+                }
+                int live = tasksClient.countLiveTasks(store.getId(), list.getGoogleTaskListId());
+                if (live > 0) {
+                    keptNotEmpty.add(label + " (" + live + " task" + (live == 1 ? "" : "s") + ")");
+                    continue;
+                }
+                if (!dryRun) {
+                    tasksClient.deleteTaskList(store.getId(), list.getGoogleTaskListId());
+                    listMappingRepository.delete(list);
+                    log.info("Google Tasks: removed now-empty list '{}' from {}", label, store.getEmail());
+                }
+                removed.add(label);
+            }
+        } finally {
+            lock.unlock();
+        }
+        return new ListCleanupResult(removed, keptNotEmpty, keptNotOurs);
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────────

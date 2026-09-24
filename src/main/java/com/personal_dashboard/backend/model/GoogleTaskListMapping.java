@@ -32,6 +32,13 @@ import java.util.Locale;
 @CompoundIndex(def = "{'userId': 1, 'accountEmail': 1}")
 public class GoogleTaskListMapping implements UserOwnedDocument {
 
+    /**
+     * Pseudo-category used by the SINGLE list strategy, where every task shares one list
+     * regardless of category. A real category can never collide with it — categories are
+     * user-entered text and this is not a legal one.
+     */
+    public static final String ALL_CATEGORIES = "__all__";
+
     @Id
     private String id;
 
@@ -56,6 +63,15 @@ public class GoogleTaskListMapping implements UserOwnedDocument {
      */
     @Builder.Default
     private Boolean missing = false;
+
+    /**
+     * True when this dashboard created the list, false when it adopted one the user
+     * already had. Only a list we created is ever offered for cleanup — deleting a list
+     * in someone's Google account is irreversible, and their own lists are not ours to
+     * tidy. Null on rows written before this was tracked, treated as "not ours".
+     */
+    @Builder.Default
+    private Boolean createdByUs = false;
 
     private Instant createdAt;
     private Instant lastSyncedAt;

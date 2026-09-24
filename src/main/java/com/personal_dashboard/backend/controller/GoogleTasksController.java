@@ -68,7 +68,10 @@ public class GoogleTasksController {
             a.put("syncedTaskCount", taskMappingRepository.countByUserIdAndAccountEmail(userId, store.getEmail()));
             a.put("lists", listMappingRepository.findByUserIdAndAccountEmail(userId, store.getEmail()).stream()
                     .map(l -> Map.of(
-                            "category", l.getCategory(),
+                            // The SINGLE strategy's sentinel category is an internal key, not
+                            // something to show; the list's own title is the meaningful label.
+                            "category", GoogleTaskListMapping.ALL_CATEGORIES.equals(l.getCategory())
+                                    ? "All tasks" : l.getCategory(),
                             "title", l.getGoogleTaskListTitle() == null ? l.getCategory() : l.getGoogleTaskListTitle(),
                             "missing", Boolean.TRUE.equals(l.getMissing())))
                     .toList());
@@ -86,7 +89,7 @@ public class GoogleTasksController {
 
     @PostMapping("/enable")
     @Operation(summary = "Enable Google Tasks mirroring",
-               description = "Creates one Google task list per category and pushes in-scope tasks. "
+               description = "Binds the shared Google task list and pushes in-scope tasks. "
                            + "Pass ?email=... for one account, omit for all connected accounts.")
     public ResponseEntity<ApiResponse<Map<String, Object>>> enable(
             @RequestParam(value = "email", required = false) String email) {
@@ -119,6 +122,9 @@ public class GoogleTasksController {
             // The initial mirror can be hundreds of calls; run it off the request thread.
             worker.submit(() -> {
                 try {
+                    // Poll before push on a *first* enable — anything already in Google must
+                    // be imported and mapped first, or the push would insert duplicates of
+                    // tasks that are already there. (Ordinary syncs push first; see /sync.)
                     tasksSyncService.pollAccount(userId, store.getEmail());
                     int pushed = tasksSyncService.pushAll(userId, store);
                     log.info("Google Tasks: initial sync for {} pushed {} task(s)", store.getEmail(), pushed);
@@ -182,8 +188,11 @@ public class GoogleTasksController {
         for (GoogleSyncStore store : targets) {
             worker.submit(() -> {
                 try {
-                    tasksSyncService.pollAccount(userId, store.getEmail());
+                    // Push first, then poll. The push is what writes the "HH:mm · " title
+                    // prefix and consolidates tasks into the shared list; polling first
+                    // would read the un-prefixed titles still sitting in Google.
                     tasksSyncService.pushAll(userId, store);
+                    tasksSyncService.pollAccount(userId, store.getEmail());
                 } catch (Exception e) {
                     log.error("Google Tasks: manual sync failed for {}", store.getEmail(), e);
                 }
@@ -193,6 +202,51 @@ public class GoogleTasksController {
         return ok("google-tasks-sync", Map.of(
                 "status", "sync_scheduled",
                 "accounts", targets.stream().map(GoogleSyncStore::getEmail).toList()));
+    }
+
+    // ─── List cleanup ────────────────────────────────────────────────────────────
+
+    @PostMapping("/cleanup-lists")
+    @Operation(summary = "Remove leftover category lists",
+               description = "Deletes task lists this dashboard created that are now empty — what is left "
+                           + "after switching to a single shared list. Defaults to a dry run; pass "
+                           + "?apply=true to actually delete. Never touches the shared list or one that "
+                           + "still holds tasks. Lists whose provenance predates tracking are skipped "
+                           + "unless ?includeAdopted=true.")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> cleanupLists(
+            @RequestParam(value = "email", required = false) String email,
+            @RequestParam(value = "apply", defaultValue = "false") boolean apply,
+            @RequestParam(value = "includeAdopted", defaultValue = "false") boolean includeAdopted) {
+
+        String userId = UserContext.getRequiredUserId();
+        List<GoogleSyncStore> targets = targets(userId, email).stream()
+                .filter(GoogleSyncStore::isTasksSyncEnabled)
+                .toList();
+
+        if (targets.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.PRECONDITION_FAILED)
+                    .body(error("google-tasks-cleanup", "Google Tasks sync is not enabled for any connected account"));
+        }
+
+        Map<String, Object> byAccount = new HashMap<>();
+        for (GoogleSyncStore store : targets) {
+            try {
+                GoogleTasksSyncService.ListCleanupResult result =
+                        tasksSyncService.cleanupEmptyLists(userId, store, !apply, includeAdopted);
+                byAccount.put(store.getEmail(), Map.of(
+                        apply ? "removed" : "wouldRemove", result.removed(),
+                        "keptNotEmpty", result.keptNotEmpty(),
+                        "keptNotOurs", result.keptNotOurs()));
+            } catch (Exception e) {
+                log.error("Google Tasks: list cleanup failed for {}", store.getEmail(), e);
+                byAccount.put(store.getEmail(), Map.of("error", String.valueOf(e.getMessage())));
+            }
+        }
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("dryRun", !apply);
+        data.put("byAccount", byAccount);
+        return ok("google-tasks-cleanup", data);
     }
 
     // ─── Diagnostics ─────────────────────────────────────────────────────────────
