@@ -40,8 +40,8 @@ class GoogleTasksClientTest {
     @Test
     void buildsTheFourWritableFields() {
         ObjectNode node = client.buildTaskNode(task());
-        assertEquals("13:00 · Book Tickets to Vijayawada", node.get("title").asText());
-        assertEquals("aisle seat", node.get("notes").asText());
+        assertEquals("Book Tickets to Vijayawada", node.get("title").asText());
+        assertEquals("⏰ 13:00\n\naisle seat", node.get("notes").asText());
         assertEquals("needsAction", node.get("status").asText());
         assertTrue(node.has("due"));
     }
@@ -53,22 +53,25 @@ class GoogleTasksClientTest {
     }
 
     @Test
-    void timeOfDayRidesInTheTitleNotInDue() {
+    void timeOfDayRidesInTheNotesAndTheTitleStaysClean() {
         // `due` keeps the date and drops the time, and the API has no other time field —
-        // so the time goes in the title, which is what a phone widget actually shows.
+        // so the time goes on the first notes line, which the widget renders under the title.
         ObjectNode node = client.buildTaskNode(task());
         assertEquals("2026-09-24T00:00:00Z", node.get("due").asText());
-        assertTrue(node.get("title").asText().startsWith("13:00 · "));
+        assertEquals("Book Tickets to Vijayawada", node.get("title").asText());
+        assertTrue(node.get("notes").asText().startsWith("⏰ 13:00"));
         assertFalse(node.has("scheduledTime"));
         assertFalse(node.has("startTime"));
     }
 
     @Test
-    void anUntimedTaskGetsNoPrefix() {
+    void anUntimedTaskGetsNoMarker() {
         DailyTask untimed = task();
         untimed.setScheduledTime(null);
         untimed.setStartTime(null);
-        assertEquals("Book Tickets to Vijayawada", client.buildTaskNode(untimed).get("title").asText());
+        ObjectNode node = client.buildTaskNode(untimed);
+        assertEquals("Book Tickets to Vijayawada", node.get("title").asText());
+        assertEquals("aisle seat", node.get("notes").asText());
     }
 
     @Test
@@ -77,7 +80,7 @@ class GoogleTasksClientTest {
         // row cannot make the time disappear from the widget.
         DailyTask contradictory = task();
         contradictory.setAllDay(true);
-        assertTrue(client.buildTaskNode(contradictory).get("title").asText().startsWith("13:00 · "));
+        assertTrue(client.buildTaskNode(contradictory).get("notes").asText().startsWith("⏰ 13:00"));
     }
 
     @Test
@@ -104,7 +107,6 @@ class GoogleTasksClientTest {
         DailyTask bare = DailyTask.builder().id("x").date(LocalDate.of(2026, 1, 1)).build();
         ObjectNode node = client.buildTaskNode(bare);
         assertEquals("Untitled", node.get("title").asText());
-        assertFalse(node.get("title").asText().contains("·"));
         assertEquals("", node.get("notes").asText());
         assertEquals("needsAction", node.get("status").asText());
     }

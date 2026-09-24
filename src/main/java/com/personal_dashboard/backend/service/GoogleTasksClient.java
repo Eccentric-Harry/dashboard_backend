@@ -39,9 +39,9 @@ import java.util.List;
  *
  * <p>And one field-level trap: {@code due} is documented as an RFC 3339 timestamp but
  * <em>only the date survives</em> — Google discards the time of day, and the API has no
- * other field for it. The time is therefore carried in the title as a {@code HH:mm · }
- * prefix (see {@link GoogleTaskTitle}), which is the only position a phone widget
- * reliably shows, and is decoded back on the way in so it round-trips.
+ * other field for it (confirmed against the live API, which rewrites a 13:00 due to
+ * midnight). The time is therefore carried on the first line of the notes; see
+ * {@link GoogleTaskTimeEncoding}.
  */
 @Service
 @RequiredArgsConstructor
@@ -302,12 +302,16 @@ public class GoogleTasksClient {
         ObjectNode node = objectMapper.createObjectNode();
         // The time of day rides in the title (see GoogleTaskTitle): the API has no field
         // for it, and the title prefix is the only position a phone widget reliably shows.
-        // Driven by whether a time exists, not by the allDay flag: the two are redundant,
-        // and trusting the flag would silently drop the time on any row where it is stale.
-        // GoogleTaskTitle.encode already omits the prefix for a null or unparseable time.
+        node.put("title", task.getTitle() == null || task.getTitle().isBlank()
+                ? "Untitled" : task.getTitle().strip());
+
+        // The time of day goes on the first line of the notes — a Google task has no time
+        // field at all, and the widget renders notes under the title, so that is the only
+        // place it stays visible without disfiguring the title. Driven by whether a time
+        // exists rather than by the allDay flag: the two are redundant, and trusting the
+        // flag would silently drop the time on any row where it is stale.
         String time = task.getScheduledTime() != null ? task.getScheduledTime() : task.getStartTime();
-        node.put("title", GoogleTaskTitle.encode(time, task.getTitle()));
-        node.put("notes", task.getNotes() == null ? "" : task.getNotes());
+        node.put("notes", GoogleTaskTimeEncoding.encodeNotes(time, task.getNotes()));
 
         LocalDate date = task.getDate();
         if (date != null) {

@@ -51,8 +51,9 @@ import java.util.concurrent.locks.ReentrantLock;
  *
  * <h2>Time of day</h2>
  * The API has no field for it — {@code due} keeps the date and drops the time. The time
- * rides in the title as a {@code HH:mm · } prefix ({@link GoogleTaskTitle}) and is decoded
- * on the way back in, so it shows on the widget and edits made there flow home.
+ * rides on the first line of the notes as {@code ⏰ HH:mm} ({@link GoogleTaskTimeEncoding})
+ * and is decoded on the way back in, so it shows on the widget under the title and edits
+ * made there flow home.
  */
 @Service
 @RequiredArgsConstructor
@@ -407,21 +408,29 @@ public class GoogleTasksSyncService {
      * (the API discards the time portion of {@code due} on write).
      */
     private void applyRemoteFields(JsonNode node, DailyTask task) {
-        // The title carries the time of day as a "HH:mm · " prefix, so it has to be split
-        // back off — otherwise the stored title grows a prefix on every round trip. The
-        // split is also what makes the time two-way: editing "13:00 · X" to "14:00 · X"
-        // on the phone reschedules the task here.
-        GoogleTaskTitle.Decoded decoded = GoogleTaskTitle.decode(GoogleTasksClient.text(node, "title"));
-        task.setTitle(decoded.title() != null ? decoded.title() : "Untitled");
-        task.setNotes(GoogleTasksClient.text(node, "notes"));
+        // The time rides on the first line of the notes and has to be split back off, or
+        // the stored notes would grow another "⏰ 13:00" line on every round trip. The split
+        // is also what makes the time two-way: editing that line on the phone reschedules
+        // the task here.
+        GoogleTaskTimeEncoding.Decoded notes =
+                GoogleTaskTimeEncoding.decodeNotes(GoogleTasksClient.text(node, "notes"));
+        // Legacy: an earlier version wrote the time as a "HH:mm · " title prefix. Strip it,
+        // so tasks synced under that scheme don't drag the prefix into the stored title.
+        // Nothing writes it any more, and the next push moves the time into the notes.
+        GoogleTaskTimeEncoding.Decoded title =
+                GoogleTaskTimeEncoding.stripLegacyTitlePrefix(GoogleTasksClient.text(node, "title"));
 
-        if (decoded.time() != null) {
-            task.setScheduledTime(decoded.time());
-            task.setStartTime(decoded.time());
+        task.setTitle(title.value() != null ? title.value() : "Untitled");
+        task.setNotes(notes.value());
+
+        String time = notes.time() != null ? notes.time() : title.time();
+        if (time != null) {
+            task.setScheduledTime(time);
+            task.setStartTime(time);
             task.setAllDay(false);
         } else {
-            // No prefix means no time — either it was never set, or it was removed on the
-            // phone. Both are the same instruction. Our own writes always carry the prefix
+            // No marker means no time — either it was never set, or it was removed on the
+            // phone. Both are the same instruction. Our own writes always carry the marker
             // when a time exists, so this cannot silently drop one we just pushed.
             task.setScheduledTime(null);
             task.setStartTime(null);
