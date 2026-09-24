@@ -314,10 +314,15 @@ public class GoogleSyncService {
 
                 } else {
                     // ── Create a new local task + mapping ───────────────────────────────
-                    log.info("Inbound: Creating new local task for event: {}", googleEventId);
+                    log.info("Inbound: Creating new local event for Google event: {}", googleEventId);
                     DailyTask newTask = new DailyTask();
                     newTask.setUserId(userId);
-                    newTask.setItemType("TASK");
+                    // A Google *Calendar* entry is an EVENT, never a TASK. Importing these as
+                    // "TASK" is what filled the /tasks route with hundreds of calendar entries
+                    // (lunches, flights, walks) that were never to-dos. Planner tasks come from
+                    // Google *Tasks* (GoogleTasksSyncService), which is a different API and the
+                    // only inbound source allowed to mint itemType=TASK.
+                    newTask.setItemType("EVENT");
                     newTask.setCategory("Personal");
                     newTask.setColor("#c9bff6");
                     // Immutable source-of-truth marker: this event was born in Google.

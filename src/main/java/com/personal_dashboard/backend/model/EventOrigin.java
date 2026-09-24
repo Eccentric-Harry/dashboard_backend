@@ -12,10 +12,14 @@ import lombok.NoArgsConstructor;
  * during outbound sync (a GOOGLE-origin event must not be pushed back to the
  * account it came from) and dedup precedence during pull.
  *
- * source     LOCAL  → created inside this dashboard.
- *            GOOGLE → pulled in from a connected Google Calendar account.
- * accountId  For GOOGLE: the calendarEmail it was pulled from. For LOCAL: null.
- * calendarId The Google calendar id (currently always "primary"). Null for LOCAL.
+ * source     LOCAL        → created inside this dashboard.
+ *            GOOGLE       → pulled in from a connected Google *Calendar* account.
+ *                           Always an EVENT: a calendar entry is not a to-do.
+ *            GOOGLE_TASKS → pulled in from a connected Google *Tasks* account.
+ *                           Always a TASK, and the only inbound source that mints one.
+ * accountId  For either GOOGLE source: the account email it was pulled from. Null for LOCAL.
+ * calendarId For GOOGLE: the Google calendar id (currently always "primary").
+ *            For GOOGLE_TASKS: the Google task-list id. Null for LOCAL.
  */
 @Data
 @Builder
@@ -25,6 +29,7 @@ public class EventOrigin {
 
     public static final String SOURCE_LOCAL = "LOCAL";
     public static final String SOURCE_GOOGLE = "GOOGLE";
+    public static final String SOURCE_GOOGLE_TASKS = "GOOGLE_TASKS";
 
     private String source;
     private String accountId;
@@ -42,8 +47,26 @@ public class EventOrigin {
                 .build();
     }
 
+    public static EventOrigin googleTasks(String accountId, String taskListId) {
+        return EventOrigin.builder()
+                .source(SOURCE_GOOGLE_TASKS)
+                .accountId(accountId)
+                .calendarId(taskListId)
+                .build();
+    }
+
+    /** True for Google <em>Calendar</em> only — {@link #isGoogleTasks()} is a separate source. */
     public boolean isGoogle() {
         return SOURCE_GOOGLE.equalsIgnoreCase(source);
+    }
+
+    public boolean isGoogleTasks() {
+        return SOURCE_GOOGLE_TASKS.equalsIgnoreCase(source);
+    }
+
+    /** True for anything pulled out of Google, whichever API it came from. */
+    public boolean isRemote() {
+        return isGoogle() || isGoogleTasks();
     }
 
     public boolean isLocal() {

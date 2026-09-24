@@ -120,9 +120,17 @@ public class DailyTaskService {
         if (request.getDate() != null && !request.getDate().isBlank()) {
             existing.setDate(LocalDate.parse(request.getDate()));
         }
-        existing.setScheduledTime(request.getScheduledTime());
-        existing.setStartTime(normalizeTime(request.getScheduledTime()));
-        existing.setAllDay(normalizeTime(request.getScheduledTime()) == null);
+        // Same rule as the date above: an edit that doesn't mention the time keeps the
+        // one already stored. Overwriting unconditionally meant every partial update
+        // (toggling a tag or a subtask, and every inbound Google Tasks sync — that API
+        // carries a date but no time of day) silently erased the time and flipped the
+        // item to all-day. Send an explicit empty string to clear a time on purpose.
+        if (request.getScheduledTime() != null) {
+            String normalized = normalizeTime(request.getScheduledTime());
+            existing.setScheduledTime(request.getScheduledTime().isBlank() ? null : request.getScheduledTime());
+            existing.setStartTime(normalized);
+            existing.setAllDay(normalized == null);
+        }
         if (existing.getItemType() == null) {
             existing.setItemType("TASK");
         }

@@ -34,8 +34,15 @@ public class OutboundPusher {
     private final DailyTaskRepository dailyTaskRepository;
     private final CalendarSyncMappingRepository mappingRepository;
     private final CalendarSyncLocks syncLocks;
+    private final GoogleTasksSyncService googleTasksSyncService;
 
-    /** Reconcile a task against all of its owner's connected Google accounts. */
+    /**
+     * Reconcile a task against all of its owner's connected Google accounts, across both
+     * Google surfaces: Calendar (events) and Tasks (to-dos). The two are independent —
+     * a failure to reach one must not stop the other, so Tasks is reconciled in its own
+     * try block and its error is logged rather than thrown. Calendar keeps propagating,
+     * because the outbox's retry/backoff is built around it.
+     */
     public void reconcile(DailyTask task) throws Exception {
         String userId = task.getUserId();
         if (userId == null || userId.isBlank()) return;
@@ -47,6 +54,12 @@ public class OutboundPusher {
         List<GoogleSyncStore> stores = syncStoreRepository.findByUserId(userId);
         for (GoogleSyncStore store : stores) {
             pushToStore(task, store);
+            try {
+                googleTasksSyncService.pushToStore(task, store);
+            } catch (Exception e) {
+                log.error("Google Tasks push failed for task {} → {}: {}",
+                        task.getId(), store.getEmail(), e.getMessage());
+            }
         }
     }
 

@@ -117,6 +117,33 @@ class GoogleSyncServiceTest {
         assertEquals("CANCELLED", cap.getValue().getSyncState());
     }
 
+    // ── A Google *Calendar* entry is an EVENT, never a planner TASK ───────────
+
+    @Test
+    void pulledCalendarEvent_isCreatedAsAnEventNotATask() throws Exception {
+        // Regression: every event pulled from Google Calendar used to be written as
+        // itemType="TASK", which filled the /tasks route with hundreds of calendar
+        // entries — lunches, flights, birthdays — that were never to-dos. It also
+        // meant they would have been mirrored into Google Tasks and onto the phone
+        // widget. Calendar pulls must mint EVENT; only Google Tasks mints TASK.
+        when(mappingRepository.findByGoogleEventIdAndUserId("G9", USER)).thenReturn(Optional.empty());
+        when(dailyTaskRepository.findByUserAndICalUID(USER, "uid-9")).thenReturn(List.of());
+        when(dailyTaskRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        // A real all-day event: mapGoogleEventToLocal needs start/end to map a date.
+        stubSinglePull(mapper.readTree(
+                "{\"id\":\"G9\",\"status\":\"confirmed\",\"updated\":\"2026-07-01T10:00:00.000Z\","
+                        + "\"etag\":\"\\\"etag-G9\\\"\",\"iCalUID\":\"uid-9\",\"summary\":\"Lunch\","
+                        + "\"start\":{\"date\":\"2026-07-01\"},\"end\":{\"date\":\"2026-07-02\"}}"));
+
+        service.syncCalendar(USER, EMAIL, true);
+
+        ArgumentCaptor<DailyTask> cap = ArgumentCaptor.forClass(DailyTask.class);
+        verify(dailyTaskRepository).save(cap.capture());
+        assertEquals("EVENT", cap.getValue().getItemType());
+        assertTrue(cap.getValue().getOrigin().isGoogle());
+        assertFalse(cap.getValue().getOrigin().isGoogleTasks());
+    }
+
     // ── Guardrail: shared invite dedups by iCalUID instead of duplicating ──────
 
     @Test

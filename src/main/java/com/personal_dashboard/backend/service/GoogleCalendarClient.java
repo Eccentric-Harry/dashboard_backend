@@ -81,11 +81,28 @@ public class GoogleCalendarClient {
         private final String accessToken;
         private final String refreshToken;
         private final Long expiresIn;
+        /**
+         * The space-delimited scopes Google actually granted. Worth reading rather than
+         * assuming: a user can untick a scope on the consent screen, and a grant that is
+         * missing Tasks must surface as "reconnect to enable" instead of 403-ing on every
+         * poll forever.
+         */
+        private final String scope;
 
         public OAuthTokens(String accessToken, String refreshToken, Long expiresIn) {
+            this(accessToken, refreshToken, expiresIn, null);
+        }
+
+        public OAuthTokens(String accessToken, String refreshToken, Long expiresIn, String scope) {
             this.accessToken = accessToken;
             this.refreshToken = refreshToken;
             this.expiresIn = expiresIn;
+            this.scope = scope;
+        }
+
+        /** True when the granted scopes cover the Google Tasks API. */
+        public boolean grantsTasks() {
+            return scope != null && scope.contains("https://www.googleapis.com/auth/tasks");
         }
     }
 
@@ -145,7 +162,9 @@ public class GoogleCalendarClient {
         String refreshToken = jsonNode.has("refresh_token") ? jsonNode.get("refresh_token").asText() : null;
         Long expiresIn = jsonNode.has("expires_in") ? jsonNode.get("expires_in").asLong() : 3600L;
 
-        return new OAuthTokens(accessToken, refreshToken, expiresIn);
+        String scope = jsonNode.has("scope") ? jsonNode.get("scope").asText() : null;
+
+        return new OAuthTokens(accessToken, refreshToken, expiresIn, scope);
     }
 
     /**

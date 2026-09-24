@@ -3,10 +3,12 @@ package com.personal_dashboard.backend.config;
 import com.personal_dashboard.backend.model.AuthToken;
 import com.personal_dashboard.backend.model.CalendarSyncMapping;
 import com.personal_dashboard.backend.model.DailyTask;
+import com.personal_dashboard.backend.model.GoogleTaskListMapping;
 import com.personal_dashboard.backend.model.MindEntry;
 import com.personal_dashboard.backend.model.PushSubscription;
 import com.personal_dashboard.backend.model.ScheduledNotification;
 import com.personal_dashboard.backend.model.SyncOutboxEntry;
+import com.personal_dashboard.backend.model.TaskSyncMapping;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -47,6 +49,11 @@ import java.time.Duration;
  *   <li>{@code calendar_sync_mappings (googleEventId, userId)} — the other per-event lookup
  *       in the same sync loop.</li>
  *   <li>{@code sync_outbox (status, nextAttemptAt)} — scanned by OutboxDrainJob every 15s.</li>
+ *   <li>{@code task_sync_mappings (googleTaskId, userId)} — resolved <em>once per remote task</em>
+ *       by every Google Tasks poll. Unindexed, a poll degrades into one collection scan per
+ *       task returned, which is the same failure mode the calendar mapping index prevents.</li>
+ *   <li>{@code task_sync_mappings (userId, accountEmail)} — the status/diagnostics counts.</li>
+ *   <li>{@code google_task_lists (userId, accountEmail)} — read at the top of every poll.</li>
  *   <li>{@code mind_entries (userId, date)} — every /mind read.</li>
  *   <li>{@code push_subscriptions.endpoint} <em>unique</em> — an endpoint identifies one device,
  *       so this is what stops two tabs subscribing at once from creating two rows and pushing
@@ -80,6 +87,9 @@ public class MongoIndexInitializer {
         ensure(DailyTask.class, new Index().on("userId", Sort.Direction.ASC).on("completed", Sort.Direction.ASC).on("date", Sort.Direction.ASC).named("user_completed_date_idx"));
         ensure(CalendarSyncMapping.class, new Index().on("googleEventId", Sort.Direction.ASC).on("userId", Sort.Direction.ASC).named("google_event_user_idx"));
         ensure(SyncOutboxEntry.class, new Index().on("status", Sort.Direction.ASC).on("nextAttemptAt", Sort.Direction.ASC).named("status_next_attempt_idx"));
+        ensure(TaskSyncMapping.class, new Index().on("googleTaskId", Sort.Direction.ASC).on("userId", Sort.Direction.ASC).named("google_task_user_idx"));
+        ensure(TaskSyncMapping.class, new Index().on("userId", Sort.Direction.ASC).on("accountEmail", Sort.Direction.ASC).named("user_account_idx"));
+        ensure(GoogleTaskListMapping.class, new Index().on("userId", Sort.Direction.ASC).on("accountEmail", Sort.Direction.ASC).named("user_account_idx"));
         ensure(MindEntry.class, new Index().on("userId", Sort.Direction.ASC).on("date", Sort.Direction.ASC).named("user_date_idx"));
         ensure(PushSubscription.class, new Index().on("endpoint", Sort.Direction.ASC).unique().named("endpoint_unique"));
         ensure(PushSubscription.class, new Index().on("userId", Sort.Direction.ASC).on("active", Sort.Direction.ASC).named("user_active_idx"));

@@ -18,6 +18,9 @@ public interface GoogleSyncStoreRepository extends MongoRepository<GoogleSyncSto
 
     Optional<GoogleSyncStore> findByWebhookChannelId(String webhookChannelId);
 
+    /** Accounts the Google Tasks poller has to visit — Tasks has no webhooks. */
+    List<GoogleSyncStore> findByTasksSyncEnabledTrue();
+
     void deleteByUserId(String userId);
 
     void deleteByUserIdAndEmail(String userId, String email);

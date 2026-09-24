@@ -72,6 +72,39 @@ public class GoogleSyncStore {
     @Builder.Default
     private Boolean crossAccountPush = false;
 
+    // ─── Google Tasks sync (separate API, separate opt-in) ──────────────────────
+
+    /**
+     * Per-account opt-in for mirroring planner tasks into Google Tasks. Off by default:
+     * enabling it creates task lists in the user's Google account, which is theirs to
+     * agree to rather than something a calendar connection should imply.
+     */
+    @Builder.Default
+    private Boolean tasksSyncEnabled = false;
+
+    /**
+     * Whether this account's OAuth grant actually covers the Tasks scope. Accounts
+     * connected before Tasks sync existed were granted Calendar only, so their tokens
+     * are valid but Tasks calls 403. Tracked separately from {@link #status} because
+     * the account is not disconnected — it just needs re-consent for one more scope.
+     */
+    @Builder.Default
+    private Boolean tasksScopeGranted = false;
+
+    /**
+     * Incremental-poll cursor: the {@code updatedMin} floor for the next poll.
+     * The Tasks API has no sync tokens, so this timestamp is the entire cursor —
+     * if it is lost the next poll degrades to a full read, which is safe but slower.
+     */
+    private Instant tasksLastPolledAt;
+
+    /** Last time a Tasks poll completed without throwing (for the status card). */
+    private Instant tasksLastSyncedAt;
+
+    public boolean isTasksSyncEnabled() {
+        return Boolean.TRUE.equals(tasksSyncEnabled);
+    }
+
     public boolean isDisconnected() {
         return "DISCONNECTED".equalsIgnoreCase(status);
     }

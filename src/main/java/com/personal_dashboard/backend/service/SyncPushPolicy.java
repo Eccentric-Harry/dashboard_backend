@@ -25,6 +25,15 @@ public final class SyncPushPolicy {
     public static boolean shouldPush(DailyTask task, GoogleSyncStore store) {
         EventOrigin origin = task.getOrigin();
 
+        // A task pulled from Google *Tasks* is never mirrored into Google *Calendar*.
+        // It already exists in the user's Google account on the surface it belongs to;
+        // copying it across would put a to-do on their calendar they never asked for,
+        // and the two copies would then fight over every edit.
+        if (origin != null && origin.isGoogleTasks()) {
+            log.debug("Skipping calendar push of task {} — it came from Google Tasks", task.getId());
+            return false;
+        }
+
         // Legacy/unknown origin behaves like LOCAL (preserves prior behavior).
         if (origin == null || origin.isLocal()) {
             return true;

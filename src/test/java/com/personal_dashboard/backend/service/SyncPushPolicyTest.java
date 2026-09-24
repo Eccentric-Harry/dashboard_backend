@@ -40,4 +40,15 @@ class SyncPushPolicyTest {
         assertFalse(SyncPushPolicy.shouldPush(t, store("b@x.com", false))); // no fan-out by default
         assertTrue(SyncPushPolicy.shouldPush(t, store("b@x.com", true)));   // opt-in fan-out
     }
+
+    @Test
+    void googleTasksOrigin_isNeverMirroredIntoTheCalendar() {
+        // A to-do pulled from Google Tasks already lives in the user's Google account on
+        // the surface it belongs to. Copying it into Calendar would put a task on their
+        // calendar they never asked for, and the two copies would fight over every edit.
+        DailyTask t = task(EventOrigin.googleTasks("a@x.com", "list-1"));
+        assertFalse(SyncPushPolicy.shouldPush(t, store("a@x.com", false)));
+        assertFalse(SyncPushPolicy.shouldPush(t, store("b@x.com", true)),
+                "Not even into a different account with cross-account push enabled.");
+    }
 }

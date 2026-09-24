@@ -20,6 +20,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -52,11 +54,19 @@ public class GoogleOAuthController {
     public ResponseEntity<ApiResponse<Map<String, String>>> getAuthUrl() {
         String userId = UserContext.getRequiredUserId();
 
+        // Calendar *and* Tasks are requested together: they are two different Google APIs
+        // with separate scopes, and an account granted only Calendar gets a hard 403 on
+        // every Tasks call. include_granted_scopes keeps this incremental, so an account
+        // connected before Tasks existed keeps its calendar grant when it reconnects.
+        String scope = URLEncoder.encode(
+                "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/tasks",
+                StandardCharsets.UTF_8);
+
         String authUrl = String.format(
                 "https://accounts.google.com/o/oauth2/v2/auth?client_id=%s&redirect_uri=%s&response_type=code"
-                        + "&scope=https://www.googleapis.com/auth/calendar"
-                        + "&access_type=offline&prompt=consent&state=%s",
-                clientId, redirectUri, userId
+                        + "&scope=%s"
+                        + "&access_type=offline&include_granted_scopes=true&prompt=consent&state=%s",
+                clientId, redirectUri, scope, userId
         );
 
         return ok("google-calendar-auth-url", Map.of("url", authUrl));
@@ -88,6 +98,10 @@ public class GoogleOAuthController {
             store.setStatus("CONNECTED");
             store.setAuthError(null);
             store.setDisconnectedAt(null);
+            // Record whether Tasks was actually granted. Reconnecting an account that
+            // predates Tasks sync is exactly how a user upgrades their grant, so this
+            // has to be read from the response rather than assumed from the request.
+            store.setTasksScopeGranted(tokens.grantsTasks());
             syncStoreRepository.save(store);
 
             // Register webhook watch for this account
@@ -124,6 +138,9 @@ public class GoogleOAuthController {
             a.put("webhookExpiration", s.getWebhookExpiration() != null ? s.getWebhookExpiration().toString() : "");
             a.put("status", s.getStatus() != null ? s.getStatus() : "CONNECTED");
             a.put("authError", s.getAuthError() != null ? s.getAuthError() : "");
+            a.put("tasksSyncEnabled", s.isTasksSyncEnabled());
+            a.put("tasksScopeGranted", Boolean.TRUE.equals(s.getTasksScopeGranted()));
+            a.put("tasksLastSyncedAt", s.getTasksLastSyncedAt() != null ? s.getTasksLastSyncedAt().toString() : "");
             return a;
         }).toList();
 
