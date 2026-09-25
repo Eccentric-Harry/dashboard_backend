@@ -204,6 +204,55 @@ public class GoogleTasksController {
                 "accounts", targets.stream().map(GoogleSyncStore::getEmail).toList()));
     }
 
+    // ─── On-demand refresh ───────────────────────────────────────────────────────
+
+    /**
+     * Pull anything new from Google right now, and report how much changed.
+     *
+     * <p>Google Tasks has no webhooks, so a change made on the phone is only ever found by
+     * asking. The background poller does that on a timer, but a timer is invisible: open the
+     * app ten seconds after ticking something off and it looks broken. This is the app saying
+     * "I'm being looked at, check now", which is exactly when freshness matters.
+     *
+     * <p>Synchronous on purpose — the caller wants to know whether to re-read its list — but
+     * debounced by {@code ?minAgeSeconds} so that flipping between routes cannot turn into a
+     * burst of multi-call polls against a per-day quota.
+     */
+    @PostMapping("/refresh")
+    @Operation(summary = "Pull from Google now",
+               description = "Debounced inbound poll. Returns how many changes were applied so the "
+                           + "caller knows whether to reload; `skipped` means a poll ran too recently.")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> refresh(
+            @RequestParam(value = "email", required = false) String email,
+            @RequestParam(value = "minAgeSeconds", defaultValue = "20") int minAgeSeconds) {
+
+        String userId = UserContext.getRequiredUserId();
+        List<GoogleSyncStore> targets = targets(userId, email).stream()
+                .filter(GoogleSyncStore::isTasksSyncEnabled)
+                .toList();
+
+        int applied = 0;
+        boolean skipped = true;
+        for (GoogleSyncStore store : targets) {
+            try {
+                int n = tasksSyncService.pollAccountIfStale(userId, store.getEmail(), minAgeSeconds);
+                if (n >= 0) {
+                    skipped = false;
+                    applied += n;
+                }
+            } catch (Exception e) {
+                // A refresh is opportunistic — never fail the caller's page load over it.
+                log.warn("Google Tasks: on-demand refresh failed for {}: {}", store.getEmail(), e.getMessage());
+            }
+        }
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("enabled", !targets.isEmpty());
+        data.put("applied", applied);
+        data.put("skipped", skipped);
+        return ok("google-tasks-refresh", data);
+    }
+
     // ─── List cleanup ────────────────────────────────────────────────────────────
 
     @PostMapping("/cleanup-lists")

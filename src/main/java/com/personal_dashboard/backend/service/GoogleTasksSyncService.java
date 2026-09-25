@@ -215,12 +215,34 @@ public class GoogleTasksSyncService {
 
     // ─── Inbound ─────────────────────────────────────────────────────────────────
 
-    /** Poll one account for changes made in Google Tasks (phone, web, widget). */
-    public void pollAccount(String userId, String email) throws Exception {
+    /**
+     * Poll one account for changes made in Google Tasks (phone, web, widget), but only if
+     * the last poll is older than {@code minAgeSeconds}. Returns the number of changes
+     * applied, or -1 when the poll was skipped as too recent.
+     *
+     * <p>The debounce exists because this is also driven on demand by the app opening its
+     * tasks view: without it, a few route switches would each fire a full multi-call poll
+     * at Google for data that provably cannot have changed since seconds ago.
+     */
+    public int pollAccountIfStale(String userId, String email, int minAgeSeconds) throws Exception {
         String storeId = GoogleSyncStore.storeId(userId, email);
         GoogleSyncStore store = syncStoreRepository.findById(storeId).orElse(null);
         if (store == null || store.isDisconnected() || !store.isTasksSyncEnabled()) {
-            return;
+            return -1;
+        }
+        Instant last = store.getTasksLastPolledAt();
+        if (last != null && last.isAfter(Instant.now().minusSeconds(minAgeSeconds))) {
+            return -1;
+        }
+        return pollAccount(userId, email);
+    }
+
+    /** Poll one account for changes made in Google Tasks (phone, web, widget). */
+    public int pollAccount(String userId, String email) throws Exception {
+        String storeId = GoogleSyncStore.storeId(userId, email);
+        GoogleSyncStore store = syncStoreRepository.findById(storeId).orElse(null);
+        if (store == null || store.isDisconnected() || !store.isTasksSyncEnabled()) {
+            return 0;
         }
 
         ReentrantLock lock = lockFor(storeId);
@@ -254,11 +276,13 @@ public class GoogleTasksSyncService {
             syncStoreRepository.save(store);
             log.info("Google Tasks poll complete for {} — {} change(s) applied across {} list(s)",
                     email, applied, lists.size());
+            return applied;
 
         } catch (GoogleApiExecutor.MissingScopeException e) {
             log.warn("Google Tasks: account {} has not granted the Tasks scope — disabling until reconnect", email);
             store.setTasksScopeGranted(false);
             syncStoreRepository.save(store);
+            return 0;
         } finally {
             lock.unlock();
         }

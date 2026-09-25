@@ -17,8 +17,13 @@ import java.util.List;
  * channels — there is no way to be told that something changed, so the only way to
  * learn about a task ticked off on the phone is to ask. The interval is the whole
  * design trade-off: shorter means the dashboard catches up sooner, longer means fewer
- * calls against a 50,000/day quota. Five minutes with a handful of lists is a few
+ * calls against a 50,000/day quota. Two minutes against the shared list is a couple of
  * thousand calls a day, comfortably inside it.
+ *
+ * <p>This is the safety net, not the main path. What the user actually notices is the
+ * on-demand refresh the app fires when it opens its tasks view
+ * ({@code POST /google-tasks/refresh}); this timer is what catches changes while nobody
+ * is looking, so the dashboard is already correct by the time they do look.
  *
  * <p>One account failing never stops the others — each is polled in its own try block,
  * exactly as the notification dispatcher treats one device's failure.
@@ -34,7 +39,7 @@ public class GoogleTasksPollJob {
     @Value("${google.tasks.poll-enabled:true}")
     private boolean pollEnabled;
 
-    @Scheduled(fixedDelayString = "${google.tasks.poll-interval-ms:300000}",
+    @Scheduled(fixedDelayString = "${google.tasks.poll-interval-ms:120000}",
                initialDelayString = "${google.tasks.poll-initial-delay-ms:60000}")
     public void poll() {
         if (!pollEnabled) {
