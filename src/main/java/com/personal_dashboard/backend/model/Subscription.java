@@ -28,7 +28,21 @@ public class Subscription implements UserOwnedDocument {
 
     private BigDecimal cost;
 
+    /**
+     * Anchor due date — any one date the bill falls due on (local midnight, Asia/Kolkata).
+     * Every other due date is this plus a whole number of intervals; the client derives
+     * "next due" and "paid this cycle" from it and the linked payments.
+     */
     private Instant billingDate;
+
+    /** Category a payment is filed under. Null reads as "Subscriptions". */
+    private String category;
+
+    /** Billing interval unit: DAY | WEEK | MONTH | YEAR. Null reads as MONTH. */
+    private String intervalUnit;
+
+    /** Billing interval length in {@link #intervalUnit}s, e.g. 28 DAYs for a prepaid plan. Null reads as 1. */
+    private Integer intervalCount;
 
     @CreatedDate
     private Instant createdAt;

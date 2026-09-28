@@ -25,8 +25,19 @@ public class TransactionRequest {
     private String category;
 
     @NotBlank(message = "Type is required")
-    @Pattern(regexp = "Expense|Income", message = "Type must be 'Expense' or 'Income'")
+    @Pattern(regexp = "Expense|Income|Transfer", message = "Type must be 'Expense', 'Income' or 'Transfer'")
     private String type;
+
+    /** Transfers only; defaults to OUT. Ignored for Expense/Income. */
+    @Pattern(regexp = "OUT|IN", message = "Direction must be 'OUT' or 'IN'")
+    private String direction;
+
+    /**
+     * Links the row to a recurring bill. On update, omitting it keeps the existing link —
+     * the edit form never changes it, so a plain edit must not orphan a bill payment.
+     */
+    @Size(max = 64, message = "subscriptionId is too long")
+    private String subscriptionId;
 
     @NotBlank(message = "Date is required")
     @Pattern(regexp = "\\d{4}-\\d{2}-\\d{2}", message = "Date must be in format YYYY-MM-DD")

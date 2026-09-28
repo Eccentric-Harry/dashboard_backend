@@ -3,9 +3,11 @@ package com.personal_dashboard.backend.controller;
 import com.personal_dashboard.backend.dto.ApiMeta;
 import com.personal_dashboard.backend.dto.ApiResponse;
 import com.personal_dashboard.backend.dto.FinanceAccountDTO;
+import com.personal_dashboard.backend.dto.ReclassifyResultDTO;
 import com.personal_dashboard.backend.dto.TransactionDTO;
 import com.personal_dashboard.backend.dto.request.BalanceUpdateRequest;
 import com.personal_dashboard.backend.dto.request.BudgetUpdateRequest;
+import com.personal_dashboard.backend.dto.request.CategoryReclassifyRequest;
 import com.personal_dashboard.backend.dto.request.TransactionRequest;
 import com.personal_dashboard.backend.model.DailyFinancialLog;
 import com.personal_dashboard.backend.model.SliceRepayment;
@@ -64,7 +66,7 @@ public class FinanceController {
         @PutMapping("/budget")
         public ResponseEntity<ApiResponse<FinanceAccountDTO>> updateBudget(
                         @Valid @RequestBody BudgetUpdateRequest request) {
-                return ResponseEntity.ok(wrap(financeService.setMonthlyBudget(request.getMonthlyBudget())));
+                return ResponseEntity.ok(wrap(financeService.updateBudget(request)));
         }
 
         @PostMapping("/transactions")
@@ -85,6 +87,13 @@ public class FinanceController {
         public ResponseEntity<ApiResponse<Void>> deleteTransaction(@PathVariable String id) {
                 financeService.deleteTransaction(id);
                 return ResponseEntity.ok(wrap((Void) null));
+        }
+
+        /** Bulk rename/merge/retype one category across every day, e.g. "To Home" → Transfer "Family". */
+        @PostMapping("/categories/reclassify")
+        public ResponseEntity<ApiResponse<ReclassifyResultDTO>> reclassifyCategory(
+                        @Valid @RequestBody CategoryReclassifyRequest request) {
+                return ResponseEntity.ok(wrap(financeService.reclassifyCategory(request)));
         }
 
         @GetMapping("/slice-repayments")

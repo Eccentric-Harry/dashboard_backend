@@ -12,6 +12,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 /**
  * A user's running cash balance ("Total Balance" on the finance dashboard).
@@ -40,6 +41,16 @@ public class FinanceAccount implements UserOwnedDocument {
     /** User-configurable monthly spending budget. Defaults to 20 000 if not set. */
     @Builder.Default
     private BigDecimal monthlyBudget = BigDecimal.valueOf(20_000);
+
+    /**
+     * What the budget covers: "ALL" spending (the default, and the behaviour before this
+     * field existed) or "FLEX" — everyday spending only, with fixed costs such as rent and
+     * recurring bills planned separately. Null reads as ALL.
+     */
+    private String budgetScope;
+
+    /** Categories counted as fixed under a FLEX budget. Null means {@code MoneyFlow.DEFAULT_FIXED_CATEGORIES}. */
+    private List<String> fixedCategories;
 
     @CreatedDate
     private Instant createdAt;

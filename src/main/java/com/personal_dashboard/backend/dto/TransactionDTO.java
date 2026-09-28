@@ -19,7 +19,13 @@ public class TransactionDTO {
 
     private String category;
 
-    private String type; // "Expense" | "Income"
+    private String type; // "Expense" | "Income" | "Transfer"
+
+    /** Transfers only: "OUT" | "IN". */
+    private String direction;
+
+    /** Recurring bill this row pays, if any. */
+    private String subscriptionId;
 
     private String date;
 }

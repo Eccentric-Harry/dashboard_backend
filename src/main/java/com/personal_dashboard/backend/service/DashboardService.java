@@ -3,6 +3,7 @@ package com.personal_dashboard.backend.service;
 import com.personal_dashboard.backend.dto.*;
 import com.personal_dashboard.backend.model.*;
 import com.personal_dashboard.backend.repository.*;
+import com.personal_dashboard.backend.util.MoneyFlow;
 import com.personal_dashboard.backend.util.ParallelReads;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -132,7 +133,7 @@ public class DashboardService {
                                 monthStart.format(DateTimeFormatter.ISO_LOCAL_DATE),
                                 monthEnd.format(DateTimeFormatter.ISO_LOCAL_DATE));
 
-                // Separate expenses and income (see isExpense: untyped rows are spend, not income)
+                // Separate spending and income (see isExpense: untyped rows are spend; transfers are neither)
                 BigDecimal totalExpenses = transactions.stream()
                                 .filter(DashboardService::isExpense)
                                 .map(t -> BigDecimal.valueOf(t.getAmount()))
@@ -431,16 +432,16 @@ public class DashboardService {
         }
 
         /**
-         * A transaction counts as spend unless it is explicitly Income.
+         * A transaction counts as spend unless it is Income or a Transfer (money sent home,
+         * lent, saved — see {@link MoneyFlow}).
          *
-         * <p>Must stay identical to {@code FinanceService.applyToTotals}, which is what writes
-         * {@code dailyTotals} and therefore what the /finance route renders. Testing
-         * {@code "Expense".equals(type)} instead silently drops every row with a null {@code type}
-         * — 140 of 301 transactions in production, ₹1.22L — so /home under-reported the same month
-         * that /finance reported correctly. Categories, not this flag, decide the breakdown.
+         * <p>Delegates to {@link MoneyFlow#isSpending}, the same rule {@code FinanceService} uses
+         * to write {@code dailyTotals}. Testing {@code "Expense".equals(type)} instead silently
+         * drops every row with a null {@code type} — 140 of 301 transactions in production once,
+         * ₹1.22L — so /home under-reported the same month that /finance reported correctly.
          */
         private static boolean isExpense(TransactionDTO t) {
-                return !"Income".equalsIgnoreCase(t.getType());
+                return MoneyFlow.isSpending(t.getType());
         }
 
         /**
@@ -470,17 +471,43 @@ public class DashboardService {
                                                                 t -> BigDecimal.valueOf(t.getAmount()),
                                                                 BigDecimal::add)));
 
-                // Use the user's persisted monthly budget (falls back to 20 000 if never set)
-                BigDecimal monthlyBudget = financeService.getMonthlyBudget();
+                // The user's persisted budget and what it covers (falls back to 20 000 / ALL)
+                FinanceService.BudgetSettings settings = financeService.getBudgetSettings();
+                BigDecimal monthlyBudget = settings.monthlyBudget();
+                Set<String> fixedLower = settings.fixedLower();
+
+                // Under a FLEX budget, fixed costs (rent, recurring bills) are tracked but not
+                // measured against the budget — same predicate as lib/finance-ledger.ts.
+                BigDecimal budgetedSpent = transactions.stream()
+                                .filter(DashboardService::isExpense)
+                                .filter(t -> MoneyFlow.countsTowardBudget(settings.scope(), t.getCategory(),
+                                                t.getSubscriptionId(), fixedLower))
+                                .map(t -> BigDecimal.valueOf(t.getAmount()))
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                BigDecimal fixedSpent = transactions.stream()
+                                .filter(DashboardService::isExpense)
+                                .filter(t -> MoneyFlow.isFixed(t.getCategory(), t.getSubscriptionId(), fixedLower))
+                                .map(t -> BigDecimal.valueOf(t.getAmount()))
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                BigDecimal transferredOut = transactions.stream()
+                                .filter(t -> MoneyFlow.isTransfer(t.getType())
+                                                && !MoneyFlow.IN.equalsIgnoreCase(t.getDirection()))
+                                .map(t -> BigDecimal.valueOf(t.getAmount()))
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
                 // Build response
                 Map<String, Object> response = new LinkedHashMap<>();
                 response.put("month", month.format(DateTimeFormatter.ofPattern("yyyy-MM")));
                 response.put("totalSpent", totalExpenses.doubleValue());
+                response.put("budgetedSpent", budgetedSpent.doubleValue());
+                response.put("fixedSpent", fixedSpent.doubleValue());
+                response.put("transferredOut", transferredOut.doubleValue());
+                response.put("budgetScope", settings.scope());
+                response.put("fixedCategories", settings.fixedCategories());
                 response.put("monthlyBudget", monthlyBudget.doubleValue());
-                response.put("budgetRemaining", monthlyBudget.subtract(totalExpenses).doubleValue());
+                response.put("budgetRemaining", monthlyBudget.subtract(budgetedSpent).doubleValue());
                 response.put("budgetUtilization", monthlyBudget.compareTo(BigDecimal.ZERO) > 0
-                                ? totalExpenses.divide(monthlyBudget, 4, java.math.RoundingMode.HALF_UP).doubleValue() * 100
+                                ? budgetedSpent.divide(monthlyBudget, 4, java.math.RoundingMode.HALF_UP).doubleValue() * 100
                                 : 0.0);
                 response.put("categoryBreakdown", categorySpend.entrySet().stream()
                                 .collect(Collectors.toMap(

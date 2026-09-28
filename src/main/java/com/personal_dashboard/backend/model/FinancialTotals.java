@@ -18,4 +18,12 @@ public class FinancialTotals {
     
     @Builder.Default
     private BigDecimal totalIncome = BigDecimal.ZERO;
+
+    /** Transfers out (sent home, lent, saved) — never part of totalExpense. */
+    @Builder.Default
+    private BigDecimal totalTransferOut = BigDecimal.ZERO;
+
+    /** Transfers in (a loan paid back, money back from savings) — never part of totalIncome. */
+    @Builder.Default
+    private BigDecimal totalTransferIn = BigDecimal.ZERO;
 }
