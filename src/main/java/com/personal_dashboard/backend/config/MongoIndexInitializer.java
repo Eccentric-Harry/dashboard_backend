@@ -3,6 +3,10 @@ package com.personal_dashboard.backend.config;
 import com.personal_dashboard.backend.model.AuthToken;
 import com.personal_dashboard.backend.model.CalendarSyncMapping;
 import com.personal_dashboard.backend.model.DailyTask;
+import com.personal_dashboard.backend.model.Goal;
+import com.personal_dashboard.backend.model.GoalCamp;
+import com.personal_dashboard.backend.model.GoalCheckIn;
+import com.personal_dashboard.backend.model.GoalKit;
 import com.personal_dashboard.backend.model.GoogleTaskListMapping;
 import com.personal_dashboard.backend.model.MindEntry;
 import com.personal_dashboard.backend.model.PushSubscription;
@@ -55,6 +59,12 @@ import java.time.Duration;
  *   <li>{@code task_sync_mappings (userId, accountEmail)} — the status/diagnostics counts.</li>
  *   <li>{@code google_task_lists (userId, accountEmail)} — read at the top of every poll.</li>
  *   <li>{@code mind_entries (userId, date)} — every /mind read.</li>
+ *   <li>{@code goals (userId, status)} and {@code goal_checkins (userId, goalId, date)} — the
+ *       /goals board; its all-check-ins read uses the {@code userId} prefix.</li>
+ *   <li>{@code goal_camps.userId} <em>unique</em> — one camp per user. GoalCampService creates
+ *       it with an upsert on first write; the uniqueness is what settles two first writes racing.</li>
+ *   <li>{@code goal_kits (userId, goalId)} <em>unique</em> — one kit per goal world, created by
+ *       GoalKitService's first page upsert; the uniqueness settles two first saves racing.</li>
  *   <li>{@code push_subscriptions.endpoint} <em>unique</em> — an endpoint identifies one device,
  *       so this is what stops two tabs subscribing at once from creating two rows and pushing
  *       the same alert twice. The uniqueness is the mechanism, not a nicety.</li>
@@ -91,6 +101,10 @@ public class MongoIndexInitializer {
         ensure(TaskSyncMapping.class, new Index().on("userId", Sort.Direction.ASC).on("accountEmail", Sort.Direction.ASC).named("user_account_idx"));
         ensure(GoogleTaskListMapping.class, new Index().on("userId", Sort.Direction.ASC).on("accountEmail", Sort.Direction.ASC).named("user_account_idx"));
         ensure(MindEntry.class, new Index().on("userId", Sort.Direction.ASC).on("date", Sort.Direction.ASC).named("user_date_idx"));
+        ensure(Goal.class, new Index().on("userId", Sort.Direction.ASC).on("status", Sort.Direction.ASC).named("user_status_idx"));
+        ensure(GoalCamp.class, new Index().on("userId", Sort.Direction.ASC).unique().named("user_unique"));
+        ensure(GoalKit.class, new Index().on("userId", Sort.Direction.ASC).on("goalId", Sort.Direction.ASC).unique().named("user_goal_unique"));
+        ensure(GoalCheckIn.class, new Index().on("userId", Sort.Direction.ASC).on("goalId", Sort.Direction.ASC).on("date", Sort.Direction.ASC).named("user_goal_date_idx"));
         ensure(PushSubscription.class, new Index().on("endpoint", Sort.Direction.ASC).unique().named("endpoint_unique"));
         ensure(PushSubscription.class, new Index().on("userId", Sort.Direction.ASC).on("active", Sort.Direction.ASC).named("user_active_idx"));
         ensure(ScheduledNotification.class, new Index().on("status", Sort.Direction.ASC).on("fireAt", Sort.Direction.ASC).on("nextAttemptAt", Sort.Direction.ASC).named("status_fire_attempt_idx"));
