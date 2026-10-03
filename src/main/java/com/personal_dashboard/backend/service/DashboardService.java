@@ -481,7 +481,7 @@ public class DashboardService {
                 BigDecimal budgetedSpent = transactions.stream()
                                 .filter(DashboardService::isExpense)
                                 .filter(t -> MoneyFlow.countsTowardBudget(settings.scope(), t.getCategory(),
-                                                t.getSubscriptionId(), fixedLower))
+                                                t.getSubscriptionId(), t.getGoalId(), fixedLower))
                                 .map(t -> BigDecimal.valueOf(t.getAmount()))
                                 .reduce(BigDecimal.ZERO, BigDecimal::add);
                 BigDecimal fixedSpent = transactions.stream()

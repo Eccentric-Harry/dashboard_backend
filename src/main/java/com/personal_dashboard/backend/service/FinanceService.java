@@ -5,6 +5,7 @@ import com.personal_dashboard.backend.dto.ReclassifyResultDTO;
 import com.personal_dashboard.backend.dto.TransactionDTO;
 import com.personal_dashboard.backend.dto.request.BudgetUpdateRequest;
 import com.personal_dashboard.backend.dto.request.CategoryReclassifyRequest;
+import com.personal_dashboard.backend.dto.request.IncomePlanRequest;
 import com.personal_dashboard.backend.dto.request.TransactionRequest;
 import com.personal_dashboard.backend.model.DailyFinancialLog;
 import com.personal_dashboard.backend.model.FinanceAccount;
@@ -27,6 +28,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,6 +99,67 @@ public class FinanceService {
         return out;
     }
 
+    /**
+     * Every savings goal's money, derived from the ledger: the Transfer OUT rows that set
+     * money aside, the Transfer IN rows that took it back out, and the purchases paid for
+     * from it. Progress is never stored on the goal, so deleting a mistaken row fixes it.
+     * Reads every day the user has logged — a goal can be older than the UI's window.
+     */
+    public Map<String, GoalTally> tallyGoals() {
+        String userId = UserContext.getRequiredUserId();
+        Map<String, GoalTally> out = new HashMap<>();
+        for (DailyFinancialLog dailyLog : dailyFinancialLogRepository.findByUserId(userId)) {
+            if (dailyLog.getTransactions() == null) continue;
+            for (List<FinancialTransaction> txs : dailyLog.getTransactions().values()) {
+                if (txs == null) continue;
+                for (FinancialTransaction tx : txs) {
+                    if (!MoneyFlow.isFromSavings(tx.getGoalId())) continue;
+                    out.computeIfAbsent(tx.getGoalId(), k -> new GoalTally()).add(tx, dailyLog.getDateString());
+                }
+            }
+        }
+        return out;
+    }
+
+    /** One goal's ledger totals. {@link #saved()} is what's still set aside. */
+    public static final class GoalTally {
+        private BigDecimal setAside = BigDecimal.ZERO;
+        private BigDecimal takenOut = BigDecimal.ZERO;
+        private BigDecimal spent = BigDecimal.ZERO;
+        private int contributions;
+        private String firstDate;
+        private String lastDate;
+
+        void add(FinancialTransaction tx, String date) {
+            BigDecimal amount = zeroIfNull(tx.getAmount());
+            if (MoneyFlow.isTransfer(tx.getType())) {
+                if (MoneyFlow.IN.equals(MoneyFlow.normalizeDirection(tx.getType(), tx.getDirection()))) {
+                    takenOut = takenOut.add(amount);
+                } else {
+                    setAside = setAside.add(amount);
+                    contributions++;
+                    if (date != null && (firstDate == null || date.compareTo(firstDate) < 0)) firstDate = date;
+                    if (date != null && (lastDate == null || date.compareTo(lastDate) > 0)) lastDate = date;
+                }
+            } else if (MoneyFlow.isSpending(tx.getType())) {
+                spent = spent.add(amount);
+            }
+        }
+
+        public BigDecimal setAside() { return setAside; }
+        public BigDecimal takenOut() { return takenOut; }
+        public BigDecimal spent() { return spent; }
+        public int contributions() { return contributions; }
+        public String firstDate() { return firstDate; }
+        public String lastDate() { return lastDate; }
+
+        /** Money still in the goal: set aside − taken out (never below zero). */
+        public BigDecimal saved() {
+            BigDecimal net = setAside.subtract(takenOut);
+            return net.signum() < 0 ? BigDecimal.ZERO : net;
+        }
+    }
+
     // ─── Account / Total Balance ──────────────────────────────────────────
 
     /** Current running balance for the user (creates a zero account on first access). */
@@ -147,6 +210,16 @@ public class FinanceService {
         return toDto(financeAccountRepository.save(account));
     }
 
+    /** Sets the declared take-home pay and payday that savings goals plan against. */
+    public FinanceAccountDTO updateIncomePlan(IncomePlanRequest request) {
+        FinanceAccount account = getOrCreateAccount();
+        log.info("Setting income plan (takeHome={}, payday={}) for userId={}",
+                request.getTakeHomeMonthly(), request.getPayday(), account.getUserId());
+        account.setTakeHomeMonthly(request.getTakeHomeMonthly());
+        account.setPayday(request.getPayday());
+        return toDto(financeAccountRepository.save(account));
+    }
+
     /** The budget and what it covers, for aggregations that must match /finance's own maths. */
     public BudgetSettings getBudgetSettings() {
         FinanceAccount account = getOrCreateAccount();
@@ -176,6 +249,7 @@ public class FinanceService {
                 .type(request.getType())
                 .direction(MoneyFlow.normalizeDirection(request.getType(), request.getDirection()))
                 .subscriptionId(blankToNull(request.getSubscriptionId()))
+                .goalId(blankToNull(request.getGoalId()))
                 .timestamp(timestamp)
                 .build();
 
@@ -201,6 +275,7 @@ public class FinanceService {
         String subscriptionId = request.getSubscriptionId() != null
                 ? blankToNull(request.getSubscriptionId())
                 : oldTx.getSubscriptionId();
+        String goalId = request.getGoalId() != null ? blankToNull(request.getGoalId()) : oldTx.getGoalId();
         FinancialTransaction tx = FinancialTransaction.builder()
                 .id(id) // keep the stable id across edits
                 .description(request.getDescription())
@@ -208,6 +283,7 @@ public class FinanceService {
                 .type(request.getType())
                 .direction(MoneyFlow.normalizeDirection(request.getType(), request.getDirection()))
                 .subscriptionId(subscriptionId)
+                .goalId(goalId)
                 .timestamp(timestamp)
                 .build();
 
@@ -409,6 +485,8 @@ public class FinanceService {
                 .monthlyBudget(budget.doubleValue())
                 .budgetScope(MoneyFlow.normalizeScope(account.getBudgetScope()))
                 .fixedCategories(effectiveFixedCategories(account))
+                .takeHomeMonthly(account.getTakeHomeMonthly() != null ? account.getTakeHomeMonthly().doubleValue() : null)
+                .payday(account.getPayday())
                 .build();
     }
 
@@ -463,6 +541,7 @@ public class FinanceService {
                 .type(tx.getType())
                 .direction(tx.getDirection())
                 .subscriptionId(tx.getSubscriptionId())
+                .goalId(tx.getGoalId())
                 .date(tx.getTimestamp() != null ? tx.getTimestamp().toString() : Instant.EPOCH.toString())
                 .build();
     }

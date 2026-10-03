@@ -38,19 +38,29 @@ class MoneyFlowTest {
     @Test
     void flexBudgetExcludesFixedCategoriesAndBillPayments() {
         Set<String> fixed = MoneyFlow.fixedCategorySet(null);
-        assertFalse(MoneyFlow.countsTowardBudget("FLEX", "Rent", null, fixed));
-        assertFalse(MoneyFlow.countsTowardBudget("FLEX", " bills ", null, fixed));
-        assertFalse(MoneyFlow.countsTowardBudget("FLEX", "Entertainment", "sub-1", fixed));
-        assertTrue(MoneyFlow.countsTowardBudget("FLEX", "Food", null, fixed));
+        assertFalse(MoneyFlow.countsTowardBudget("FLEX", "Rent", null, null, fixed));
+        assertFalse(MoneyFlow.countsTowardBudget("FLEX", " bills ", null, null, fixed));
+        assertFalse(MoneyFlow.countsTowardBudget("FLEX", "Entertainment", "sub-1", null, fixed));
+        assertTrue(MoneyFlow.countsTowardBudget("FLEX", "Food", null, null, fixed));
         // ALL (and anything unknown) counts every spending row.
-        assertTrue(MoneyFlow.countsTowardBudget("ALL", "Rent", null, fixed));
-        assertTrue(MoneyFlow.countsTowardBudget(null, "Rent", "sub-1", fixed));
+        assertTrue(MoneyFlow.countsTowardBudget("ALL", "Rent", null, null, fixed));
+        assertTrue(MoneyFlow.countsTowardBudget(null, "Rent", "sub-1", null, fixed));
     }
 
     @Test
     void customFixedListReplacesDefaults() {
         Set<String> fixed = MoneyFlow.fixedCategorySet(List.of("Rent"));
-        assertTrue(MoneyFlow.countsTowardBudget("FLEX", "Bills", null, fixed));
-        assertFalse(MoneyFlow.countsTowardBudget("FLEX", "rent", null, fixed));
+        assertTrue(MoneyFlow.countsTowardBudget("FLEX", "Bills", null, null, fixed));
+        assertFalse(MoneyFlow.countsTowardBudget("FLEX", "rent", null, null, fixed));
+    }
+
+    @Test
+    void purchasesFromSavingsNeverCountAgainstTheBudget() {
+        Set<String> fixed = MoneyFlow.fixedCategorySet(null);
+        assertFalse(MoneyFlow.countsTowardBudget("ALL", "Shopping", null, "goal-1", fixed));
+        assertFalse(MoneyFlow.countsTowardBudget("FLEX", "Shopping", null, "goal-1", fixed));
+        assertTrue(MoneyFlow.countsTowardBudget("ALL", "Shopping", null, " ", fixed));
+        assertTrue(MoneyFlow.isFromSavings("goal-1"));
+        assertFalse(MoneyFlow.isFromSavings(null));
     }
 }

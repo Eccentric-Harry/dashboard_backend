@@ -23,4 +23,10 @@ public class FinanceAccountDTO {
 
     /** Categories treated as fixed under a FLEX budget (defaults applied). Never null. */
     private List<String> fixedCategories;
+
+    /** Declared monthly take-home pay; null when not set. */
+    private Double takeHomeMonthly;
+
+    /** Day of the month pay lands (1–31); null when not set. */
+    private Integer payday;
 }

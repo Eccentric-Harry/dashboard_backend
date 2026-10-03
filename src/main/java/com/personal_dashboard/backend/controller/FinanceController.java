@@ -8,6 +8,7 @@ import com.personal_dashboard.backend.dto.TransactionDTO;
 import com.personal_dashboard.backend.dto.request.BalanceUpdateRequest;
 import com.personal_dashboard.backend.dto.request.BudgetUpdateRequest;
 import com.personal_dashboard.backend.dto.request.CategoryReclassifyRequest;
+import com.personal_dashboard.backend.dto.request.IncomePlanRequest;
 import com.personal_dashboard.backend.dto.request.TransactionRequest;
 import com.personal_dashboard.backend.model.DailyFinancialLog;
 import com.personal_dashboard.backend.model.SliceRepayment;
@@ -67,6 +68,13 @@ public class FinanceController {
         public ResponseEntity<ApiResponse<FinanceAccountDTO>> updateBudget(
                         @Valid @RequestBody BudgetUpdateRequest request) {
                 return ResponseEntity.ok(wrap(financeService.updateBudget(request)));
+        }
+
+        /** Declared take-home pay + payday, which savings goals plan against. */
+        @PutMapping("/account/income")
+        public ResponseEntity<ApiResponse<FinanceAccountDTO>> updateIncomePlan(
+                        @Valid @RequestBody IncomePlanRequest request) {
+                return ResponseEntity.ok(wrap(financeService.updateIncomePlan(request)));
         }
 
         @PostMapping("/transactions")

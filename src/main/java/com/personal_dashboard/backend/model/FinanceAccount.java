@@ -52,6 +52,16 @@ public class FinanceAccount implements UserOwnedDocument {
     /** Categories counted as fixed under a FLEX budget. Null means {@code MoneyFlow.DEFAULT_FIXED_CATEGORIES}. */
     private List<String> fixedCategories;
 
+    /**
+     * Monthly take-home pay, declared once so savings goals can tell whether a pace fits.
+     * Nothing is logged as income today, so without it "can I afford this?" stays unknown
+     * — never treated as ₹0. Null = not set.
+     */
+    private BigDecimal takeHomeMonthly;
+
+    /** Day of the month pay lands, 1–31 (31 = the month's last day). Null = not set. */
+    private Integer payday;
+
     @CreatedDate
     private Instant createdAt;
 

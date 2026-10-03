@@ -33,5 +33,11 @@ public class FinancialTransaction {
     private String direction;
     /** Set when this row is a payment against a recurring bill ({@link Subscription}). */
     private String subscriptionId;
+    /**
+     * Set when this row moves money into or out of a savings goal ({@link SavingsGoal}):
+     * a Transfer OUT sets money aside, a Transfer IN takes it back out, and an Expense is a
+     * purchase paid for from the goal. A goal's progress is derived from these rows.
+     */
+    private String goalId;
     private Instant timestamp;
 }

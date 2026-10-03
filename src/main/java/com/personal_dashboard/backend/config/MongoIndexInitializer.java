@@ -5,6 +5,7 @@ import com.personal_dashboard.backend.model.CalendarSyncMapping;
 import com.personal_dashboard.backend.model.DailyTask;
 import com.personal_dashboard.backend.model.GoogleTaskListMapping;
 import com.personal_dashboard.backend.model.MindEntry;
+import com.personal_dashboard.backend.model.SavingsGoal;
 import com.personal_dashboard.backend.model.PushSubscription;
 import com.personal_dashboard.backend.model.ScheduledNotification;
 import com.personal_dashboard.backend.model.SyncOutboxEntry;
@@ -55,6 +56,7 @@ import java.time.Duration;
  *   <li>{@code task_sync_mappings (userId, accountEmail)} — the status/diagnostics counts.</li>
  *   <li>{@code google_task_lists (userId, accountEmail)} — read at the top of every poll.</li>
  *   <li>{@code mind_entries (userId, date)} — every /mind read.</li>
+ *   <li>{@code savings_goals.userId} — every /finance load lists the user's goals.</li>
  *   <li>{@code push_subscriptions.endpoint} <em>unique</em> — an endpoint identifies one device,
  *       so this is what stops two tabs subscribing at once from creating two rows and pushing
  *       the same alert twice. The uniqueness is the mechanism, not a nicety.</li>
@@ -91,6 +93,7 @@ public class MongoIndexInitializer {
         ensure(TaskSyncMapping.class, new Index().on("userId", Sort.Direction.ASC).on("accountEmail", Sort.Direction.ASC).named("user_account_idx"));
         ensure(GoogleTaskListMapping.class, new Index().on("userId", Sort.Direction.ASC).on("accountEmail", Sort.Direction.ASC).named("user_account_idx"));
         ensure(MindEntry.class, new Index().on("userId", Sort.Direction.ASC).on("date", Sort.Direction.ASC).named("user_date_idx"));
+        ensure(SavingsGoal.class, new Index().on("userId", Sort.Direction.ASC).named("user_idx"));
         ensure(PushSubscription.class, new Index().on("endpoint", Sort.Direction.ASC).unique().named("endpoint_unique"));
         ensure(PushSubscription.class, new Index().on("userId", Sort.Direction.ASC).on("active", Sort.Direction.ASC).named("user_active_idx"));
         ensure(ScheduledNotification.class, new Index().on("status", Sort.Direction.ASC).on("fireAt", Sort.Direction.ASC).on("nextAttemptAt", Sort.Direction.ASC).named("status_fire_attempt_idx"));

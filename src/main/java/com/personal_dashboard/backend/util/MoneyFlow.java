@@ -101,9 +101,24 @@ public final class MoneyFlow {
         return category != null && fixedLower.contains(category.trim().toLowerCase(Locale.ROOT));
     }
 
-    /** Whether a spending row counts against the monthly budget under {@code scope}. */
-    public static boolean countsTowardBudget(String scope, String category, String subscriptionId,
+    /**
+     * A purchase paid for from a savings goal. It is still spending — the money is gone —
+     * but it was planned and saved for over earlier months, so it never counts against
+     * this month's budget (otherwise buying the phone you saved for reads as "₹1.5L over").
+     */
+    public static boolean isFromSavings(String goalId) {
+        return goalId != null && !goalId.isBlank();
+    }
+
+    /**
+     * Whether a spending row counts against the monthly budget under {@code scope}. Keep
+     * identical to {@code lib/finance-ledger.ts#countsTowardBudget}.
+     */
+    public static boolean countsTowardBudget(String scope, String category, String subscriptionId, String goalId,
             Set<String> fixedLower) {
+        if (isFromSavings(goalId)) {
+            return false;
+        }
         return !SCOPE_FLEX.equals(normalizeScope(scope)) || !isFixed(category, subscriptionId, fixedLower);
     }
 }

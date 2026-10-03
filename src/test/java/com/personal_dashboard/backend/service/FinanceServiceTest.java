@@ -114,6 +114,60 @@ class FinanceServiceTest {
     }
 
     @Test
+    void editKeepsTheGoalLinkWhenTheFormOmitsIt() {
+        FinancialTransaction setAside = FinancialTransaction.builder()
+                .id("tx2").description("Set aside").amount(new BigDecimal("5000")).type("Transfer").direction("OUT")
+                .goalId("goal-1").timestamp(Instant.parse("2026-09-28T06:00:00Z")).build();
+        DailyFinancialLog day = dayWith("Savings", setAside);
+        when(logRepository.findByUserId("u1")).thenReturn(List.of(day));
+        when(logRepository.findByUserIdAndDateString(anyString(), anyString())).thenReturn(Optional.of(day));
+
+        financeService.updateTransaction("tx2", request("Transfer", "OUT", "Savings", "6000"));
+
+        assertEquals("goal-1", day.getTransactions().get("Savings").get(0).getGoalId());
+    }
+
+    @Test
+    void goalMoneyIsDerivedFromLinkedRows() {
+        DailyFinancialLog sep = dayWith("Savings", FinancialTransaction.builder()
+                .id("a").amount(new BigDecimal("20000")).type("Transfer").direction("OUT").goalId("phone").build());
+        sep.setDateString("2026-09-01");
+        sep.getTransactions().get("Savings").add(FinancialTransaction.builder()
+                .id("b").amount(new BigDecimal("3000")).type("Transfer").direction("IN").goalId("phone").build());
+        // Unlinked savings and ordinary spending never touch a goal.
+        sep.getTransactions().get("Savings").add(FinancialTransaction.builder()
+                .id("c").amount(new BigDecimal("999")).type("Transfer").direction("OUT").build());
+        DailyFinancialLog oct = dayWith("Savings", FinancialTransaction.builder()
+                .id("d").amount(new BigDecimal("15000")).type("Transfer").direction("OUT").goalId("phone").build());
+        oct.setDateString("2026-10-01");
+        oct.getTransactions().put("Shopping", new ArrayList<>(List.of(FinancialTransaction.builder()
+                .id("e").amount(new BigDecimal("1200")).type("Expense").goalId("phone").build())));
+        when(logRepository.findByUserId("u1")).thenReturn(List.of(oct, sep));
+
+        FinanceService.GoalTally phone = financeService.tallyGoals().get("phone");
+
+        assertEquals(new BigDecimal("35000"), phone.setAside());
+        assertEquals(new BigDecimal("3000"), phone.takenOut());
+        assertEquals(new BigDecimal("32000"), phone.saved());
+        assertEquals(new BigDecimal("1200"), phone.spent());
+        assertEquals(2, phone.contributions());
+        assertEquals("2026-09-01", phone.firstDate());
+        assertEquals("2026-10-01", phone.lastDate());
+        assertEquals(1, financeService.tallyGoals().size());
+    }
+
+    @Test
+    void incomePlanIsStoredAndReturned() {
+        FinanceAccountDTO dto = financeService.updateIncomePlan(
+                com.personal_dashboard.backend.dto.request.IncomePlanRequest.builder()
+                        .takeHomeMonthly(new BigDecimal("85000")).payday(1).build());
+
+        assertEquals(85000.0, dto.getTakeHomeMonthly());
+        assertEquals(1, dto.getPayday());
+        assertEquals(new BigDecimal("85000"), account.getTakeHomeMonthly());
+    }
+
+    @Test
     void reclassifyTurnsLegacyHomeSpendingIntoFamilyTransfersWithoutMovingBalance() {
         FinancialTransaction gold = FinancialTransaction.builder()
                 .id("g").description("Gold").amount(new BigDecimal("30000")).type("Expense").build();

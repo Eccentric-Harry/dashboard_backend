@@ -39,6 +39,10 @@ public class TransactionRequest {
     @Size(max = 64, message = "subscriptionId is too long")
     private String subscriptionId;
 
+    /** Links the row to a savings goal. Like {@code subscriptionId}, omitting it on update keeps the link. */
+    @Size(max = 64, message = "goalId is too long")
+    private String goalId;
+
     @NotBlank(message = "Date is required")
     @Pattern(regexp = "\\d{4}-\\d{2}-\\d{2}", message = "Date must be in format YYYY-MM-DD")
     private String date;

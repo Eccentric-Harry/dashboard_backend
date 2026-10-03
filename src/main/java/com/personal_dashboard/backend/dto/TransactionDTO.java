@@ -27,5 +27,8 @@ public class TransactionDTO {
     /** Recurring bill this row pays, if any. */
     private String subscriptionId;
 
+    /** Savings goal this row sets aside for, takes out of, or was bought from, if any. */
+    private String goalId;
+
     private String date;
 }
