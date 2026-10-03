@@ -82,6 +82,9 @@ public class SavingsGoal implements UserOwnedDocument {
     private String boughtOn;
     private BigDecimal boughtFor;
 
+    /** Photos, highlights and the user's reasons — what it looks like. Managed by the showcase endpoints only. */
+    private GoalShowcase showcase;
+
     @CreatedDate
     private Instant createdAt;
 

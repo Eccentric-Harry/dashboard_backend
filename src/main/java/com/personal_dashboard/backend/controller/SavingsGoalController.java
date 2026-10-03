@@ -7,7 +7,10 @@ import com.personal_dashboard.backend.dto.request.GoalArchiveRequest;
 import com.personal_dashboard.backend.dto.request.GoalMoneyRequest;
 import com.personal_dashboard.backend.dto.request.GoalPurchaseRequest;
 import com.personal_dashboard.backend.dto.request.SavingsGoalRequest;
+import com.personal_dashboard.backend.dto.request.ShowcaseFindRequest;
+import com.personal_dashboard.backend.dto.request.ShowcaseUpdateRequest;
 import com.personal_dashboard.backend.service.SavingsGoalService;
+import com.personal_dashboard.backend.service.showcase.GoalShowcaseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -29,6 +32,7 @@ import java.util.UUID;
 public class SavingsGoalController {
 
     private final SavingsGoalService savingsGoalService;
+    private final GoalShowcaseService goalShowcaseService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<SavingsGoalDTO>>> list(
@@ -73,6 +77,23 @@ public class SavingsGoalController {
     public ResponseEntity<ApiResponse<SavingsGoalDTO>> archive(
             @PathVariable String id, @RequestBody(required = false) GoalArchiveRequest request) {
         return ResponseEntity.ok(wrap(savingsGoalService.archive(id, request != null && request.isRelease())));
+    }
+
+    /**
+     * Fills the goal's showcase — from a pasted link (a page's photos, or one image), or with
+     * no link from the official page looked up by the goal's name. Can take several seconds.
+     */
+    @PostMapping("/{id}/showcase/find")
+    public ResponseEntity<ApiResponse<SavingsGoalDTO>> findShowcase(
+            @PathVariable String id, @Valid @RequestBody(required = false) ShowcaseFindRequest request) {
+        return ResponseEntity.ok(wrap(goalShowcaseService.find(id, request == null ? null : request.getUrl())));
+    }
+
+    /** Reorders or removes photos and highlights, and replaces the user's reasons. */
+    @PutMapping("/{id}/showcase")
+    public ResponseEntity<ApiResponse<SavingsGoalDTO>> updateShowcase(
+            @PathVariable String id, @Valid @RequestBody ShowcaseUpdateRequest request) {
+        return ResponseEntity.ok(wrap(goalShowcaseService.update(id, request)));
     }
 
     private static <T> ApiResponse<T> wrap(T data) {

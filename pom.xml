@@ -111,6 +111,12 @@
 			<artifactId>anthropic-java</artifactId>
 			<version>2.48.0</version>
 		</dependency>
+		<!-- HTML parsing for a savings goal's showcase: photos + highlights from a product page -->
+		<dependency>
+			<groupId>org.jsoup</groupId>
+			<artifactId>jsoup</artifactId>
+			<version>1.21.1</version>
+		</dependency>
 	</dependencies>
 
 	<build>

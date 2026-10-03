@@ -1,5 +1,6 @@
 package com.personal_dashboard.backend.dto;
 
+import com.personal_dashboard.backend.model.GoalShowcase;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -31,6 +32,8 @@ public class SavingsGoalDTO {
     private String status;
     private String boughtOn;
     private Double boughtFor;
+    /** Null until photos are found or added. */
+    private GoalShowcase showcase;
 
     /** Still set aside: total set aside − taken out. */
     private Double saved;

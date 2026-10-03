@@ -177,6 +177,18 @@ public class SavingsGoalService {
         return withTally(saved);
     }
 
+    // ─── For the showcase (GoalShowcaseService) ───────────────────────────
+
+    /** The current user's goal, or a not-found error. */
+    public SavingsGoal requireOwned(String id) {
+        return findOwned(id);
+    }
+
+    /** A goal as the client sees it, its money included. */
+    public SavingsGoalDTO view(SavingsGoal goal) {
+        return withTally(goal);
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────
 
     private SavingsGoal findOwned(String id) {
@@ -286,6 +298,7 @@ public class SavingsGoalService {
                 .status(goal.getStatus() == null ? SavingsGoal.ACTIVE : goal.getStatus())
                 .boughtOn(goal.getBoughtOn())
                 .boughtFor(toDouble(goal.getBoughtFor()))
+                .showcase(goal.getShowcase())
                 .saved(t.saved().doubleValue())
                 .setAside(t.setAside().doubleValue())
                 .takenOut(t.takenOut().doubleValue())
