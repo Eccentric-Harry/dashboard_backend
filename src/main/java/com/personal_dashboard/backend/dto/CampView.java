@@ -1,5 +1,6 @@
 package com.personal_dashboard.backend.dto;
 
+import com.personal_dashboard.backend.model.GoalCamp;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -33,6 +34,9 @@ public class CampView {
     private Map<String, String> equipped;
 
     private List<String> decor;
+
+    /** Item id → where that meadow decoration stands; missing means its default spot. */
+    private Map<String, GoalCamp.DecorSpot> decorAt;
 
     /** One entry per goal with kept weeks the chest hasn't paid out yet; empty = nothing inside. */
     private List<ChestItem> chest;

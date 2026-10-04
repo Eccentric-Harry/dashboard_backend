@@ -148,6 +148,28 @@ class GoalCampServiceTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void decorationsKeepTheirSpotsOnlyWhileTheyreOut() {
+        camp.setOwned(List.of("pond", "telescope"));
+        camp.setDecor(List.of("pond", "telescope"));
+        camp.setDecorAt(Map.of("pond", new GoalCamp.DecorSpot(0.2, 0.3), "telescope", new GoalCamp.DecorSpot(0.9, 0.1)));
+        updateMatches(1);
+
+        // No spots sent: the saved ones stay, minus the telescope that was put away.
+        service.setLook(CampLookRequest.builder().decor(List.of("pond")).build(), TODAY);
+        // Spots sent: they replace the old ones, for decorations that are out.
+        service.setLook(CampLookRequest.builder().decor(List.of("pond", "telescope"))
+                .decorAt(Map.of("telescope", new CampLookRequest.Spot(0.5, 0.5), "crown", new CampLookRequest.Spot(0.1, 0.1))).build(), TODAY);
+
+        ArgumentCaptor<Update> update = ArgumentCaptor.forClass(Update.class);
+        verify(mongoTemplate, atLeastOnce()).updateFirst(any(Query.class), update.capture(), eq(GoalCamp.class));
+        Map<String, GoalCamp.DecorSpot> kept = (Map<String, GoalCamp.DecorSpot>) ((Document) update.getAllValues().get(0).getUpdateObject().get("$set")).get("decorAt");
+        assertEquals(Map.of("pond", new GoalCamp.DecorSpot(0.2, 0.3)), kept);
+        Map<String, GoalCamp.DecorSpot> moved = (Map<String, GoalCamp.DecorSpot>) ((Document) update.getAllValues().get(1).getUpdateObject().get("$set")).get("decorAt");
+        assertEquals(Map.of("telescope", new GoalCamp.DecorSpot(0.5, 0.5)), moved);
+    }
+
+    @Test
     void theChestPaysOnlyIfNothingWasPaidSinceItWasRead() {
         // A once-a-week daily goal, so today's check-in keeps this week.
         Goal easy = Goal.builder().id("g").userId("u").title("Ten quiet minutes").measure(Goal.MEASURE_CHECK)

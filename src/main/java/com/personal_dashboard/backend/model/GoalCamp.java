@@ -53,6 +53,9 @@ public class GoalCamp implements UserOwnedDocument {
     /** Owned camp decorations on show. */
     private List<String> decor;
 
+    /** Where meadow decorations stand, by item id; one not listed stands in its default spot. */
+    private Map<String, DecorSpot> decorAt;
+
     /** Goal id → how many of its kept weeks the chest has already paid out. */
     private Map<String, Integer> chestPaid;
 
@@ -62,4 +65,13 @@ public class GoalCamp implements UserOwnedDocument {
     private Instant createdAt;
 
     private Instant updatedAt;
+
+    /** A spot in the camp's meadow: fractions (0–1) across its width and down its depth. */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class DecorSpot {
+        private double x;
+        private double y;
+    }
 }

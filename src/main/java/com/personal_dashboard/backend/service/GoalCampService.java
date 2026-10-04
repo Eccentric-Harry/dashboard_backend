@@ -88,6 +88,7 @@ public class GoalCampService {
                 .owned(c.getOwned() == null ? List.of() : c.getOwned())
                 .equipped(c.getEquipped() == null ? Map.of() : c.getEquipped())
                 .decor(c.getDecor() == null ? List.of() : c.getDecor())
+                .decorAt(c.getDecorAt() == null ? Map.of() : c.getDecorAt())
                 .chest(CampRules.chest(views, c.getChestPaid()))
                 .quests(CampRules.quests(today, goals, byGoal, claimed, ZONE))
                 .questsYesterday(yesterday)
@@ -209,7 +210,7 @@ public class GoalCampService {
         return read(userId, today);
     }
 
-    /** Names the buddy and sets what it wears and which decorations are out. */
+    /** Names the buddy and sets what it wears, which decorations are out and where they stand. */
     public CampView setLook(CampLookRequest request, LocalDate requestedToday) {
         String userId = UserContext.getRequiredUserId();
         LocalDate today = resolveToday(requestedToday);
@@ -238,12 +239,28 @@ public class GoalCampService {
                 throw new IllegalArgumentException("Buy it from Fen first.");
             }
         }
+        // Spots: the request's if it sent any, else the ones already saved — kept only for
+        // decorations still out, so a piece put away and brought back returns to its default.
+        Map<String, GoalCamp.DecorSpot> decorAt = new LinkedHashMap<>();
+        if (request.getDecorAt() != null) {
+            request.getDecorAt().forEach((id, spot) -> {
+                if (decor.contains(id) && spot != null) {
+                    decorAt.put(id, new GoalCamp.DecorSpot(spot.getX(), spot.getY()));
+                }
+            });
+        } else if (camp.getDecorAt() != null) {
+            camp.getDecorAt().forEach((id, spot) -> {
+                if (decor.contains(id)) {
+                    decorAt.put(id, spot);
+                }
+            });
+        }
         String name = request.getBuddyName() == null || request.getBuddyName().isBlank()
                 ? null
                 : request.getBuddyName().trim().replaceAll("\\s+", " ");
 
         mongoTemplate.updateFirst(new Query(Criteria.where("userId").is(userId)),
-                new Update().set("equipped", equipped).set("decor", decor).set("buddyName", name).set("updatedAt", Instant.now()),
+                new Update().set("equipped", equipped).set("decor", decor).set("decorAt", decorAt).set("buddyName", name).set("updatedAt", Instant.now()),
                 GoalCamp.class);
         return read(userId, today);
     }

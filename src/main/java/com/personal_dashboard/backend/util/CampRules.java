@@ -61,18 +61,31 @@ public final class CampRules {
             new CampItem("straw-hat", SLOT_HAT, 70),
             new CampItem("flower-crown", SLOT_HAT, 90),
             new CampItem("wizard-hat", SLOT_HAT, 160),
+            new CampItem("bucket-hat", SLOT_HAT, 65),
+            new CampItem("headphones", SLOT_HAT, 85),
             new CampItem("crown", SLOT_HAT, 260),
             new CampItem("bow-tie", SLOT_NECK, 35),
             new CampItem("bandana", SLOT_NECK, 45),
             new CampItem("scarf", SLOT_NECK, 50),
+            new CampItem("flower-lei", SLOT_NECK, 60),
+            new CampItem("medal", SLOT_NECK, 110),
             new CampItem("round-glasses", SLOT_FACE, 60),
             new CampItem("star-shades", SLOT_FACE, 90),
+            new CampItem("heart-shades", SLOT_FACE, 80),
             new CampItem("flower-bed", SLOT_DECOR, 50),
             new CampItem("bunting", SLOT_DECOR, 60),
             new CampItem("mushroom-lamps", SLOT_DECOR, 80),
             new CampItem("fairy-lights", SLOT_DECOR, 100),
             new CampItem("guitar", SLOT_DECOR, 120),
-            new CampItem("telescope", SLOT_DECOR, 180));
+            new CampItem("telescope", SLOT_DECOR, 180),
+            new CampItem("pinwheel", SLOT_DECOR, 45),
+            new CampItem("pumpkins", SLOT_DECOR, 55),
+            new CampItem("signpost", SLOT_DECOR, 70),
+            new CampItem("birdhouse", SLOT_DECOR, 75),
+            new CampItem("lamp-post", SLOT_DECOR, 90),
+            new CampItem("picnic", SLOT_DECOR, 95),
+            new CampItem("pond", SLOT_DECOR, 140),
+            new CampItem("cherry-tree", SLOT_DECOR, 220));
 
     public static final String QUEST_LIGHT_N = "light-n";
     public static final String QUEST_LIGHT_GOAL = "light-goal";
