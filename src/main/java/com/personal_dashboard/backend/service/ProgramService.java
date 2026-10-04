@@ -211,6 +211,18 @@ public class ProgramService {
                 track.setPlan(blank(plan) ? null : plan.trim());
             });
         }
+        if (request.getOpens() != null) {
+            request.getOpens().forEach((key, date) -> {
+                Program.Track track = track(program, key);
+                if (blank(date)) {
+                    track.setOpenedOn(null);
+                    return;
+                }
+                LocalDate on = LocalDate.parse(date);
+                if (on.isAfter(program.getEndDate())) throw new IllegalArgumentException("A track can't start after the program ends");
+                track.setOpenedOn(on.isBefore(program.getStartDate()) ? program.getStartDate() : on);
+            });
+        }
         program.setUpdatedAt(Instant.now());
         return view(programRepository.save(program));
     }

@@ -85,6 +85,11 @@ public class Program implements UserOwnedDocument {
         private Double floor;
         /** The user's if-then plan: "If it's 7am on Mon/Wed/Fri, then shoes on and out the door." */
         private String plan;
+        /**
+         * Set when the user starts a track before its scheduled day ("Start it now"): it's on
+         * from this date. Null keeps the schedule. Never later than the scheduled day.
+         */
+        private LocalDate openedOn;
     }
 
     @Data

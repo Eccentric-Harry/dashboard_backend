@@ -140,6 +140,21 @@ class ProgramServiceTest {
     }
 
     @Test
+    void aTrackCanStartEarlyAndGoBackToTheSchedule() {
+        Program p = owned(LocalDate.parse("2026-10-05"));
+        when(programRepository.save(any(Program.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.updateSettings("p", ProgramSettingsRequest.builder().opens(Map.of("run", "2026-10-04", "lift", "2026-10-07")).build());
+        assertEquals(LocalDate.parse("2026-10-05"), track(p, "run").getOpenedOn(), "before day 1 means day 1");
+        assertEquals(LocalDate.parse("2026-10-07"), track(p, "lift").getOpenedOn());
+
+        service.updateSettings("p", ProgramSettingsRequest.builder().opens(Map.of("run", "")).build());
+        assertNull(track(p, "run").getOpenedOn());
+        assertThrows(IllegalArgumentException.class,
+                () -> service.updateSettings("p", ProgramSettingsRequest.builder().opens(Map.of("run", "2027-06-01")).build()));
+    }
+
+    @Test
     void movingTheStartKeepsTheLengthAndTheBirthdayOnTheLastDay() {
         Program p = owned(LocalDate.parse("2026-10-05"));
         when(programRepository.save(any(Program.class))).thenAnswer(inv -> inv.getArgument(0));

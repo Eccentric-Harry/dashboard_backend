@@ -48,4 +48,13 @@ public class ProgramSettingsRequest {
     private Map<
             @Pattern(regexp = "^[a-z]{1,12}$", message = "plan keys must be track keys") String,
             @Size(max = 200, message = "each plan must be at most 200 characters") String> plans;
+
+    /**
+     * Track key → the date it starts, for a track started before its scheduled day; a blank
+     * date puts it back on the schedule. A date before day 1 means day 1.
+     */
+    @Size(max = 8, message = "at most 8 tracks")
+    private Map<
+            @Pattern(regexp = "^[a-z]{1,12}$", message = "track keys must be track keys") String,
+            @Pattern(regexp = "(\\d{4}-\\d{2}-\\d{2})?", message = "each date must be yyyy-MM-dd") String> opens;
 }
