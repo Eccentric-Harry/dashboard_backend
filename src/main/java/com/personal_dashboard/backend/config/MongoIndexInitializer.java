@@ -9,6 +9,11 @@ import com.personal_dashboard.backend.model.GoalCheckIn;
 import com.personal_dashboard.backend.model.GoalKit;
 import com.personal_dashboard.backend.model.GoogleTaskListMapping;
 import com.personal_dashboard.backend.model.MindEntry;
+import com.personal_dashboard.backend.model.Program;
+import com.personal_dashboard.backend.model.ProgramAssessment;
+import com.personal_dashboard.backend.model.ProgramLog;
+import com.personal_dashboard.backend.model.ProgramMedia;
+import com.personal_dashboard.backend.model.ProgramReview;
 import com.personal_dashboard.backend.model.PushSubscription;
 import com.personal_dashboard.backend.model.ScheduledNotification;
 import com.personal_dashboard.backend.model.SyncOutboxEntry;
@@ -65,6 +70,10 @@ import java.time.Duration;
  *       it with an upsert on first write; the uniqueness is what settles two first writes racing.</li>
  *   <li>{@code goal_kits (userId, goalId)} <em>unique</em> — one kit per goal world, created by
  *       GoalKitService's first page upsert; the uniqueness settles two first saves racing.</li>
+ *   <li>{@code programs (userId, status)}, {@code program_logs / program_assessments /
+ *       program_media (userId, programId, …)} — The Lighthouse's one read per visit.
+ *       {@code program_reviews (userId, programId, weekStart)} <em>unique</em> — one review a
+ *       week; the uniqueness settles two saves of a new week's review racing.</li>
  *   <li>{@code push_subscriptions.endpoint} <em>unique</em> — an endpoint identifies one device,
  *       so this is what stops two tabs subscribing at once from creating two rows and pushing
  *       the same alert twice. The uniqueness is the mechanism, not a nicety.</li>
@@ -105,6 +114,11 @@ public class MongoIndexInitializer {
         ensure(GoalCamp.class, new Index().on("userId", Sort.Direction.ASC).unique().named("user_unique"));
         ensure(GoalKit.class, new Index().on("userId", Sort.Direction.ASC).on("goalId", Sort.Direction.ASC).unique().named("user_goal_unique"));
         ensure(GoalCheckIn.class, new Index().on("userId", Sort.Direction.ASC).on("goalId", Sort.Direction.ASC).on("date", Sort.Direction.ASC).named("user_goal_date_idx"));
+        ensure(Program.class, new Index().on("userId", Sort.Direction.ASC).on("status", Sort.Direction.ASC).named("user_status_idx"));
+        ensure(ProgramLog.class, new Index().on("userId", Sort.Direction.ASC).on("programId", Sort.Direction.ASC).on("date", Sort.Direction.ASC).named("user_program_date_idx"));
+        ensure(ProgramReview.class, new Index().on("userId", Sort.Direction.ASC).on("programId", Sort.Direction.ASC).on("weekStart", Sort.Direction.ASC).unique().named("user_program_week_unique"));
+        ensure(ProgramAssessment.class, new Index().on("userId", Sort.Direction.ASC).on("programId", Sort.Direction.ASC).on("date", Sort.Direction.ASC).named("user_program_date_idx"));
+        ensure(ProgramMedia.class, new Index().on("userId", Sort.Direction.ASC).on("programId", Sort.Direction.ASC).on("date", Sort.Direction.ASC).named("user_program_date_idx"));
         ensure(PushSubscription.class, new Index().on("endpoint", Sort.Direction.ASC).unique().named("endpoint_unique"));
         ensure(PushSubscription.class, new Index().on("userId", Sort.Direction.ASC).on("active", Sort.Direction.ASC).named("user_active_idx"));
         ensure(ScheduledNotification.class, new Index().on("status", Sort.Direction.ASC).on("fireAt", Sort.Direction.ASC).on("nextAttemptAt", Sort.Direction.ASC).named("status_fire_attempt_idx"));
