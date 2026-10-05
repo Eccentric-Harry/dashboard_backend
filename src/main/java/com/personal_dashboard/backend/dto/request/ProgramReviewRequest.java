@@ -42,7 +42,7 @@ public class ProgramReviewRequest {
     /** Track key → its new target. Tracks left out keep theirs. */
     @Size(max = 8, message = "at most 8 targets")
     private Map<
-            @Pattern(regexp = "^(run|lift|protein|learn|english|screen|regard)$", message = "unknown track") String,
+            @Pattern(regexp = "^(run|lift|protein|learn|english|regard)$", message = "unknown track") String,
             @Valid @NotNull TargetEdit> targets;
 
     @Data
@@ -57,8 +57,5 @@ public class ProgramReviewRequest {
         @DecimalMin(value = "0", message = "floor can't be negative")
         @DecimalMax(value = "1000", message = "floor is too large")
         private Double floor;
-
-        /** Screen only: go back to the cap derived from the audit week. */
-        private Boolean auto;
     }
 }

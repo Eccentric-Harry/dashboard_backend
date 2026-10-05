@@ -16,9 +16,9 @@ import java.util.Map;
  * A fixed-length self-improvement program on /goals — the user's "90 days to 23", lived in
  * The Lighthouse world (design/LIGHTHOUSE_90_PLAN.md). One ACTIVE program per user.
  *
- * <p>Only the plan is stored here: dates, the eight tracks' targets and if-then plans, the
+ * <p>Only the plan is stored here: dates, the seven tracks' targets and if-then plans, the
  * user's answers and their letters. Everything judged from it — the day, the phase, what's
- * done, consistency, the screen cap — is derived by the client from the program's logs
+ * done, consistency — is derived by the client from the program's logs
  * (features/goals/lighthouse/program-engine.ts), so editing history fixes every view.
  *
  * <p>Targets change only through the weekly review ({@code ProgramService#saveReview}); the
@@ -77,9 +77,9 @@ public class Program implements UserOwnedDocument {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class Track {
-        /** run, lift, protein, mood, learn, english, screen, regard. */
+        /** run, lift, protein, mood, learn, english, regard. */
         private String key;
-        /** Sessions or days per week, grams, minutes, or a cap; null = derived (screen) or none (mood). */
+        /** Sessions or days per week, grams or minutes; null for mood, which is never targeted. */
         private Double target;
         /** The bad-day floor where the track has a number for it. */
         private Double floor;

@@ -7,13 +7,13 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Pure rules for {@link Program}s: the eight tracks a program starts with, and the two
+ * Pure rules for {@link Program}s: the seven tracks a program starts with, and the two
  * questionnaires' scoring. Kept free of Spring so ProgramScoringTest can pin every case.
  */
 public final class ProgramScoring {
 
     /** Track keys in display order. The client's content (program-content.ts) owns the words. */
-    public static final List<String> TRACKS = List.of("run", "lift", "protein", "mood", "learn", "english", "screen", "regard");
+    public static final List<String> TRACKS = List.of("run", "lift", "protein", "mood", "learn", "english", "regard");
 
     /** Protein that maxes out muscle gain from training (Morton et al. 2018), and the bad-day floor. */
     public static final double PROTEIN_G_PER_KG = 1.6;
@@ -28,10 +28,7 @@ public final class ProgramScoring {
     private ProgramScoring() {
     }
 
-    /**
-     * The tracks a new program starts with — the brief's targets. Screen has no number yet:
-     * its cap is derived from the audit week until a review sets one.
-     */
+    /** The tracks a new program starts with — the brief's targets. */
     public static List<Program.Track> defaultTracks(Double weightKg) {
         List<Program.Track> tracks = new ArrayList<>();
         for (String key : TRACKS) {
@@ -49,7 +46,7 @@ public final class ProgramScoring {
                 }
                 case "regard" -> t.target(1.0);
                 default -> {
-                    // mood is observed, never targeted; screen's cap comes from the audit week.
+                    // mood is observed, never targeted.
                 }
             }
             tracks.add(t.build());

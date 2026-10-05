@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-/** One action on a program track (see ProgramLog). Only the fields the track uses are set. */
+/** One action on a program track, or an urge ridden out (see ProgramLog). Only the fields the track uses are set. */
 @Data
 @Builder
 @NoArgsConstructor
@@ -24,7 +24,7 @@ import java.util.List;
 public class ProgramLogRequest {
 
     @NotBlank(message = "track is required")
-    @Pattern(regexp = "^(run|lift|protein|mood|learn|english|screen|regard)$", message = "track must be a program track")
+    @Pattern(regexp = "^(run|lift|protein|mood|learn|english|regard|urge)$", message = "track must be a program track or urge")
     private String track;
 
     @NotBlank(message = "date is required")
@@ -72,10 +72,6 @@ public class ProgramLogRequest {
     private String session;
 
     private Boolean urge;
-
-    private Boolean morningRule;
-
-    private Boolean nightRule;
 
     private Boolean stretch;
 

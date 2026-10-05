@@ -13,8 +13,9 @@ import java.util.List;
 
 /**
  * One logged action on a {@link Program} track: a run, a lift, a mood check-in, a kept
- * promise, minutes spoken, a day's screen minutes. Several per day are allowed (two kept
- * promises, two speaking sessions); the client folds a day's logs into one status.
+ * promise, minutes spoken. Several per day are allowed (two kept promises, two speaking
+ * sessions); the client folds a day's logs into one status. An urge ridden out is filed under
+ * {@code track: "urge"} — urge surfing is a tool, not one of the program's tracks.
  *
  * <p>{@link #level}: FULL (the full version), MIN (the bad-day version — still done), REST
  * (a planned rest day, logged rather than hidden), or null for evidence that isn't a
@@ -44,7 +45,7 @@ public class ProgramLog implements UserOwnedDocument {
     /** FULL, MIN, REST, or null. */
     private String level;
 
-    /** Screen minutes, mood score 1–5, protein grams (manual), speaking minutes. */
+    /** Mood score 1–5, protein grams (manual), speaking minutes. */
     private Double value;
 
     private Integer minutes;
@@ -73,14 +74,8 @@ public class ProgramLog implements UserOwnedDocument {
     /** A plan session: c25k-3-2 (week 3, run 2), lift-a, shadow… */
     private String session;
 
-    /** Screen: an urge ridden out. */
+    /** True on an {@code urge} log: an urge ridden out. */
     private Boolean urge;
-
-    /** Screen: no phone for the first 30 minutes after waking. */
-    private Boolean morningRule;
-
-    /** Screen: no phone for the last 30 minutes before sleep. */
-    private Boolean nightRule;
 
     /** English: this week's meeting stretch (speaking up once). */
     private Boolean stretch;

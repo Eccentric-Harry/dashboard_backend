@@ -315,11 +315,8 @@ public class ProgramService {
                     throw new IllegalArgumentException("A mood check-in is a score from 1 to 5.");
                 }
             }
-            case "screen" -> {
-                if (value != null && value > 1440) throw new IllegalArgumentException("A day has 1440 minutes.");
-                if (value == null && !Boolean.TRUE.equals(r.getUrge()) && r.getMorningRule() == null && r.getNightRule() == null) {
-                    throw new IllegalArgumentException("Log the minutes, a rule, or an urge ridden out.");
-                }
+            case "urge" -> {
+                if (!Boolean.TRUE.equals(r.getUrge())) throw new IllegalArgumentException("An urge log is an urge ridden out.");
             }
             case "protein" -> {
                 if (value != null && value > 500) throw new IllegalArgumentException("That's more protein than a day holds.");
@@ -347,9 +344,7 @@ public class ProgramService {
         log.setKind(trimOrNull(r.getKind()));
         log.setPursuitId(trimOrNull(r.getPursuitId()));
         log.setSession(blank(r.getSession()) ? null : r.getSession());
-        log.setUrge(r.getUrge());
-        log.setMorningRule(r.getMorningRule());
-        log.setNightRule(r.getNightRule());
+        log.setUrge("urge".equals(track) ? Boolean.TRUE : null);
         log.setStretch(r.getStretch());
     }
 
@@ -422,10 +417,6 @@ public class ProgramService {
     /** Ranges are generous on purpose — lowering a target in a review is always allowed. */
     static void applyTarget(Program.Track track, ProgramReviewRequest.TargetEdit edit) {
         String key = track.getKey();
-        if ("screen".equals(key) && Boolean.TRUE.equals(edit.getAuto())) {
-            track.setTarget(null);
-            return;
-        }
         Double target = edit.getTarget();
         if (target == null) throw new IllegalArgumentException("A new target needs a number.");
         switch (key) {
@@ -447,11 +438,6 @@ public class ProgramService {
                 track.setTarget((double) t);
                 Double floor = edit.getFloor() != null ? Double.valueOf(Math.round(edit.getFloor())) : track.getFloor();
                 if (floor != null) track.setFloor(Math.min(floor, (double) t));
-            }
-            case "screen" -> {
-                long t = Math.round(target);
-                if (t < 15 || t > 1440) throw new IllegalArgumentException("A cap between 15 minutes and a whole day.");
-                track.setTarget((double) t);
             }
             default -> throw new IllegalArgumentException("That track has no target.");
         }

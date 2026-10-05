@@ -48,7 +48,7 @@ class ProgramScoringTest {
         assertEquals(112.0, byKey.get("protein").getTarget()); // 1.6 g/kg
         assertEquals(84.0, byKey.get("protein").getFloor());   // 1.2 g/kg
         assertNull(byKey.get("mood").getTarget(), "mood is observed, never targeted");
-        assertNull(byKey.get("screen").getTarget(), "the cap comes from the audit week");
+        assertFalse(byKey.containsKey("screen"), "the screen track was retired");
         assertEquals(5.0, byKey.get("learn").getTarget());
         assertEquals(15.0, byKey.get("english").getTarget());
         assertEquals(5.0, byKey.get("english").getFloor());

@@ -101,7 +101,7 @@ class ProgramServiceTest {
     }
 
     @Test
-    void startSeedsNinetyDaysAndTheEightTracks() {
+    void startSeedsNinetyDaysAndTheSevenTracks() {
         when(programRepository.findFirstByUserIdAndStatusOrderByStartDateDesc("u", Program.ACTIVE)).thenReturn(Optional.empty());
         when(programRepository.save(any(Program.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -172,12 +172,13 @@ class ProgramServiceTest {
 
         Map<String, ProgramReviewRequest.TargetEdit> targets = new LinkedHashMap<>();
         targets.put("run", ProgramReviewRequest.TargetEdit.builder().target(2.0).build());
-        targets.put("screen", ProgramReviewRequest.TargetEdit.builder().target(180.0).build());
+        targets.put("english", ProgramReviewRequest.TargetEdit.builder().target(10.0).build());
         ProgramService.ReviewResult result = service.saveReview("p", monday, ProgramReviewRequest.builder()
                 .selfTrust(6).win("Three lifts").targets(targets).build());
 
         assertEquals(2.0, track(p, "run").getTarget());
-        assertEquals(180.0, track(p, "screen").getTarget());
+        assertEquals(10.0, track(p, "english").getTarget());
+        assertEquals(5.0, track(p, "english").getFloor(), "a floor under the new target stays");
         assertEquals(2, result.review().getChanges().size());
         assertEquals(3.0, result.review().getChanges().get(0).getFromTarget());
         assertEquals(6, result.review().getSelfTrust());
@@ -203,15 +204,7 @@ class ProgramServiceTest {
     }
 
     @Test
-    void screenCanGoBackToTheAutomaticCapAndReviewsStartOnMonday() {
-        Program p = owned(TODAY);
-        track(p, "screen").setTarget(200.0);
-        when(reviewRepository.findByUserIdAndProgramIdAndWeekStart(eq("u"), eq("p"), any())).thenReturn(Optional.empty());
-        when(reviewRepository.save(any(ProgramReview.class))).thenAnswer(inv -> inv.getArgument(0));
-        service.saveReview("p", LocalDate.parse("2026-10-19"), ProgramReviewRequest.builder().selfTrust(5)
-                .targets(Map.of("screen", ProgramReviewRequest.TargetEdit.builder().auto(true).build())).build());
-        assertNull(track(p, "screen").getTarget());
-
+    void reviewsStartOnMonday() {
         assertThrows(IllegalArgumentException.class, () -> service.saveReview("p", LocalDate.parse("2026-10-18"),
                 ProgramReviewRequest.builder().selfTrust(5).build()));
     }
@@ -273,7 +266,23 @@ class ProgramServiceTest {
                 ProgramLogRequest.builder().track("regard").date(TODAY.toString()).level("FULL").build()));
         assertThrows(IllegalArgumentException.class, () -> service.addLog("p",
                 ProgramLogRequest.builder().track("run").date(TODAY.plusDays(200).toString()).level("FULL").build()));
+        assertThrows(IllegalArgumentException.class, () -> service.addLog("p",
+                ProgramLogRequest.builder().track("urge").date(TODAY.toString()).build()));
         verify(logRepository, never()).save(any());
+        verifyNoInteractions(mindService);
+    }
+
+    @Test
+    void anUrgeRiddenOutIsFiledUnderItsOwnKey() {
+        owned(TODAY);
+        when(logRepository.save(any(ProgramLog.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ProgramLog urge = service.addLog("p", ProgramLogRequest.builder().track("urge").date(TODAY.toString()).urge(true).note("rode it out after 10 min").build());
+        assertEquals("urge", urge.getTrack());
+        assertTrue(urge.getUrge());
+
+        ProgramLog run = service.addLog("p", ProgramLogRequest.builder().track("run").date(TODAY.toString()).level("FULL").urge(true).build());
+        assertNull(run.getUrge(), "only an urge log is an urge");
         verifyNoInteractions(mindService);
     }
 
