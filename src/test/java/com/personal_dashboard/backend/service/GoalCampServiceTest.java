@@ -2,6 +2,7 @@ package com.personal_dashboard.backend.service;
 
 import com.mongodb.client.result.UpdateResult;
 import com.personal_dashboard.backend.dto.CampView;
+import com.personal_dashboard.backend.dto.request.CampFirstLightRequest;
 import com.personal_dashboard.backend.dto.request.CampLookRequest;
 import com.personal_dashboard.backend.model.Goal;
 import com.personal_dashboard.backend.model.GoalCamp;
@@ -196,5 +197,38 @@ class GoalCampServiceTest {
         // A claim "for" next month is judged against the server's today, which has no such quest.
         assertThrows(IllegalArgumentException.class,
                 () -> service.claimQuest("2026-11-01:0", LocalDate.of(2026, 11, 1)));
+    }
+
+    @Test
+    void firstLightIsForTodayOrTomorrowAndOnlyAnActiveGoal() {
+        Goal goal = Goal.builder().id("g").userId("u").status(Goal.STATUS_ACTIVE).build();
+        when(goalRepository.findByIdAndUserId("g", "u")).thenReturn(Optional.of(goal));
+        when(goalRepository.findByIdAndUserId("other", "u")).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.setFirstLight(new CampFirstLightRequest(TODAY.minusDays(1).toString(), "g"), TODAY));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.setFirstLight(new CampFirstLightRequest(TODAY.plusDays(2).toString(), "g"), TODAY));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.setFirstLight(new CampFirstLightRequest(TODAY.plusDays(1).toString(), "other"), TODAY));
+        verify(mongoTemplate, never()).updateFirst(any(Query.class), any(Update.class), eq(GoalCamp.class));
+
+        updateMatches(1);
+        service.setFirstLight(new CampFirstLightRequest(TODAY.plusDays(1).toString(), "g"), TODAY);
+        ArgumentCaptor<Update> update = ArgumentCaptor.forClass(Update.class);
+        verify(mongoTemplate).updateFirst(any(Query.class), update.capture(), eq(GoalCamp.class));
+        Document set = (Document) update.getValue().getUpdateObject().get("$set");
+        GoalCamp.FirstLight saved = (GoalCamp.FirstLight) set.get("firstLight");
+        assertEquals(TODAY.plusDays(1).toString(), saved.getDate());
+        assertEquals("g", saved.getGoalId());
+    }
+
+    @Test
+    void aStaleOrOrphanedFirstLightReadsAsNone() {
+        GoalCamp.FirstLight pick = new GoalCamp.FirstLight(TODAY.toString(), "g");
+        assertEquals(pick, GoalCampService.firstLightFor(pick, java.util.Set.of("g"), TODAY));
+        assertNull(GoalCampService.firstLightFor(pick, java.util.Set.of("g"), TODAY.plusDays(1)), "yesterday's pick is gone");
+        assertNull(GoalCampService.firstLightFor(pick, java.util.Set.of("h"), TODAY), "an archived goal's pick is gone");
+        assertNull(GoalCampService.firstLightFor(new GoalCamp.FirstLight("not-a-day", "g"), java.util.Set.of("g"), TODAY));
     }
 }

@@ -55,6 +55,9 @@ public class CampView {
      */
     private int grownWeeks;
 
+    /** Hoot's pick for today or tomorrow (still an active goal); null when there isn't one. */
+    private GoalCamp.FirstLight firstLight;
+
     @Data
     @Builder
     @NoArgsConstructor

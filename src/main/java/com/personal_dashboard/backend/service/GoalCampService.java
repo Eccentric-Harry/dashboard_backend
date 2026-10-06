@@ -4,6 +4,7 @@ import com.personal_dashboard.backend.dto.CampView;
 import com.personal_dashboard.backend.dto.CampView.ChestItem;
 import com.personal_dashboard.backend.dto.CampView.Quest;
 import com.personal_dashboard.backend.dto.GoalBoardResponse.GoalProgressView;
+import com.personal_dashboard.backend.dto.request.CampFirstLightRequest;
 import com.personal_dashboard.backend.dto.request.CampLookRequest;
 import com.personal_dashboard.backend.model.Goal;
 import com.personal_dashboard.backend.model.GoalCamp;
@@ -93,6 +94,7 @@ public class GoalCampService {
                 .quests(CampRules.quests(today, goals, byGoal, claimed, ZONE))
                 .questsYesterday(yesterday)
                 .season(CampRules.season(goals, byGoal, today))
+                .firstLight(firstLightFor(c.getFirstLight(), active, today))
                 .build();
     }
 
@@ -265,7 +267,51 @@ public class GoalCampService {
         return read(userId, today);
     }
 
+    /**
+     * Hoot's "first light" — the lantern to light first on a day, chosen the night before
+     * (or that morning). Only today or tomorrow, only an active goal of the user's own; a
+     * null goal id clears it. Nothing is ever owed for it: it's a plan, never a promise.
+     */
+    public CampView setFirstLight(CampFirstLightRequest request, LocalDate requestedToday) {
+        String userId = UserContext.getRequiredUserId();
+        LocalDate today = resolveToday(requestedToday);
+        LocalDate date;
+        try {
+            date = LocalDate.parse(request.getDate());
+        } catch (java.time.format.DateTimeParseException e) {
+            throw new IllegalArgumentException("date must be a real day, yyyy-MM-dd");
+        }
+        if (date.isBefore(today) || date.isAfter(today.plusDays(1))) {
+            throw new IllegalArgumentException("Hoot only plans for today or tomorrow.");
+        }
+        ensureCamp(userId);
+        Update update = new Update().set("updatedAt", Instant.now());
+        String goalId = request.getGoalId() == null || request.getGoalId().isBlank() ? null : request.getGoalId();
+        if (goalId == null) {
+            update.unset("firstLight");
+        } else {
+            Goal goal = goalRepository.findByIdAndUserId(goalId, userId)
+                    .filter(g -> Goal.STATUS_ACTIVE.equals(g.getStatus()))
+                    .orElseThrow(() -> new IllegalArgumentException("That lantern isn't at camp."));
+            update.set("firstLight", new GoalCamp.FirstLight(date.toString(), goal.getId()));
+        }
+        mongoTemplate.updateFirst(new Query(Criteria.where("userId").is(userId)), update, GoalCamp.class);
+        return read(userId, today);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────
+
+    /** The stored pick, if it's for today or later and its goal is still at camp. */
+    static GoalCamp.FirstLight firstLightFor(GoalCamp.FirstLight pick, Set<String> activeGoalIds, LocalDate today) {
+        if (pick == null || pick.getDate() == null || pick.getGoalId() == null || !activeGoalIds.contains(pick.getGoalId())) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(pick.getDate()).isBefore(today) ? null : pick;
+        } catch (java.time.format.DateTimeParseException e) {
+            return null;
+        }
+    }
 
     private record Snapshot(List<Goal> goals, Map<String, List<GoalCheckIn>> byGoal, List<GoalProgressView> views) {
     }

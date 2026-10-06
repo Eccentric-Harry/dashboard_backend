@@ -62,9 +62,24 @@ public class GoalCamp implements UserOwnedDocument {
     /** Claimed quest ids ("yyyy-MM-dd:slot"), pruned after a couple of weeks. */
     private List<String> questsClaimed;
 
+    /**
+     * Hoot's "first light": the lantern the user chose, the night before, to light first on
+     * {@code date}. One at a time; a pick for a day that has passed is simply ignored on read.
+     */
+    private FirstLight firstLight;
+
     private Instant createdAt;
 
     private Instant updatedAt;
+
+    /** The goal to light first on a given local day (yyyy-MM-dd). */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class FirstLight {
+        private String date;
+        private String goalId;
+    }
 
     /** A spot in the camp's meadow: fractions (0–1) across its width and down its depth. */
     @Data

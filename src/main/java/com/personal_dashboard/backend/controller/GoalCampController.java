@@ -5,6 +5,7 @@ import com.personal_dashboard.backend.dto.ApiResponse;
 import com.personal_dashboard.backend.dto.CampView;
 import com.personal_dashboard.backend.dto.request.CampBuyRequest;
 import com.personal_dashboard.backend.dto.request.CampClaimRequest;
+import com.personal_dashboard.backend.dto.request.CampFirstLightRequest;
 import com.personal_dashboard.backend.dto.request.CampLookRequest;
 import com.personal_dashboard.backend.service.GoalCampService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -64,6 +65,14 @@ public class GoalCampController {
             @Valid @RequestBody CampLookRequest request,
             @RequestParam(name = "today", required = false) String today) {
         return ok(campService.setLook(request, parse(today)), "look");
+    }
+
+    @PutMapping("/first-light")
+    @Operation(summary = "Hoot's first light", description = "The lantern to light first today or tomorrow; a null goalId clears it")
+    public ResponseEntity<ApiResponse<CampView>> setFirstLight(
+            @Valid @RequestBody CampFirstLightRequest request,
+            @RequestParam(name = "today", required = false) String today) {
+        return ok(campService.setFirstLight(request, parse(today)), "first-light");
     }
 
     private static LocalDate parse(String date) {

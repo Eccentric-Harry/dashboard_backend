@@ -15,6 +15,9 @@ import com.personal_dashboard.backend.model.ProgramLog;
 import com.personal_dashboard.backend.model.ProgramMedia;
 import com.personal_dashboard.backend.model.ProgramReview;
 import com.personal_dashboard.backend.model.SavingsGoal;
+import com.personal_dashboard.backend.model.ShoppingItem;
+import com.personal_dashboard.backend.model.ShoppingMemory;
+import com.personal_dashboard.backend.model.WishlistItem;
 import com.personal_dashboard.backend.model.PushSubscription;
 import com.personal_dashboard.backend.model.ScheduledNotification;
 import com.personal_dashboard.backend.model.SyncOutboxEntry;
@@ -76,6 +79,9 @@ import java.time.Duration;
  *       {@code program_reviews (userId, programId, weekStart)} <em>unique</em> — one review a
  *       week; the uniqueness settles two saves of a new week's review racing.</li>
  *   <li>{@code savings_goals.userId} — every /finance load lists the user's goals.</li>
+ *   <li>{@code shopping_items.userId} — every /shopping load reads the user's whole list.</li>
+ *   <li>{@code shopping_memory.userId} <em>unique</em> — one memory per user, created by the first add.</li>
+ *   <li>{@code wishlist_items.userId} — every Wishlist load reads the user's wishes.</li>
  *   <li>{@code push_subscriptions.endpoint} <em>unique</em> — an endpoint identifies one device,
  *       so this is what stops two tabs subscribing at once from creating two rows and pushing
  *       the same alert twice. The uniqueness is the mechanism, not a nicety.</li>
@@ -122,6 +128,9 @@ public class MongoIndexInitializer {
         ensure(ProgramAssessment.class, new Index().on("userId", Sort.Direction.ASC).on("programId", Sort.Direction.ASC).on("date", Sort.Direction.ASC).named("user_program_date_idx"));
         ensure(ProgramMedia.class, new Index().on("userId", Sort.Direction.ASC).on("programId", Sort.Direction.ASC).on("date", Sort.Direction.ASC).named("user_program_date_idx"));
         ensure(SavingsGoal.class, new Index().on("userId", Sort.Direction.ASC).named("user_idx"));
+        ensure(ShoppingItem.class, new Index().on("userId", Sort.Direction.ASC).named("user_idx"));
+        ensure(ShoppingMemory.class, new Index().on("userId", Sort.Direction.ASC).unique().named("user_unique"));
+        ensure(WishlistItem.class, new Index().on("userId", Sort.Direction.ASC).named("user_idx"));
         ensure(PushSubscription.class, new Index().on("endpoint", Sort.Direction.ASC).unique().named("endpoint_unique"));
         ensure(PushSubscription.class, new Index().on("userId", Sort.Direction.ASC).on("active", Sort.Direction.ASC).named("user_active_idx"));
         ensure(ScheduledNotification.class, new Index().on("status", Sort.Direction.ASC).on("fireAt", Sort.Direction.ASC).on("nextAttemptAt", Sort.Direction.ASC).named("status_fire_attempt_idx"));
